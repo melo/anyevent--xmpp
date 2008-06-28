@@ -609,6 +609,7 @@ sub _reply_iq {
    return $self->{writer}->send_iq (
       $iqnode->attr ('id'), $type, $create_cb,
       (defined $iqnode->attr ('from') ? (to => $iqnode->attr ('from')) : ()),
+      (defined $iqnode->attr ('to') ? (from => $iqnode->attr ('to')) : ()),
       %attrs
    );
 }
