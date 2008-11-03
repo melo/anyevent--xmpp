@@ -396,6 +396,10 @@ sub write_data {
    $self->SUPER::write_data ($data);
 }
 
+sub default_namespace {
+  return 'client';
+}
+
 sub handle_stanza {
    my ($self, $p, $node) = @_;
 
@@ -403,6 +407,8 @@ sub handle_stanza {
       $self->disconnect ("end of 'XML' stream encountered");
       return;
    }
+   
+   my $def_ns = $self->default_namespace;
 
    my (@res) = $self->event (recv_stanza_xml => $node);
    @res = grep $_, @res;
@@ -436,14 +442,14 @@ sub handle_stanza {
       $self->event (sasl_error => $error);
       $self->disconnect ('SASL authentication failure: ' . $error->string);
 
-   } elsif ($node->eq (client => 'iq')) {
+   } elsif ($node->eq ($def_ns => 'iq')) {
       $self->event (iq_xml => $node);
       $self->handle_iq ($node);
 
-   } elsif ($node->eq (client => 'message')) {
+   } elsif ($node->eq ($def_ns => 'message')) {
       $self->event (message_xml => $node);
 
-   } elsif ($node->eq (client => 'presence')) {
+   } elsif ($node->eq ($def_ns => 'presence')) {
       $self->event (presence_xml => $node);
 
    } elsif ($node->eq (stream => 'error')) {
