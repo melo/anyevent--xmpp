@@ -433,8 +433,8 @@ sub handle_stanza {
       $self->disconnect ('SASL authentication failure: ' . $error->string);
 
    } elsif ($node->eq ($def_ns => 'iq')) {
-      $self->event (iq_xml => $node);
-      $self->handle_iq ($node);
+      my @r = $self->event (iq_xml => $node);
+      $self->handle_iq ($node) unless grep { $_ } @r;
 
    } elsif ($node->eq ($def_ns => 'message')) {
       $self->event (message_xml => $node);
