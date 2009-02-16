@@ -12,19 +12,13 @@ use AnyEvent::Handle;
 
 AnyEvent::XMPP::SimpleConnection - Low level TCP/TLS connection
 
-=head1 SYNOPSIS
-
-   package foo;
-   use AnyEvent::XMPP::SimpleConnection;
-
-   our @ISA = qw/AnyEvent::XMPP::SimpleConnection/;
-
 =head1 DESCRIPTION
 
 This module only implements the basic low level socket and SSL handling stuff.
-It is used by L<AnyEvent::XMPP::Connection> and you shouldn't mess with it :-)
+It is used by L<AnyEvent::XMPP::Connection> and you shouldn't have to mess
+with this module at all.
 
-(NOTE: This is the part of AnyEvent::XMPP which I feel least confident about :-)
+It uses L<AnyEvent::Socket> and L<AnyEvent::Handle> for TCP and SSL.
 
 =cut
 
@@ -86,22 +80,6 @@ sub connect {
    return 1;
 }
 
-sub connected {
-   # subclass responsibility
-}
-
-sub send_buffer_empty {
-   # subclass responsibility
-}
-
-sub block_until_send_buffer_empty {
-   # subclass responsibility
-}
-
-sub debug_wrote_data {
-   # subclass responsibility
-}
-
 sub end_sockets {
    my ($self) = @_;
    delete $self->{handle};
@@ -111,7 +89,6 @@ sub write_data {
    my ($self, $data) = @_;
 
    $self->{handle}->push_write (encode_utf8 ($data));
-   $self->debug_wrote_data (encode_utf8 ($data));
    $self->{handle}->on_drain (sub {
       $self->send_buffer_empty;
    });
@@ -127,7 +104,27 @@ sub enable_ssl {
 sub disconnect {
    my ($self, $msg) = @_;
    $self->end_sockets;
-   $self->{disconnect_cb}->($self->{peer_host}, $self->{peer_port}, $msg);
+   $self->disconnected ($self->{peer_host}, $self->{peer_port}, $msg);
+}
+
+sub connected {
+   # subclass responsibility
+}
+
+sub handle_data {
+   # subclass responsibility
+}
+
+sub send_buffer_empty {
+   # subclass responsibility
+}
+
+sub block_until_send_buffer_empty {
+   # subclass responsibility
+}
+
+sub disconnected {
+   # subclass responsibility
 }
 
 1;

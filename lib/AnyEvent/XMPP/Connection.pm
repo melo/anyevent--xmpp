@@ -12,7 +12,8 @@ use Object::Event;
 use Digest::SHA1 qw/sha1_hex/;
 use Encode;
 
-our @ISA = qw/AnyEvent::XMPP::SimpleConnection Object::Event AnyEvent::XMPP::Extendable/;
+use base qw/AnyEvent::XMPP::SimpleConnection
+            AnyEvent::XMPP::Extendable/;
 
 =head1 NAME
 
@@ -25,11 +26,13 @@ AnyEvent::XMPP::Connection - XML stream that implements the XMPP RFC 3920.
    my $con =
       AnyEvent::XMPP::Connection->new (
          username => "abc",
-         domain => "jabber.org",
-         resource => "AnyEvent::XMPP"
+         domain   => "jabber.org",
+         resource => "AnyEvent::XMPP",
+         password => 'secret123',
       );
 
    $con->reg_cb (stream_ready => sub { print "XMPP stream ready!\n" });
+
    $con->connect; # will do non-blocking connect
 
 =head1 DESCRIPTION
@@ -194,137 +197,131 @@ are 60 seconds.  You can disable the whitespace ping by setting C<$interval> to
 
 =cut
 
+sub default_namespace {
+   return 'client';
+}
+
 sub new {
    my $this = shift;
    my $class = ref($this) || $this;
    my $self =
       $class->SUPER::new (
-         language         => 'en',
-         stream_namespace => 'client',
+         language                 => 'en',
          whitespace_ping_interval => 60,
          @_
       );
 
-   $self->{parser} = new AnyEvent::XMPP::Parser;
-   $self->{writer} = AnyEvent::XMPP::Writer->new (
-      write_cb     => sub { $self->write_data ($_[0]) },
-      send_iq_cb   => sub { $self->event (send_iq_hook => @_) },
-      send_msg_cb  => sub { $self->event (send_message_hook => @_) },
-      send_pres_cb => sub { $self->event (send_presence_hook => @_) },
-   );
+   $self->{parser} = new AnyEvent::XMPP::Parser $self->default_namespace;
 
-   $self->{parser}->set_stanza_cb (sub {
-      eval {
-         $self->handle_stanza (@_);
-      };
-      if ($@) {
-         $self->event (error =>
-            AnyEvent::XMPP::Error::Exception->new (
-               exception => $@, context => 'stanza handling'
-            )
-         );
-      }
-   });
-   $self->{parser}->set_error_cb (sub {
-      my ($ex, $data, $type) = @_;
+   $self->{parser}->reg_cb (
+      stream_start => sub {
+         my ($parser, $node) = @_;
 
-      if ($type eq 'xml') {
-         my $pe = AnyEvent::XMPP::Error::Parser->new (exception => $_[0], data => $_[1]);
-         $self->event (xml_parser_error => $pe);
-         $self->disconnect ("xml error: $_[0], $_[1]");
+         $self->{stream_id} = $node->attr ('id');
 
-      } else {
-         my $pe = AnyEvent::XMPP::Error->new (
-            text => "uncaught exception in stanza handling: $ex"
-         );
-         $self->event (uncaught_exception_error => $pe);
-         $self->disconnect ($pe->string);
-      }
-   });
-
-   $self->{parser}->set_stream_cb (sub {
-      $self->{stream_id} = $_[0]->attr ('id');
-
-      # This is some very bad "hack" for _very_ old jabber
-      # servers to work with AnyEvent::XMPP
-      if (not defined $_[0]->attr ('version')) {
-         $self->start_old_style_authentication
-            if (not $self->{disable_iq_auth})
-               && (not $self->{disable_old_jabber_authentication})
-      }
-   });
-
-
-   $self->{iq_id}              = 1;
-   $self->{default_iq_timeout} = 60;
-
-   $self->{disconnect_cb} = sub {
-      my ($host, $port, $message) = @_;
-      delete $self->{authenticated};
-      delete $self->{ssl_enabled};
-      $self->event (disconnect => $host, $port, $message);
-   };
-
-   if ($self->{jid}) {
-      my ($user, $host, $res) = split_jid ($self->{jid});
-      $self->{username} = $user;
-      $self->{domain}   = $host;
-      $self->{resource} = $res if defined $res;
-   }
-
-   $self->{host} = $self->{domain}    unless defined $self->{host};
-   $self->{port} = 'xmpp-client=5222' unless defined $self->{port};
-
-   my $proxy_cb = sub {
-      my ($self, $er) = @_;
-      $self->event (error => $er);
-   };
-
-   $self->reg_cb (
-      xml_parser_error => $proxy_cb,
-      sasl_error       => $proxy_cb,
-      stream_error     => $proxy_cb,
-      bind_error       => $proxy_cb,
-      iq_auth_error    => $proxy_cb,
-      iq_result_cb_exception => sub {
-         my ($self, $ex) = @_;
-         $self->event (error =>
-            AnyEvent::XMPP::Error::Exception->new (
-               exception => $ex, context => 'iq result callback execution'
-            )
-         );
-      },
-      tls_error => sub {
-         my ($self) = @_;
-         $self->event (error =>
-            AnyEvent::XMPP::Error->new (text => 'tls_error: tls negotiation failed')
-         );
-      },
-      iq_xml => sub { shift @_; $self->handle_iq (@_) }
-   );
-
-   if ($self->{whitespace_ping_interval} > 0) {
-      $self->reg_cb (
-         stream_ready => sub {
-            my ($self) = @_;
-            $self->_start_whitespace_ping;
-            $self->unreg_me;
-         },
-         disconnect => sub {
-            $self->_stop_whitespace_ping;
-            $self->unreg_me;
+         # This is some very bad "hack" for _very_ old jabber
+         # servers to work with AnyEvent::XMPP
+         if (not defined $node->attr ('version')) {
+            $self->start_old_style_authentication
+               if (not $self->{disable_iq_auth})
+                  && (not $self->{disable_old_jabber_authentication})
          }
-      );
-   }
+      },
+      received_stanza => sub {
+         eval { $self->handle_stanza ($_[1]) };
+         if ($@) {
+            $self->error (
+               AnyEvent::XMPP::Error::Exception->new (
+                  exception => $@, context => 'stanza handling'
+               )
+            );
+         }
+      },
+      parse_error => sub {
+         my ($parser, $ex, $data) = @_;
 
-   $self->set_exception_cb (sub {
-      my ($ex) = @_;
-      $self->event (error =>
-         AnyEvent::XMPP::Error::Exception->new (
-            exception => $ex, context => 'event callback'
-         )
-      );
-   });
+         $self->error (
+            AnyEvent::XMPP::Error::Parser->new (
+               exception => $ex, data => $data
+            );
+         );
+
+         $self->disconnect ("xml error: $ex: $data");
+      }
+   );
+
+   #$self->{writer} = AnyEvent::XMPP::Writer->new (
+   #   write_cb     => sub { $self->write_data ($_[0]) },
+   #   send_iq_cb   => sub { $self->event (send_iq_hook => @_) },
+   #   send_msg_cb  => sub { $self->event (send_message_hook => @_) },
+   #   send_pres_cb => sub { $self->event (send_presence_hook => @_) },
+   #);
+
+   #$self->{iq_id}              = 1;
+   #$self->{default_iq_timeout} = 60;
+
+   #if ($self->{jid}) {
+   #   my ($user, $host, $res) = split_jid ($self->{jid});
+   #   $self->{username} = $user;
+   #   $self->{domain}   = $host;
+   #   $self->{resource} = $res if defined $res;
+   #}
+
+   #$self->{host} = $self->{domain}    unless defined $self->{host};
+   #$self->{port} = 'xmpp-client=5222' unless defined $self->{port};
+
+   #my $proxy_cb = sub {
+   #   my ($self, $er) = @_;
+   #   $self->event (error => $er);
+   #};
+
+   #$self->reg_cb (
+   #   sasl_error    => $proxy_cb,
+   #   stream_error  => $proxy_cb,
+   #   bind_error    => $proxy_cb,
+   #   iq_auth_error => $proxy_cb,
+
+   #   iq_result_cb_exception => sub {
+   #      my ($self, $ex) = @_;
+   #      $self->error (
+   #         AnyEvent::XMPP::Error::Exception->new (
+   #            exception => $ex, context => 'iq result callback execution'
+   #         )
+   #      );
+   #   },
+   #   tls_error => sub {
+   #      my ($self) = @_;
+   #      $self->error (
+   #         AnyEvent::XMPP::Error->new (text => 'tls_error: tls negotiation failed')
+   #      );
+   #   },
+   #   iq_xml => sub { shift @_; $self->handle_iq (@_) }
+   #);
+
+   #if ($self->{whitespace_ping_interval} > 0) {
+   #   $self->reg_cb (
+   #      stream_ready => sub {
+   #         my ($self) = @_;
+   #         $self->_start_whitespace_ping;
+   #         $self->unreg_me;
+   #      },
+   #      disconnect => sub {
+   #         $self->_stop_whitespace_ping;
+   #         $self->unreg_me;
+   #      }
+   #   );
+   #}
+
+   #$self->set_exception_cb (sub {
+   #   my ($ex) = @_;
+   #   $self->event (error =>
+   #      AnyEvent::XMPP::Error::Exception->new (
+   #         exception => $ex, context => 'event callback'
+   #      )
+   #   );
+   #});
+
+   # TODO: CONTINUE HERE
 
    return $self;
 }
@@ -354,43 +351,6 @@ sub connect {
    $self->SUPER::connect ($self->{host}, $self->{port}, $self->{connect_timeout});
 }
 
-sub connected {
-   my ($self) = @_;
-
-   if ($self->{old_style_ssl}) {
-      $self->enable_ssl;
-   }
-
-   $self->init;
-   $self->event (connect => $self->{peer_host}, $self->{peer_port});
-}
-
-sub send_buffer_empty {
-   my ($self) = @_;
-   $self->event ('send_buffer_empty');
-}
-
-sub handle_data {
-   my ($self, $buf) = @_;
-   $self->event (debug_recv => $$buf);
-   $self->{parser}->feed (substr $$buf, 0, (length $$buf), '');
-}
-
-sub debug_wrote_data {
-   my ($self, $data) = @_;
-   $self->event (debug_send => $data);
-}
-
-sub write_data {
-   my ($self, $data) = @_;
-   $self->event (send_stanza_data => $data);
-   $self->SUPER::write_data ($data);
-}
-
-sub default_namespace {
-   return 'client';
-}
-
 sub handle_stanza {
    my ($self, $p, $node) = @_;
 
@@ -415,7 +375,7 @@ sub handle_stanza {
       $self->{parser}->init;
       $self->{writer}->init;
       $self->{writer}->send_init_stream (
-         $self->{language}, $self->{domain}, $self->{stream_namespace}
+         $self->{language}, $self->{domain}, $self->default_namespace
       );
 
    } elsif ($node->eq (tls => 'failure')) {
@@ -451,7 +411,12 @@ sub handle_stanza {
 
 sub init {
    my ($self) = @_;
-   $self->{writer}->send_init_stream ($self->{language}, $self->{domain}, $self->{stream_namespace}, $self->{stream_version_override});
+   $self->{writer}->send_init_stream (
+      $self->{language},
+      $self->{domain},
+      $self->default_namespace,
+      $self->{stream_version_override}
+   );
 }
 
 =item B<is_connected ()>
@@ -1042,15 +1007,14 @@ Trivial error reporting may look like this:
 
 Basically this event is a collect event for all other error events.
 
+=cut
+
+sub error { my ($self, $errorobj) = @_ }
+
 =item stream_error => $error
 
 This event is sent if a XML stream error occured. C<$error>
 is a L<AnyEvent::XMPP::Error::Stream> object.
-
-=item xml_parser_error => $error
-
-This event is generated whenever the parser trips over XML that it can't
-read. C<$error> is a L<AnyEvent::XMPP::Error::Parser> object.
 
 =item tls_error
 
@@ -1113,19 +1077,10 @@ to take care of it return a true value from your registered callback.
 
 If any of the event callbacks return a true value this stanza will be ignored.
 
-=item send_stanza_data => $data
-
-This event is generated shortly before data is sent to the socket.
-C<$data> contains a complete "XML" stanza or the end of stream closing
-tag. This method is useful for debugging purposes and I recommend
-using XML::Twig or something like that to display it nicely.
-
-See also the event C<debug_send>.
-
 =item debug_send => $data
 
-This method is invoked whenever data is written out. This event
-is mostly the same as C<send_stanza_data>.
+This method is invoked whenever data is written out. C<$data> contains
+the XML version of a complete stanza.
 
 =item debug_recv => $data
 
@@ -1259,6 +1214,48 @@ for C<send_presence> of L<AnyEvent::XMPP::Writer> (C<$attrs> is C<%attrs> there)
 
 To actually append something you need to return something, what you need to return
 is described in the C<send_iq_hook> event above.
+
+=cut 
+
+# TODO: document events and extend Object::Event to allow attribute based
+#       priorities of these methods.
+
+sub connected {
+   my ($self) = @_;
+
+   if ($self->{old_style_ssl}) {
+      $self->enable_ssl;
+   }
+
+   $self->init;
+}
+
+sub disconnected {
+   my ($self, $host, $port, $message) = @_;
+   delete $self->{authenticated};
+   delete $self->{ssl_enabled};
+};
+
+sub send_buffer_empty {
+   my ($self) = @_;
+   # event
+}
+
+sub handle_data {
+   my ($self, $buf) = @_;
+   $self->event (debug_recv => $$buf);
+   $self->{parser}->feed (substr $$buf, 0, (length $$buf), '');
+}
+
+sub write_data {
+   my ($self, $data) = @_;
+   $self->event (send_stanza_data => $data);
+   $self->SUPER::write_data ($data);
+   $self->event (debug_send => $data);
+}
+
+sub debug_recv {}
+sub debug_send {}
 
 =back
 
