@@ -190,7 +190,7 @@ set C<$version> to '0.9' for testing IQ authentication with ejabberd.
 =item whitespace_ping_interval => $interval
 
 This will set the whitespace ping interval (in seconds). The default interval
-are 60 seconds.  You can disable the whitespace ping by setting C<$interval> to
+is 60 seconds.  You can disable the whitespace ping by setting C<$interval> to
 0.
 
 =back
