@@ -1,5 +1,6 @@
 'x' means: is done!
 
+- use parse_start of XML::Parser instead of XML::Parser::ExpatNB directly!
 - keep an eye on disco_feature stuff.
 - fix MUC documentation!
 X make the MUC extension not be tied to a specific connection.
