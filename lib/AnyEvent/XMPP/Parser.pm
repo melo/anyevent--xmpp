@@ -146,7 +146,7 @@ sub cleanup {
 
    $self->{parser}->release;
 
-   for (qw(stanza_cb error_cb stream_cb parser)) {
+   for (qw(stanza_cb error_cb stream_cb parser nso nodestack)) {
       delete $self->{$_};
    }
 

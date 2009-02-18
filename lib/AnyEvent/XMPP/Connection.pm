@@ -12,8 +12,7 @@ use Object::Event;
 use Digest::SHA1 qw/sha1_hex/;
 use Encode;
 
-use base qw/AnyEvent::XMPP::SimpleConnection
-            AnyEvent::XMPP::Extendable/;
+use base qw/Object::Event/;
 
 =head1 NAME
 
@@ -37,12 +36,16 @@ AnyEvent::XMPP::Connection - XML stream that implements the XMPP RFC 3920.
 
 =head1 DESCRIPTION
 
-This module represents a XMPP stream as described in RFC 3920. You can issue the basic
-XMPP XML stanzas with methods like C<send_iq>, C<send_message> and C<send_presence>.
+This module represents a XMPP stream as described in RFC 3920. You can issue
+the basic XMPP XML stanzas with methods like C<send_iq>, C<send_message> and
+C<send_presence>.
+
+FIXME: DOCUMENTATION
 
 And receive events with the C<reg_cb> event framework from the connection.
 
-If you need instant messaging stuff please take a look at C<AnyEvent::XMPP::IM::Connection>.
+If you need instant messaging stuff please take a look at
+C<AnyEvent::XMPP::IM::Connection>.
 
 =head1 METHODS
 
@@ -53,13 +56,6 @@ If you need instant messaging stuff please take a look at C<AnyEvent::XMPP::IM::
 Following arguments can be passed in C<%args>:
 
 =over 4
-
-=item language => $tag
-
-This should be the language of the human readable contents that
-will be transmitted over the stream. The default will be 'en'.
-
-Please look in RFC 3066 how C<$tag> should look like.
 
 =item jid => $jid
 
@@ -95,6 +91,10 @@ resources can be applied at: C<$resource>. Otherwise the server
 might signal an error. See L<AnyEvent::XMPP::Util> for utility functions
 to check this.
 
+=item password => $password
+
+This is the password for the C<username> above.
+
 =item host => $host
 
 This parameter specifies the hostname where we are going
@@ -102,15 +102,6 @@ to connect to. The default for this is the C<domain> of the C<jid>.
 
 B<NOTE:> To disable DNS SRV lookup you need to specify the port B<number>
 yourself. See C<port> below.
-
-=item use_host_as_sasl_hostname => $bool
-
-This is a special parameter for people who might want to use GSSAPI SASL
-mechanism. It will cause the value of the C<host> parameter (see above) to be
-passed to the SASL mechanisms, instead of the C<domain> of the JID.
-
-This flag is provided until support for XEP 0233 is deployed, which
-will fix the hostname issue w.r.t. GSSAPI SASL.
 
 =item port => $port
 
@@ -125,9 +116,27 @@ This sets the connection timeout. If the socket connect takes too long
 a C<disconnect> event will be generated with an appropriate error message.
 If this argument is not given no timeout is installed for the connects.
 
-=item password => $password
+=item whitespace_ping_interval => $interval
 
-This is the password for the C<username> above.
+This will set the whitespace ping interval (in seconds). The default interval
+is 60 seconds.  You can disable the whitespace ping by setting C<$interval> to
+0.
+
+=item language => $tag
+
+This should be the language of the human readable contents that
+will be transmitted over the stream. The default will be 'en'.
+
+Please look in RFC 3066 how C<$tag> should look like.
+
+=item use_host_as_sasl_hostname => $bool
+
+This is a special parameter for people who might want to use GSSAPI SASL
+mechanism. It will cause the value of the C<host> parameter (see above) to be
+passed to the SASL mechanisms, instead of the C<domain> of the JID.
+
+This flag is provided until support for XEP 0233 is deployed, which
+will fix the hostname issue w.r.t. GSSAPI SASL.
 
 =item disable_ssl => $bool
 
@@ -187,12 +196,6 @@ This will override the stream version which is sent in the XMPP stream
 initiation element. This is currently only used by the tests which
 set C<$version> to '0.9' for testing IQ authentication with ejabberd.
 
-=item whitespace_ping_interval => $interval
-
-This will set the whitespace ping interval (in seconds). The default interval
-is 60 seconds.  You can disable the whitespace ping by setting C<$interval> to
-0.
-
 =back
 
 =cut
@@ -211,8 +214,59 @@ sub new {
          @_
       );
 
-   $self->{parser} = new AnyEvent::XMPP::Parser $self->default_namespace;
+   if ($self->{jid}) {
+      my ($user, $host, $res) = split_jid ($self->{jid});
+      $self->{username} = $user;
+      $self->{domain}   = $host;
+      $self->{resource} = $res if defined $res;
+   }
 
+   $self->{host} = $self->{domain}    unless defined $self->{host};
+   $self->{port} = 'xmpp-client=5222' unless defined $self->{port};
+
+   $self->set_exception_cb (sub {
+      my ($ex) = @_;
+      $self->event (error =>
+         AnyEvent::XMPP::Error::Exception->new (
+            exception => $ex, context => 'event callback'
+         )
+      );
+   });
+
+   return $self;
+}
+
+sub cleanup {
+   my ($self) = @_;
+
+   if ($self->{handle}) {
+      $self->{handle}->on_drain;
+      delete $self->{handle};
+   }
+
+   delete $self->{connected};
+   delete $self->{authenticated};
+   delete $self->{ssl_enabled};
+   delete $self->{peer_host};
+   delete $self->{peer_port};
+
+   if ($self->{writer}) {
+      delete $self->{writer};
+   }
+
+   if ($self->{parser}) {
+      $self->{parser}->remove_all_callbacks;
+      $self->{parser}->cleanup;
+      delete $self->{parser};
+   }
+}
+
+sub init {
+   my ($self) = @_;
+
+   $self->cleanup;
+
+   $self->{parser} = new AnyEvent::XMPP::Parser $self->default_namespace;
    $self->{parser}->reg_cb (
       stream_start => sub {
          my ($parser, $node) = @_;
@@ -250,80 +304,9 @@ sub new {
       }
    );
 
-   #$self->{writer} = AnyEvent::XMPP::Writer->new (
-   #   write_cb     => sub { $self->write_data ($_[0]) },
-   #   send_iq_cb   => sub { $self->event (send_iq_hook => @_) },
-   #   send_msg_cb  => sub { $self->event (send_message_hook => @_) },
-   #   send_pres_cb => sub { $self->event (send_presence_hook => @_) },
-   #);
-
-   #$self->{iq_id}              = 1;
-   #$self->{default_iq_timeout} = 60;
-
-   #if ($self->{jid}) {
-   #   my ($user, $host, $res) = split_jid ($self->{jid});
-   #   $self->{username} = $user;
-   #   $self->{domain}   = $host;
-   #   $self->{resource} = $res if defined $res;
-   #}
-
-   #$self->{host} = $self->{domain}    unless defined $self->{host};
-   #$self->{port} = 'xmpp-client=5222' unless defined $self->{port};
-
-   #my $proxy_cb = sub {
-   #   my ($self, $er) = @_;
-   #   $self->event (error => $er);
-   #};
-
-   #$self->reg_cb (
-   #   sasl_error    => $proxy_cb,
-   #   stream_error  => $proxy_cb,
-   #   bind_error    => $proxy_cb,
-   #   iq_auth_error => $proxy_cb,
-
-   #   iq_result_cb_exception => sub {
-   #      my ($self, $ex) = @_;
-   #      $self->error (
-   #         AnyEvent::XMPP::Error::Exception->new (
-   #            exception => $ex, context => 'iq result callback execution'
-   #         )
-   #      );
-   #   },
-   #   tls_error => sub {
-   #      my ($self) = @_;
-   #      $self->error (
-   #         AnyEvent::XMPP::Error->new (text => 'tls_error: tls negotiation failed')
-   #      );
-   #   },
-   #   iq_xml => sub { shift @_; $self->handle_iq (@_) }
-   #);
-
-   #if ($self->{whitespace_ping_interval} > 0) {
-   #   $self->reg_cb (
-   #      stream_ready => sub {
-   #         my ($self) = @_;
-   #         $self->_start_whitespace_ping;
-   #         $self->unreg_me;
-   #      },
-   #      disconnect => sub {
-   #         $self->_stop_whitespace_ping;
-   #         $self->unreg_me;
-   #      }
-   #   );
-   #}
-
-   #$self->set_exception_cb (sub {
-   #   my ($ex) = @_;
-   #   $self->event (error =>
-   #      AnyEvent::XMPP::Error::Exception->new (
-   #         exception => $ex, context => 'event callback'
-   #      )
-   #   );
-   #});
-
-   # TODO: CONTINUE HERE
-
-   return $self;
+   $self->{writer} = AnyEvent::XMPP::Writer->new (
+      write_cb => sub { $self->write_data ($_[0]) }
+   );
 }
 
 =item B<connect ()>
@@ -348,81 +331,90 @@ was successfully connected.
 
 sub connect {
    my ($self) = @_;
-   $self->SUPER::connect ($self->{host}, $self->{port}, $self->{connect_timeout});
-}
 
-sub handle_stanza {
-   my ($self, $p, $node) = @_;
-
-   if (not defined $node) { # got stream end
-      $self->disconnect ("end of 'XML' stream encountered");
-      return;
+   if ($self->{connected}) {
+      $self->disconnect ("reconnecting");
    }
 
-   my (@res) = $self->event (recv_stanza_xml => $node);
-   @res = grep $_, @res;
-   return if @res;
+   $self->init;
 
-   my $def_ns = $self->default_namespace;
+   my ($host, $service, $timeout) =
+      ($self->{host}, $self->{port}, $self->{connect_timeout})
 
-   if ($node->eq (stream => 'features')) {
-      $self->event (stream_features => $node);
-      $self->{features} = $node;
-      $self->handle_stream_features ($node);
+   $self->{handle} = tcp_connect $host, $service, sub {
+      my ($fh, $peerhost, $peerport) = @_;
 
-   } elsif ($node->eq (tls => 'proceed')) {
-      $self->enable_ssl;
-      $self->{parser}->init;
-      $self->{writer}->init;
-      $self->{writer}->send_init_stream (
-         $self->{language}, $self->{domain}, $self->default_namespace
-      );
+      unless ($fh) {
+         $self->disconnect ("Couldn't create socket to $host:$service: $!");
+         return;
+      }
 
-   } elsif ($node->eq (tls => 'failure')) {
-      $self->event ('tls_error');
-      $self->disconnect ('TLS failure on TLS negotiation.');
+      $self->{peer_host} = $peerhost;
+      $self->{peer_port} = $peerport;
 
-   } elsif ($node->eq (sasl => 'challenge')) {
-      $self->handle_sasl_challenge ($node);
+      binmode $fh, ":raw";
 
-   } elsif ($node->eq (sasl => 'success')) {
-      $self->handle_sasl_success ($node);
-
-   } elsif ($node->eq (sasl => 'failure')) {
-      my $error = AnyEvent::XMPP::Error::SASL->new (node => $node);
-      $self->event (sasl_error => $error);
-      $self->disconnect ('SASL authentication failure: ' . $error->string);
-
-   } elsif ($node->eq ($def_ns => 'iq')) {
-      $self->event (iq_xml => $node);
-
-   } elsif ($node->eq ($def_ns => 'message')) {
-      $self->event (message_xml => $node);
-
-   } elsif ($node->eq ($def_ns => 'presence')) {
-      $self->event (presence_xml => $node);
-
-   } elsif ($node->eq (stream => 'error')) {
-      $self->handle_error ($node);
-   }
+      $self->{handle} =
+         AnyEvent::Handle->new (
+            fh => $fh,
+            on_eof => sub {
+               $self->disconnect (
+                  "EOF on connection to $self->{peer_host}:$self->{peer_port}: $!"
+               );
+            },
+            on_error => sub {
+               $self->disconnect (
+                  "Error on connection to $self->{peer_host}:$self->{peer_port}: $!"
+               );
+            },
+            on_read => sub {
+               my ($hdl) = @_;
+               my $data   = $hdl->rbuf;
+               $hdl->rbuf = '';
+               $data      = decode_utf8 $data;
+               $self->debug_recv ($data);
+               $self->{parser}->feed ($data);
+            },
+         );
+      
+      $self->connected
+      
+   }, sub { $timeout };
 }
 
-# This method is private
+sub write_data {
+   my ($self, $data) = @_;
+   $self->send_stanza_data ($data);
 
-sub init {
+   $self->{handle}->push_write (encode_utf8 ($data));
+   $self->{handle}->on_drain (sub {
+      $self->send_buffer_empty;
+   });
+
+   $self->debug_send ($data);
+}
+
+sub enable_ssl {
    my ($self) = @_;
-   $self->{writer}->send_init_stream (
-      $self->{language},
-      $self->{domain},
-      $self->default_namespace,
-      $self->{stream_version_override}
-   );
+
+   $self->{handle}->starttls ('connect');
+   $self->{ssl_enabled} = 1;
+}
+
+sub disconnect {
+   my ($self, $msg) = @_;
+
+   $self->cleanup;
+
+   return unless $self->{connected};
+
+   $self->disconnected ($self->{peer_host}, $self->{peer_port}, $msg);
 }
 
 =item B<is_connected ()>
 
-Returns true if the connection is still connected and stanzas can be
-sent.
+Returns true if the connection is still connected and authenticated, so
+stanzas can be sent.
 
 =cut
 
@@ -431,184 +423,30 @@ sub is_connected {
    $self->{authenticated}
 }
 
-=item B<set_default_iq_timeout ($seconds)>
+=item B<jid>
 
-This sets the default timeout for IQ requests. If the timeout runs out
-the request will be aborted and the callback called with a L<AnyEvent::XMPP::Error::IQ> object
-where the C<condition> method returns a special value (see also C<condition> method of L<AnyEvent::XMPP::Error::IQ>).
-
-The default timeout for IQ is 60 seconds.
+After the stream has been bound to a resource the JID can be retrieved via this
+method.
 
 =cut
 
-sub set_default_iq_timeout {
-   my ($self, $sec) = @_;
-   $self->{default_iq_timeout} = $sec;
-}
+sub jid { $_[0]->{jid} }
 
-=item B<send_iq ($type, $create_cb, $result_cb, %attrs)>
+=item B<features>
 
-This method sends an IQ XMPP B<request>.
-
-If you want to B<respond> to a IQ request you received via the C<iq_set_request_xml>,
-and C<iq_get_request_xml> events you have to use the C<reply_iq_result> or
-C<reply_iq_error> methods documented below.
-
-Please take a look at the documentation for C<send_iq> in AnyEvent::XMPP::Writer
-about the meaning of C<$type>, C<$create_cb> and C<%attrs> (with the exception
-of the 'timeout' key of C<%attrs>, see below).
-
-C<$result_cb> will be called when a result was received or the timeout reached.
-The first argument to C<$result_cb> will be a AnyEvent::XMPP::Node instance
-containing the IQ result stanza contents.
-
-If the IQ resulted in a stanza error the second argument to C<$result_cb> will
-be C<undef> (if the error type was not 'continue') and the third argument will
-be a L<AnyEvent::XMPP::Error::IQ> object.
-
-The timeout can be set by C<set_default_iq_timeout> or passed separately
-in the C<%attrs> array as the value for the key C<timeout> (timeout in seconds btw.).
-
-This method returns the newly generated id for this iq request.
+Returns the last received <features> tag in form of an L<AnyEvent::XMPP::Node> object.
 
 =cut
 
-sub send_iq {
-   my ($self, $type, $create_cb, $result_cb, %attrs) = @_;
-   my $id = $self->{iq_id}++;
-   $self->{iqs}->{$id} = $result_cb;
+sub features { $_[0]->{features} }
 
-   my $timeout = delete $attrs{timeout} || $self->{default_iq_timeout};
-   if ($timeout) {
-      $self->{iq_timers}->{$id} =
-         AnyEvent->timer (after => $timeout, cb => sub {
-            delete $self->{iq_timers}->{$id};
-            my $cb = delete $self->{iqs}->{$id};
-            $cb->(undef, AnyEvent::XMPP::Error::IQ->new)
-         });
-   }
+=item B<stream_id>
 
-   $self->{writer}->send_iq ($id, $type, $create_cb, %attrs);
-   $id
-}
-
-=item B<next_iq_id>
-
-This method returns the next IQ id that will be used.
+This is the ID of this stream that was given us by the server.
 
 =cut
 
-sub next_iq_id {
-   $_[0]->{iq_id};
-}
-
-=item B<reply_iq_result ($req_iq_node, $create_cb, %attrs)>
-
-This method will generate a result reply to the iq request C<AnyEvent::XMPP::Node>
-in C<$req_iq_node>.
-
-Please take a look at the documentation for C<send_iq> in L<AnyEvent::XMPP::Writer>
-about the meaning C<$create_cb> and C<%attrs>.
-
-Use C<$create_cb> to create the XML for the result.
-
-The type for this iq reply is 'result'.
-
-The C<to> attribute of the reply stanza will be set to the C<from>
-attribute of the C<$req_iq_node>. If C<$req_iq_node> had no C<from>
-node it won't be set. If you want to overwrite the C<to> field just
-pass it via C<%attrs>.
-
-=cut
-
-sub reply_iq_result {
-   my ($self, $iqnode, $create_cb, %attrs) = @_;
-   
-   return $self->_reply_iq(
-      $iqnode,
-      'result',
-      $create_cb,
-      %attrs
-   );
-}
-
-=item B<reply_iq_error ($req_iq_node, $error_type, $error, %attrs)>
-
-This method will generate an error reply to the iq request C<AnyEvent::XMPP::Node>
-in C<$req_iq_node>.
-
-C<$error_type> is one of 'cancel', 'continue', 'modify', 'auth' and 'wait'.
-C<$error> is one of the defined error conditions described in
-C<write_error_tag> method of L<AnyEvent::XMPP::Writer>.
-
-Please take a look at the documentation for C<send_iq> in AnyEvent::XMPP::Writer
-about the meaning of C<%attrs>.
-
-The type for this iq reply is 'error'.
-
-The C<to> attribute of the reply stanza will be set to the C<from>
-attribute of the C<$req_iq_node>. If C<$req_iq_node> had no C<from>
-node it won't be set. If you want to overwrite the C<to> field just
-pass it via C<%attrs>.
-
-=cut
-
-sub reply_iq_error {
-   my ($self, $iqnode, $errtype, $error, %attrs) = @_;
-
-   return $self->_reply_iq(
-      $iqnode,
-      'error',
-      sub { $self->{writer}->write_error_tag ($iqnode, $errtype, $error) },
-      %attrs
-   );
-}
-
-sub _reply_iq {
-   my ($self, $iqnode, $type, $create_cb, %attrs) = @_;
-
-   return $self->{writer}->send_iq (
-      $iqnode->attr ('id'), $type, $create_cb,
-      (defined $iqnode->attr ('from') ? (to => $iqnode->attr ('from')) : ()),
-      (defined $iqnode->attr ('to') ? (from => $iqnode->attr ('to')) : ()),
-      %attrs
-   );
-}
-
-sub handle_iq {
-   my ($self, $node) = @_;
-
-   my $type = $node->attr ('type');
-
-   my $id = $node->attr ('id');
-   delete $self->{iq_timers}->{$id} if defined $id;
-
-   if ($type eq 'result') {
-      if (my $cb = delete $self->{iqs}->{$id}) {
-         eval {
-            $cb->($node);
-         };
-         if ($@) { $self->event (iq_result_cb_exception => $@) }
-      }
-
-   } elsif ($type eq 'error') {
-      if (my $cb = delete $self->{iqs}->{$id}) {
-
-         my $error = AnyEvent::XMPP::Error::IQ->new (node => $node);
-
-         eval {
-            $cb->(($error->type eq 'continue' ? $node : undef), $error);
-         };
-         if ($@) { $self->event (iq_result_cb_exception => $@) }
-      }
-
-   } else {
-      my (@r) = $self->event ("iq_${type}_request_xml" => $node);
-      unless (grep { $_ } @r) {
-         $self->reply_iq_error ($node, undef, 'service-unavailable');
-      }
-   }
-}
+sub stream_id { $_[0]->{stream_id} }
 
 sub send_sasl_auth {
    my ($self, @mechs) = @_;
@@ -821,140 +659,69 @@ sub do_iq_auth_send {
    });
 }
 
-=item B<send_presence ($type, $create_cb, %attrs)>
+# TODO TODO
+# TODO TODO
+# TODO TODO
+# TODO TODO
+# TODO TODO
+# TODO TODO
+# TODO TODO
+# TODO TODO
+sub handle_stanza {
+   my ($self, $p, $node) = @_;
 
-This method sends a presence stanza, for the meanings
-of C<$type>, C<$create_cb> and C<%attrs> please take a look
-at the documentation for C<send_presence> method of L<AnyEvent::XMPP::Writer>.
+   if (not defined $node) { # got stream end
+      $self->disconnect ("end of 'XML' stream encountered");
+      return;
+   }
 
-This methods does attach an id attribute to the presence stanza and
-will return the id that was used (so you can react on possible replies).
+   my (@res) = $self->event (recv_stanza_xml => $node);
+   @res = grep $_, @res;
+   return if @res;
 
-=cut
+   my $def_ns = $self->default_namespace;
 
-sub send_presence {
-   my ($self, $type, $create_cb, %attrs) = @_;
-   my $id = $self->{iq_id}++;
-   $self->{writer}->send_presence ($id, $type, $create_cb, %attrs);
-   $id
+   if ($node->eq (stream => 'features')) {
+      $self->event (stream_features => $node);
+      $self->{features} = $node;
+      $self->handle_stream_features ($node);
+
+   } elsif ($node->eq (tls => 'proceed')) {
+      $self->enable_ssl;
+      $self->{parser}->init;
+      $self->{writer}->init;
+      $self->{writer}->send_init_stream (
+         $self->{language}, $self->{domain}, $self->default_namespace
+      );
+
+   } elsif ($node->eq (tls => 'failure')) {
+      $self->event ('tls_error');
+      $self->disconnect ('TLS failure on TLS negotiation.');
+
+   } elsif ($node->eq (sasl => 'challenge')) {
+      $self->handle_sasl_challenge ($node);
+
+   } elsif ($node->eq (sasl => 'success')) {
+      $self->handle_sasl_success ($node);
+
+   } elsif ($node->eq (sasl => 'failure')) {
+      my $error = AnyEvent::XMPP::Error::SASL->new (node => $node);
+      $self->event (sasl_error => $error);
+      $self->disconnect ('SASL authentication failure: ' . $error->string);
+
+   } elsif ($node->eq ($def_ns => 'iq')) {
+      $self->event (iq_xml => $node);
+
+   } elsif ($node->eq ($def_ns => 'message')) {
+      $self->event (message_xml => $node);
+
+   } elsif ($node->eq ($def_ns => 'presence')) {
+      $self->event (presence_xml => $node);
+
+   } elsif ($node->eq (stream => 'error')) {
+      $self->handle_error ($node);
+   }
 }
-
-=item B<send_message ($to, $type, $create_cb, %attrs)>
-
-This method sends a message stanza, for the meanings
-of C<$to>, C<$type>, C<$create_cb> and C<%attrs> please take a look
-at the documentation for C<send_message> method of L<AnyEvent::XMPP::Writer>.
-
-This methods does attach an id attribute to the message stanza and
-will return the id that was used (so you can react on possible replies).
-
-=cut
-
-sub send_message {
-   my ($self, $to, $type, $create_cb, %attrs) = @_;
-   my $id = $self->{iq_id}++;
-   $self->{writer}->send_message ($id, $to, $type, $create_cb, %attrs);
-   $id
-}
-
-=item B<do_rebind ($resource)>
-
-In case you got a C<bind_error> event and want to retry
-binding you can call this function to set a new C<$resource>
-and retry binding.
-
-If it fails again you can call this again. Becareful not to
-end up in a loop!
-
-If binding was successful the C<stream_ready> event will be generated.
-
-=cut
-
-sub do_rebind {
-   my ($self, $resource) = @_;
-   $self->{resource} = $resource;
-   $self->send_iq (
-      set =>
-         sub {
-            my ($w) = @_;
-            if ($self->{resource}) {
-               simxml ($w,
-                  defns => 'bind',
-                  node => {
-                     name => 'bind',
-                     childs => [ { name => 'resource', childs => [ $self->{resource} ] } ]
-                  }
-               )
-            } else {
-               simxml ($w, defns => 'bind', node => { name => 'bind' })
-            }
-         },
-         sub {
-            my ($ret_iq, $error) = @_;
-
-            if ($error) {
-               # TODO: make bind error into a seperate error class?
-               if ($error->xml_node ()) {
-                  my ($res) = $error->xml_node ()->find_all ([qw/bind bind/], [qw/bind resource/]);
-                  $self->event (bind_error => $error, ($res ? $res : $self->{resource}));
-               } else {
-                  $self->event (bind_error => $error);
-               }
-
-            } else {
-               my @jid = $ret_iq->find_all ([qw/bind bind/], [qw/bind jid/]);
-               my $jid = $jid[0]->text;
-               unless ($jid) { die "Got empty JID tag from server!\n" }
-               $self->{jid} = $jid;
-
-               $self->event (stream_ready => $jid);
-            }
-         }
-   );
-}
-
-
-sub _start_whitespace_ping {
-   my ($self) = @_;
-
-   return unless $self->{whitespace_ping_interval} > 0;
-
-   $self->{_ws_ping} =
-      AnyEvent->timer (after => $self->{whitespace_ping_interval}, cb => sub {
-         $self->{writer}->send_whitespace_ping;
-         $self->_start_whitespace_ping;
-      });
-}
-
-sub _stop_whitespace_ping {
-   delete $_[0]->{_ws_ping};
-}
-
-
-=item B<jid>
-
-After the stream has been bound to a resource the JID can be retrieved via this
-method.
-
-=cut
-
-sub jid { $_[0]->{jid} }
-
-=item B<features>
-
-Returns the last received <features> tag in form of an L<AnyEvent::XMPP::Node> object.
-
-=cut
-
-sub features { $_[0]->{features} }
-
-=item B<stream_id>
-
-This is the ID of this stream that was given us by the server.
-
-=cut
-
-sub stream_id { $_[0]->{stream_id} }
 
 =back
 
@@ -972,250 +739,16 @@ These events can be registered on with C<reg_cb>:
 
 =over 4
 
-=item stream_features => $node
-
-This event is sent when a stream feature (<features>) tag is received. C<$node> is the
-L<AnyEvent::XMPP::Node> object that represents the <features> tag.
-
-=item stream_pre_authentication
-
-This event is emitted after TLS/SSL was initiated (if enabled) and before any
-authentication happened.
-
-The return value of the first event callback that is called decides what happens next.
-If it is true value the authentication continues. If it is undef or a false value
-authentication is stopped and you need to call C<authentication> later.
-value
-
-This event is usually used when you want to do in-band registration,
-see also L<AnyEvent::XMPP::Ext::Registration>.
-
-=item stream_ready => $jid
-
-This event is sent if the XML stream has been established (and
-resources have been bound) and is ready for transmitting regular stanzas.
-
-C<$jid> is the bound jabber id.
-
 =item error => $error
 
-This event is generated whenever some error occured.
-C<$error> is an instance of L<AnyEvent::XMPP::Error>.
-Trivial error reporting may look like this:
+This event is generated whenever some error occurred. C<$error> is an instance
+of L<AnyEvent::XMPP::Error>. Trivial error reporting may look like this:
 
    $con->reg_cb (error => sub { warn "xmpp error: " . $_[1]->string . "\n" });
-
-Basically this event is a collect event for all other error events.
 
 =cut
 
 sub error { my ($self, $errorobj) = @_ }
-
-=item stream_error => $error
-
-This event is sent if a XML stream error occured. C<$error>
-is a L<AnyEvent::XMPP::Error::Stream> object.
-
-=item tls_error
-
-This event is emitted when a TLS error occured on TLS negotiation.
-After this the connection will be disconnected.
-
-=item sasl_error => $error
-
-This event is emitted on SASL authentication error.
-
-=item iq_auth_error => $error
-
-This event is emitted when IQ authentication (XEP-0078) failed.
-
-=item bind_error => $error, $resource
-
-This event is generated when the stream was unable to bind to
-any or the in C<new> specified resource. C<$error> is a L<AnyEvent::XMPP::Error::IQ>
-object. C<$resource> is the errornous resource string or undef if none
-was received.
-
-The C<condition> of the C<$error> might be one of: 'bad-request',
-'not-allowed' or 'conflict'.
-
-Node: this is untested, I couldn't get the server to send a bind error
-to test this.
-
-=item connect => $host, $port
-
-This event is generated when a successful TCP connect was performed to
-the domain passed to C<new>.
-
-Note: C<$host> and C<$port> might be different from the domain you passed to
-C<new> if C<connect> performed a SRV RR lookup.
-
-If this connection is lost a C<disconnect> will be generated with the same
-C<$host> and C<$port>.
-
-=item disconnect => $host, $port, $message
-
-This event is generated when the TCP connection was lost or another error
-occurred while writing or reading from it.
-
-C<$message> is a human readable error message for the failure.
-C<$host> and C<$port> were the host and port we were connected to.
-
-Note: C<$host> and C<$port> might be different from the domain you passed to
-C<new> if C<connect> performed a SRV RR lookup.
-
-=item recv_stanza_xml => $node
-
-This event is generated before any processing of a "XML" stanza happens.
-C<$node> is the node of the stanza that is being processed, it's of
-type L<AnyEvent::XMPP::Node>.
-
-This method might not be as handy for debugging purposes as C<debug_recv>.
-
-If you want to handle the stanza yourself and don't want this module
-to take care of it return a true value from your registered callback.
-
-If any of the event callbacks return a true value this stanza will be ignored.
-
-=item debug_send => $data
-
-This method is invoked whenever data is written out. C<$data> contains
-the XML version of a complete stanza.
-
-=item debug_recv => $data
-
-This method is invoked whenever a chunk of data was received.
-
-It works to filter C<$data> through L<XML::Twig> for debugging
-display purposes sometimes, but as C<$data> is some arbitrary chunk
-of bytes you might get a XML parse error (did I already mention that XMPP's
-application of "XML" sucks?).
-
-So you might want to use C<recv_stanza_xml> to detect
-complete stanzas. Unfortunately C<recv_stanza_xml> doesn't have the
-bytes anymore and just a data structure (L<AnyEvent::XMPP::Node>).
-
-=item send_buffer_empty
-
-This event is VERY useful if you want to wait (or at least be notified)
-when the output buffer is empty. If you got a bunch of messages to sent
-or even one and you want to do something when the output buffer is empty,
-you can wait for this event. It is emitted every time the output buffer is
-completely written out to the kernel.
-
-Here is an example:
-
-   $con->reg_cb (send_buffer_empty => sub {
-      $con->disconnect ("wrote message, going to disconnect now...");
-   });
-   $con->send_message ("Test message!" => 'elmex@jabber.org', undef, 'chat');
-
-=item presence_xml => $node
-
-This event is sent when a presence stanza is received. C<$node> is the
-L<AnyEvent::XMPP::Node> object that represents the <presence> tag.
-
-If you want to overtake the handling of the stanza, see C<iq_xml>
-below.
-
-=item message_xml => $node
-
-This event is sent when a message stanza is received. C<$node> is the
-L<AnyEvent::XMPP::Node> object that represents the <message> tag.
-
-If you want to overtake the handling of the stanza, see C<iq_xml>
-below.
-
-=item iq_xml => $node
-
-This event is emitted when a iq stanza arrives. C<$node> is the
-L<AnyEvent::XMPP::Node> object that represents the <iq> tag.
-
-If you want to overtake the handling of a stanza, you should
-register a callback for the C<before_iq_xml> event and call the
-C<stop_event> method. See also L<Object::Event>. This is an example:
-
-   $con->reg_cb (before_iq_xml => sub {
-      my ($con, $node) = @_;
-
-      if (...) {
-         # and stop_event will stop internal handling of the stanza:
-         $con->stop_event;
-      }
-   });
-
-Please note that if you overtake handling of a stanza none of the internal
-handling of that stanza will be done. That means you won't get events
-like C<iq_set_request_xml> anymore.
-
-=item iq_set_request_xml => $node
-
-=item iq_get_request_xml => $node
-
-These events are sent when an iq request stanza of type 'get' or 'set' is received.
-C<$type> will either be 'get' or 'set' and C<$node> will be the L<AnyEvent::XMPP::Node>
-object of the iq tag.
-
-If one of the event callbacks returns a true value the IQ request will be
-considered as handled.
-If no callback returned a true value or no value at all an error iq will be generated.
-
-=item iq_result_cb_exception => $exception
-
-If the C<$result_cb> of a C<send_iq> operation somehow threw a exception
-or failed this event will be generated.
-
-=item send_iq_hook => $id, $type, $attrs
-
-This event lets you add any desired number of additional create callbacks
-to a IQ stanza that is about to be sent.
-
-C<$id>, C<$type> are described in the documentation of C<send_iq> of
-L<AnyEvent::XMPP::Writer>. C<$attrs> is the hashref to the C<%attrs> hash that can
-be passed to C<send_iq> and also has the exact same semantics as described in
-the documentation of C<send_iq>.
-
-The return values of the event callbacks are interpreted as C<$create_cb> value as
-documented for C<send_iq>. (That means you can for example return a callback
-that fills the IQ).
-
-Example:
-
-   # this appends a <test/> element to all outgoing IQs
-   # and also a <test2/> element to all outgoing IQs
-   $con->reg_cb (send_iq_hook => sub {
-      my ($con, $id, $type, $attrs) = @_;
-      (sub {
-         my $w = shift; # $w is a XML::Writer instance
-         $w->emptyTag ('test');
-      }, {
-         node => { name => "test2" } # see also simxml() defined in AnyEvent::XMPP::Util
-      })
-   });
-
-=item send_message_hook => $id, $to, $type, $attrs
-
-This event lets you add any desired number of additional create callbacks
-to a message stanza that is about to be sent.
-
-C<$id>, C<$to>, C<$type> and the hashref C<$attrs> are described in the documentation
-for C<send_message> of L<AnyEvent::XMPP::Writer> (C<$attrs> is C<%attrs> there).
-
-To actually append something you need to return something, what you need to return
-is described in the C<send_iq_hook> event above.
-
-=item send_presence_hook => $id, $type, $attrs
-
-This event lets you add any desired number of additional create callbacks
-to a presence stanza that is about to be sent.
-
-C<$id>, C<$type> and the hashref C<$attrs> are described in the documentation
-for C<send_presence> of L<AnyEvent::XMPP::Writer> (C<$attrs> is C<%attrs> there).
-
-To actually append something you need to return something, what you need to return
-is described in the C<send_iq_hook> event above.
-
-=cut 
 
 # TODO: document events and extend Object::Event to allow attribute based
 #       priorities of these methods.
@@ -1227,18 +760,19 @@ sub connected {
       $self->enable_ssl;
    }
 
-   $self->init;
+   $self->{writer}->send_init_stream (
+      $self->{language},
+      $self->{domain},
+      $self->default_namespace,
+      $self->{stream_version_override}
+   );
+
+   $self->{connected} = 1;
 }
 
 sub disconnected {
    my ($self, $host, $port, $message) = @_;
-   delete $self->{authenticated};
-   delete $self->{ssl_enabled};
-
-   # FIXME: make it reusable!
-   delete $self->{writer};
-   $self->{parser}->cleanup;
-   delete $self->{parser};
+   $self->cleanup;
 };
 
 sub send_buffer_empty {
@@ -1246,19 +780,7 @@ sub send_buffer_empty {
    # event
 }
 
-sub handle_data {
-   my ($self, $buf) = @_;
-   $self->event (debug_recv => $$buf);
-   $self->{parser}->feed (substr $$buf, 0, (length $$buf), '');
-}
-
-sub write_data {
-   my ($self, $data) = @_;
-   $self->event (send_stanza_data => $data);
-   $self->SUPER::write_data ($data);
-   $self->event (debug_send => $data);
-}
-
+sub send_stanza_data {}
 sub debug_recv {}
 sub debug_send {}
 

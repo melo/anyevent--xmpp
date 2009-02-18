@@ -111,9 +111,6 @@ sub new {
    my $class = ref($this) || $this;
    my $self = {
       write_cb     => sub {},
-      send_iq_cb   => sub {},
-      send_msg_cb  => sub {},
-      send_pres_cb => sub {},
       @_
    };
    bless $self, $class;
@@ -351,7 +348,6 @@ sub send_iq {
    my ($self, $id, $type, $create_cb, %attrs) = @_;
 
    $create_cb = _trans_create_cb ($create_cb);
-   $create_cb = $self->_fetch_cb_additions (send_iq_cb => $create_cb, $id, $type, \%attrs);
 
    my (@from) = ($self->{jid} ? (from => $self->{jid}) : ());
    if ($attrs{lang}) {
@@ -459,28 +455,10 @@ sub _trans_create_cb {
    $cb
 }
 
-sub _fetch_cb_additions {
-   my ($self, $key, $create_cb, @args) = @_;
-   my (@add_cbs) = $self->{$key}->(@args);
-   @add_cbs = map { _trans_create_cb ($_) } @add_cbs;
-
-   if (@add_cbs) {
-      my $crcb = $create_cb;
-      $create_cb = sub {
-         my (@args) = @_;
-         $crcb->(@args) if $crcb;
-         for (@add_cbs) { $_->(@args) }
-      }
-   }
-
-   $create_cb
-}
-
 sub send_presence {
    my ($self, $id, $type, $create_cb, %attrs) = @_;
 
    $create_cb = _trans_create_cb ($create_cb);
-   $create_cb = $self->_fetch_cb_additions (send_pres_cb => $create_cb, $id, $type, \%attrs);
 
    my $w = $self->{writer};
    $w->addPrefix (xmpp_ns ('client'), '');
@@ -556,7 +534,6 @@ sub send_message {
    my ($self, $id, $to, $type, $create_cb, %attrs) = @_;
 
    $create_cb = _trans_create_cb ($create_cb);
-   $create_cb = $self->_fetch_cb_additions (send_msg_cb => $create_cb, $id, $to, $type, \%attrs);
 
    my $w = $self->{writer};
    $w->addPrefix (xmpp_ns ('client'), '');
