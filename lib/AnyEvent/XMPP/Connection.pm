@@ -1234,6 +1234,11 @@ sub disconnected {
    my ($self, $host, $port, $message) = @_;
    delete $self->{authenticated};
    delete $self->{ssl_enabled};
+
+   # FIXME: make it reusable!
+   delete $self->{writer};
+   $self->{parser}->cleanup;
+   delete $self->{parser};
 };
 
 sub send_buffer_empty {

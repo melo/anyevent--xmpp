@@ -26,7 +26,6 @@ sub new {
    my $this = shift;
    my $class = ref($this) || $this;
    my $self = {
-      disconnect_cb => sub {},
       @_
    };
    bless $self, $class;
@@ -105,6 +104,7 @@ sub disconnect {
    my ($self, $msg) = @_;
    $self->end_sockets;
    $self->disconnected ($self->{peer_host}, $self->{peer_port}, $msg);
+   $self->remove_all_callbacks;
 }
 
 sub connected {
