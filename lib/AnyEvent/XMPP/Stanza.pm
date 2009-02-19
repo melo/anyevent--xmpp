@@ -1,6 +1,10 @@
 package AnyEvent::XMPP::Stanza;
 use strict;
 no warnings;
+require Exporter;
+
+our @ISA = qw/Exporter/;
+our @EXPORT = qw/new_iq new_msg new_pres/;
 
 =head1 NAME
 
@@ -18,6 +22,18 @@ which are used to represent the 3 main stanza types of XMPP:
   AnyEvent::XMPP::Presence
 
 =head2 FUNCTIONS
+
+=item B<new_iq ($type, $from, $to, %args)>
+
+=cut
+
+sub new_iq {
+   my ($type, $from, $to, %args) = @_;
+   AnyEvent::XMPP::IQ->new ($type, $from, $to, %args)
+}
+
+sub new_msg { }
+sub new_pres { }
 
 =item B<analyze ($node, $stream_ns)>
 
@@ -39,20 +55,20 @@ sub analyze {
    if (not defined $node) {
       $type = 'end'
 
-   } elsif ($node->eq ($def_ns => 'presence')) {
-      return AnyEvent::XMPP::Presence->new (node => $node, type => 'presence');
+   } elsif ($node->eq ($stream_ns => 'presence')) {
+      return AnyEvent::XMPP::Presence->new ($node, type => 'presence');
 
-   } elsif ($node->eq ($def_ns => 'iq')) {
-      return AnyEvent::XMPP::IQ->new (node => $node, type => 'iq');
+   } elsif ($node->eq ($stream_ns => 'iq')) {
+      return AnyEvent::XMPP::IQ->new ($node, type => 'iq');
 
-   } elsif ($node->eq ($def_ns => 'message')) {
-      return AnyEvent::XMPP::Message->new (node => $node, type => 'message');
+   } elsif ($node->eq ($stream_ns => 'message')) {
+      return AnyEvent::XMPP::Message->new ($node, type => 'message');
 
    } elsif ($node->eq (stream => 'features')) {
-      $type = 'features'
+      return AnyEvent::XMPP::FeatureStanza->new ($node, type => 'features');
 
    } elsif ($node->eq (tls => 'proceed')) {
-      $type = 'tls_proceed'
+      $type = 'tls_proceed';
 
    } elsif ($node->eq (tls => 'failure')) {
       $type = 'tls_failure';
@@ -71,7 +87,7 @@ sub analyze {
 
    }
 
-   AnyEvent::XMPP::Stanza->new (node => $node, type => $type);
+   AnyEvent::XMPP::Stanza->new ($node, type => $type);
 }
 
 =head2 METHODS
@@ -85,10 +101,92 @@ sub analyze {
 sub new {
    my $this  = shift;
    my $class = ref($this) || $this;
-   my $self  = { @_ };
-   bless $self, $class;
+   my $self  = { };
+   $self = bless $self, $class;
+
+   if (ref ($_[0])) {
+      my $node = shift;
+      (%$self) = (node => $node, @_);
+      $self->internal_analyze;
+   } else {
+      $self->construct (@_);
+   }
 
    return $self
+}
+
+sub want_id { $_[0]->{want_id} && not defined $_[0]->{id} }
+sub set_id { $_[0]->{id} = $_[1] }
+
+sub type { $_[0]->{type} }
+
+sub construct {
+   my ($self) = @_;
+}
+
+sub internal_analyze {
+   my ($self) = @_;
+   my $node = $self->{node};
+   $self->{attrs} = $node->attrs;
+}
+
+sub set_default_to {
+   my ($self, $to) = @_;
+
+   unless (defined $self->{attrs}->{to}) {
+      $self->{attrs}->{to} = $to;
+   }
+}
+
+sub set_default_from {
+   my ($self, $from) = @_;
+
+   unless (defined $self->{attrs}->{from}) {
+      $self->{attrs}->{from} = $from;
+   }
+}
+
+sub add {
+   my ($self, $cb) = @_;
+   push @{$self->{cbs}}, $cb;
+}
+
+sub _writer_serialize {
+   my ($w, $arg) = @_;
+
+   if (ref ($arg) eq 'HASH') {
+      simxml ($w, %$arg);
+
+   } elsif (ref ($arg) eq 'ARRAY') {
+      _writer_serialize ($w, $_) for @$arg;
+
+   } else {
+      $arg->($w)
+   }
+}
+
+sub serialize {
+   my ($self, $writer) = @_;
+
+   my @add;
+
+   if (defined $self->{id}) {
+      push @add, (id => $self->{id})
+   }
+
+   $self->{attrs} ||= {};
+
+   $writer->stanza (
+      $self->{name},
+      {
+         (map { $_ => $self->{attrs}->{$_} }
+            grep { defined $self->{attrs}->{$_} }
+               keys %{$self->{attrs}}),
+         @add
+      },
+      $self->{cbs}
+         ? (sub { _writer_serialize ($_[0], $self->{cbs}) }) : ()
+   )
 }
 
 =item B<type>
@@ -139,11 +237,59 @@ no warnings;
 
 use base qw/AnyEvent::XMPP::Stanza/;
 
+sub construct {
+   my ($self, $type, $from, $to, %args) = @_;
+
+   if (my $int = delete $args{create}) {
+      $self->add ($int);
+   }
+
+   $self->{want_id} = 1;
+
+   $self->{name}          = 'iq';
+   $self->{attrs}         = \%args;
+   $self->{attrs}->{to}   = $to;
+   $self->{attrs}->{from} = $from;
+   $self->{attrs}->{type} = $type;
+}
+
 package AnyEvent::XMPP::Presence;
 use strict;
 no warnings;
 
 use base qw/AnyEvent::XMPP::Stanza/;
 
-1;
+package AnyEvent::XMPP::FeatureStanza;
+use strict;
+no warnings;
 
+use base qw/AnyEvent::XMPP::Stanza/;
+
+sub internal_analyze {
+   my ($self) = @_;
+
+   $self->SUPER::internal_analyze;
+
+   my $node = $self->{node};
+
+   my @bind  = $node->find_all ([qw/bind bind/]);
+   my @tls   = $node->find_all ([qw/tls starttls/]);
+   my @mechs = $node->find_all ([qw/sasl mechanisms/], [qw/sasl mechanism/]);
+
+   $self->{sasl_mechs} = [ map { $_->text } @mechs ]
+      if @mechs;
+   $self->{tls}  = 1 if @tls;
+   $self->{bind} = 1 if @bind;
+
+   # and yet another weird thingie: in XEP-0077 it's said that
+   # the register feature MAY be advertised by the server. That means:
+   # it MAY not be advertised even if it is available... so we don't
+   # care about it...
+   # my @reg   = $node->find_all ([qw/register register/]);
+}
+
+sub tls        { (shift)->{tls} }
+sub bind       { (shift)->{tls} }
+sub sasl_mechs { (shift)->{tls} }
+
+1;

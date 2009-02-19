@@ -38,7 +38,7 @@ C<$stream_ns> is the namespace of the stream.
 sub new {
    my $this = shift;
    my $class = ref($this) || $this;
-   my $self = { stream_ns => (shift) };
+   my $self = $class->SUPER::new (stream_ns => (shift));
    bless $self, $class;
    $self->init;
    $self
@@ -57,6 +57,7 @@ sub cb_start_tag {
    $node->append_raw ($p->recognized_string);
 
    if (not @{$self->{nodestack}}) {
+      $self->received_stanza_xml ($node);
       $self->stream_start ($node);
    }
 
@@ -98,11 +99,15 @@ sub cb_end_tag {
    }
 
    if (@{$self->{nodestack}} == 1) {
+      $self->received_stanza_xml ($node);
+
       $self->received_stanza (
          AnyEvent::XMPP::Stanza::analyze ($node, $self->{stream_ns})
       );
 
    } elsif (@{$self->{nodestack}} == 0) {
+      $self->received_stanza_xml ($node);
+
       $self->received_stanza (
          AnyEvent::XMPP::Stanza::analyze ($node, $self->{stream_ns})
       );
@@ -119,6 +124,12 @@ sub cb_default {
 sub init {
    my ($self) = @_;
 
+   if ($self->{parser}) {
+      $self->{parser}->finish;
+      $self->{parser}->release;
+      delete $self->{parser};
+   }
+
    $self->{parser} = XML::Parser::ExpatNB->new (
       Namespaces => 1,
       ProtocolEncoding => 'UTF-8'
@@ -128,7 +139,7 @@ sub init {
       Start   => sub { $self->cb_start_tag (@_) },
       End     => sub { $self->cb_end_tag   (@_) },
       Char    => sub { $self->cb_char_data (@_) },
-      Default => sub { $self->cb_default (@_) },
+      Default => sub { $self->cb_default   (@_) },
    );
 
    $self->{nso}       = {};
@@ -146,7 +157,7 @@ sub cleanup {
 
    $self->{parser}->release;
 
-   for (qw(stanza_cb error_cb stream_cb parser nso nodestack)) {
+   for (qw(stanza_cb parser nso nodestack)) {
       delete $self->{$_};
    }
 

@@ -1,18 +1,22 @@
 package AnyEvent::XMPP::Connection;
 use strict;
 use AnyEvent;
+use AnyEvent::Socket;
+use AnyEvent::Handle;
 use AnyEvent::XMPP::Parser;
 use AnyEvent::XMPP::Writer;
-use AnyEvent::XMPP::Util qw/split_jid join_jid simxml/;
-use AnyEvent::XMPP::SimpleConnection;
+use AnyEvent::XMPP::Authenticator;
+use AnyEvent::XMPP::Util qw/split_jid join_jid simxml dump_twig_xml/;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
-use AnyEvent::XMPP::Extendable;
 use AnyEvent::XMPP::Error;
+use AnyEvent::XMPP::Stanza;
 use Object::Event;
 use Digest::SHA1 qw/sha1_hex/;
 use Encode;
 
 use base qw/Object::Event/;
+
+our $DEBUG = 1;
 
 =head1 NAME
 
@@ -240,11 +244,12 @@ sub cleanup {
    my ($self) = @_;
 
    if ($self->{handle}) {
-      $self->{handle}->on_drain;
       delete $self->{handle};
    }
 
+   delete $self->{server_jid};
    delete $self->{connected};
+   delete $self->{authenticator};
    delete $self->{authenticated};
    delete $self->{ssl_enabled};
    delete $self->{peer_host};
@@ -265,6 +270,7 @@ sub init {
    my ($self) = @_;
 
    $self->cleanup;
+   $self->{stanza_id_cnt} = 0;
 
    $self->{parser} = new AnyEvent::XMPP::Parser $self->default_namespace;
    $self->{parser}->reg_cb (
@@ -272,14 +278,21 @@ sub init {
          my ($parser, $node) = @_;
 
          $self->{stream_id} = $node->attr ('id');
+         $self->{server_jid} = $node->attr ('from');
 
          # This is some very bad "hack" for _very_ old jabber
          # servers to work with AnyEvent::XMPP
-         if (not defined $node->attr ('version')) {
-            $self->start_old_style_authentication
-               if (not $self->{disable_iq_auth})
-                  && (not $self->{disable_old_jabber_authentication})
+         if (not (defined $node->attr ('version'))
+             && not ($self->{disable_iq_auth})
+             && not ($self->{disable_old_jabber_authentication})) {
+
+            $self->start_authenticator;
          }
+      },
+      received_stanza_xml => sub {
+         my ($parser, $node) = @_;
+
+         $self->recv_stanza ($node);
       },
       received_stanza => sub {
          eval { $self->handle_stanza ($_[1]) };
@@ -297,16 +310,14 @@ sub init {
          $self->error (
             AnyEvent::XMPP::Error::Parser->new (
                exception => $ex, data => $data
-            );
+            )
          );
 
          $self->disconnect ("xml error: $ex: $data");
       }
    );
 
-   $self->{writer} = AnyEvent::XMPP::Writer->new (
-      write_cb => sub { $self->write_data ($_[0]) }
-   );
+   $self->{writer} = AnyEvent::XMPP::Writer->new (stream_ns => $self->default_namespace);
 }
 
 =item B<connect ()>
@@ -326,7 +337,6 @@ object. You need to recreate it if you want to reconnect.
 NOTE: The "XML" stream initiation is sent when the connection
 was successfully connected.
 
-
 =cut
 
 sub connect {
@@ -339,52 +349,53 @@ sub connect {
    $self->init;
 
    my ($host, $service, $timeout) =
-      ($self->{host}, $self->{port}, $self->{connect_timeout})
+      ($self->{host}, $self->{port}, $self->{connect_timeout});
 
-   $self->{handle} = tcp_connect $host, $service, sub {
-      my ($fh, $peerhost, $peerport) = @_;
+   $self->{handle} =
+      tcp_connect $host, $service, sub {
+         my ($fh, $peerhost, $peerport) = @_;
 
-      unless ($fh) {
-         $self->disconnect ("Couldn't create socket to $host:$service: $!");
-         return;
-      }
+         unless ($fh) {
+            $self->disconnect ("Couldn't create socket to $host:$service: $!");
+            return;
+         }
 
-      $self->{peer_host} = $peerhost;
-      $self->{peer_port} = $peerport;
+         $self->{peer_host} = $peerhost;
+         $self->{peer_port} = $peerport;
 
-      binmode $fh, ":raw";
+         binmode $fh, ":raw";
 
-      $self->{handle} =
-         AnyEvent::Handle->new (
-            fh => $fh,
-            on_eof => sub {
-               $self->disconnect (
-                  "EOF on connection to $self->{peer_host}:$self->{peer_port}: $!"
-               );
-            },
-            on_error => sub {
-               $self->disconnect (
-                  "Error on connection to $self->{peer_host}:$self->{peer_port}: $!"
-               );
-            },
-            on_read => sub {
-               my ($hdl) = @_;
-               my $data   = $hdl->rbuf;
-               $hdl->rbuf = '';
-               $data      = decode_utf8 $data;
-               $self->debug_recv ($data);
-               $self->{parser}->feed ($data);
-            },
-         );
-      
-      $self->connected
-      
-   }, sub { $timeout };
+         $self->{handle} =
+            AnyEvent::Handle->new (
+               fh => $fh,
+               on_eof => sub {
+                  $self->disconnect (
+                     "EOF on connection to $self->{peer_host}:$self->{peer_port}: $!"
+                  );
+               },
+               on_error => sub {
+                  $self->disconnect (
+                     "Error on connection to $self->{peer_host}:$self->{peer_port}: $!"
+                  );
+               },
+               on_read => sub {
+                  my ($hdl) = @_;
+                  my $data   = $hdl->rbuf;
+                  $hdl->rbuf = '';
+                  $data      = decode_utf8 $data;
+
+                  $self->debug_recv ($data);
+                  $self->{parser}->feed ($data);
+               },
+            );
+         
+         $self->connected
+         
+      }, sub { $timeout };
 }
 
 sub write_data {
    my ($self, $data) = @_;
-   $self->send_stanza_data ($data);
 
    $self->{handle}->push_write (encode_utf8 ($data));
    $self->{handle}->on_drain (sub {
@@ -400,6 +411,29 @@ sub enable_ssl {
    $self->{handle}->starttls ('connect');
    $self->{ssl_enabled} = 1;
 }
+
+
+=item B<close>
+
+This method will send a closing stream stanza if we are connected.
+Please use this method whenever you want to close a connection gracefully.
+
+=cut
+
+sub close {
+   my ($self) = @_;
+
+   if ($self->{connected}) {
+      $self->write_data ($self->{writer}->end_of_stream);
+   }
+}
+
+=item B<disconnect ($msg)>
+
+Call this method if you want to kill the connection forcefully.
+C<$msg> is a human readable message for logging purposes.
+
+=cut
 
 sub disconnect {
    my ($self, $msg) = @_;
@@ -434,7 +468,8 @@ sub jid { $_[0]->{jid} }
 
 =item B<features>
 
-Returns the last received <features> tag in form of an L<AnyEvent::XMPP::Node> object.
+Returns the last received C<features> stanza in form of a
+L<AnyEvent::XMPP::FeatureStanza> object.
 
 =cut
 
@@ -448,278 +483,121 @@ This is the ID of this stream that was given us by the server.
 
 sub stream_id { $_[0]->{stream_id} }
 
-sub send_sasl_auth {
-   my ($self, @mechs) = @_;
+=item B<send ($stanza)>
 
-   for (qw/username password domain/) {
-      die "No '$_' argument given to new, but '$_' is required\n"
-         unless defined $self->{$_};
-   }
-
-   $self->{writer}->send_sasl_auth (
-      [map { $_->text } @mechs],
-      $self->{username},
-      ($self->{use_host_as_sasl_hostname}
-         ? $self->{host}
-         : $self->{domain}),
-      $self->{password}
-   );
-}
-
-sub handle_stream_features {
-   my ($self, $node) = @_;
-   my @bind  = $node->find_all ([qw/bind bind/]);
-   my @tls   = $node->find_all ([qw/tls starttls/]);
-
-   # and yet another weird thingie: in XEP-0077 it's said that
-   # the register feature MAY be advertised by the server. That means:
-   # it MAY not be advertised even if it is available... so we don't
-   # care about it...
-   # my @reg   = $node->find_all ([qw/register register/]);
-
-   if (not ($self->{disable_ssl}) && not ($self->{ssl_enabled}) && @tls) {
-      $self->{writer}->send_starttls;
-
-   } elsif (not $self->{authenticated}) {
-      my $continue = 1;
-      my (@ret) = $self->event (stream_pre_authentication => \$continue);
-      $continue = pop @ret if @ret;
-      if ($continue) {
-         $self->authenticate;
-      }
-
-   } elsif (@bind) {
-      $self->do_rebind ($self->{resource});
-   }
-}
-
-=item B<authenticate>
-
-This method should be called after the C<stream_pre_authentication> event
-was emitted to continue authentication of the stream.
-
-Usually this method only has to be called when you want to register before
-you authenticate. See also the documentation of the C<stream_pre_authentication>
-event below.
+This method is used to send an XMPP stanza directly over
+the connection. 
 
 =cut
 
-sub authenticate {
-   my ($self) = @_;
-   my $node = $self->{features};
-   my @mechs = $node->find_all ([qw/sasl mechanisms/], [qw/sasl mechanism/]);
+sub send {
+   my ($self, $stanza) = @_;
 
-   # Yes, and also iq-auth isn't correctly advertised in the
-   # stream features! We all love the depreacted XEP-0078, eh?
-   my @iqa = $node->find_all ([qw/iqauth auth/]);
-
-   if (not ($self->{disable_sasl}) && @mechs) {
-      $self->send_sasl_auth (@mechs)
-
-   } elsif (not $self->{disable_iq_auth}) {
-      if ($self->{anal_iq_auth} && !@iqa) {
-         if (@iqa) {
-            $self->do_iq_auth;
-         } else {
-            die "No authentication method left after anal iq auth, neither SASL or IQ auth.\n";
-         }
-      } else {
-         $self->do_iq_auth;
-      }
-
-   } else {
-      die "No authentication method left, neither SASL or IQ auth.\n";
-   }
-}
-
-sub handle_sasl_challenge {
-   my ($self, $node) = @_;
-   $self->{writer}->send_sasl_response ($node->text);
-}
-
-sub handle_sasl_success {
-   my ($self, $node) = @_;
-   $self->{authenticated} = 1;
-   $self->{parser}->init;
-   $self->{writer}->init;
-   $self->{writer}->send_init_stream (
-      $self->{language}, $self->{domain}, $self->{stream_namespace}
-   );
-}
-
-sub handle_error {
-   my ($self, $node) = @_;
-   my $error = AnyEvent::XMPP::Error::Stream->new (node => $node);
-
-   $self->event (stream_error => $error);
-   $self->{writer}->send_end_of_stream;
-}
-
-# This is a hack for jabberd 1.4.2, VERY OLD Jabber stuff.
-sub start_old_style_authentication {
-   my ($self) = @_;
-
-   $self->{features}
-      = AnyEvent::XMPP::Node->new (
-          'http://etherx.jabber.org/streams', 'features', [], $self->{parser}
-        );
-
-   my $continue = 1;
-   my (@ret) = $self->event (stream_pre_authentication => \$continue);
-   $continue = pop @ret if @ret;
-   if ($continue) {
-      $self->do_iq_auth;
-   }
-}
-
-sub do_iq_auth {
-   my ($self) = @_;
-
-   if ($self->{anal_iq_auth}) {
-      $self->send_iq (get => {
-         defns => 'auth', node => { ns => 'auth', name => 'query',
-            # heh, something i've seen on some ejabberd site:
-            # childs => [ { name => 'username', childs => [ $self->{username} ] } ] 
-         }
-      }, sub {
-         my ($n, $e) = @_;
-         if ($e) {
-            $self->event (iq_auth_error =>
-               AnyEvent::XMPP::Error::IQAuth->new (context => 'iq_error', iq_error => $e)
-            );
-         } else {
-            my $fields = {};
-            my (@query) = $n->find_all ([qw/auth query/]);
-            if (@query) {
-               for (qw/username password digest resource/) {
-                  if ($query[0]->find_all ([qw/auth/, $_])) {
-                     $fields->{$_} = 1;
-                  }
-               }
-
-               $self->do_iq_auth_send ($fields);
-            } else {
-               $self->event (iq_auth_error =>
-                  AnyEvent::XMPP::Error::IQAuth->new (context => 'no_fields')
-               );
-            }
-         }
-      });
-   } else {
-      $self->do_iq_auth_send ({ username => 1, password => 1, resource => 1 });
-   }
-}
-
-sub do_iq_auth_send {
-   my ($self, $fields) = @_;
-
-   for (qw/username password resource/) {
-      die "No '$_' argument given to new, but '$_' is required\n"
-         unless defined $self->{$_};
+   if ($stanza->want_id) {
+      $stanza->set_id ('c_' . ++$self->{stanza_id_cnt})
    }
 
-   my $do_resource = $fields->{resource};
-   my $password = $self->{password};
+   $self->send_stanza ($stanza);
+   $self->write_data ($stanza->serialize ($self->{writer}));
+}
 
-   if ($fields->{digest}) {
-      my $out_password = encode ("UTF-8", $password);
-      my $out = lc sha1_hex ($self->stream_id () . $out_password);
-      $fields = {
-         username => $self->{username},
-         digest => $out,
-      }
+sub start_authenticator {
+   my ($self, $stanza) = @_;
 
-   } else {
-      $fields = {
-         username => $self->{username},
-         password => $password
-      }
-   }
+   $self->send (new_iq (set => undef, 'elmex@192.168.5.10', create => sub {
+      $_[0]->emptyTag ('def');
+   }));
 
-   if ($do_resource && defined $self->{resource}) {
-      $fields->{resource} = $self->{resource}
-   }
+   return;
 
-   $self->send_iq (set => {
-      defns => 'auth',
-      node => { ns => 'auth', name => 'query', childs => [
-         map { { name => $_, childs => [ $fields->{$_} ] } } reverse sort keys %$fields
-      ]}
-   }, sub {
-      my ($n, $e) = @_;
-      if ($e) {
-         $self->event (iq_auth_error =>
-            AnyEvent::XMPP::Error::IQAuth->new (context => 'iq_error', iq_error => $e)
-         );
-      } else {
+   $self->{authenticator}
+      = AnyEvent::XMPP::Authenticator->new (connection => $self);
+   $self->{authenticator}->reg_cb (
+      auth => sub {
+         delete $self->{authenticator};
          $self->{authenticated} = 1;
-         $self->{jid} = join_jid ($self->{username}, $self->{domain}, $self->{resource});
-         $self->event (stream_ready => $self->{jid});
+      },
+      auth_fail => sub {
+         my ($auth, $error) = @_;
+         $self->error ($error);
+         $self->disconnect ("authentication failed");
       }
-   });
+   );
+
+   $self->{authenticator}->start ($stanza);
 }
 
-# TODO TODO
-# TODO TODO
-# TODO TODO
-# TODO TODO
-# TODO TODO
-# TODO TODO
-# TODO TODO
-# TODO TODO
-sub handle_stanza {
-   my ($self, $p, $node) = @_;
+sub bind_resource {
+   my ($self) = @_;
 
-   if (not defined $node) { # got stream end
+}
+
+sub get_first_bound_resource_jid {
+   my ($self) = @_;
+   return unless %{$self->{bound_resources} || {}};
+
+   my ($k) = keys %{$self->{bound_resources}};
+   $self->{bound_resources}->{$k}
+}
+
+sub handle_stanza {
+   my ($self, $stanza) = @_;
+
+   if (defined (my $resjid = $self->get_first_bound_resource_jid)) {
+      $stanza->set_default_to ($resjid);
+   }
+
+   if (defined $self->{server_jid}) {
+      $stanza->set_default_from ($self->{server_jid});
+   }
+
+   if ($stanza->type eq 'end') {
       $self->disconnect ("end of 'XML' stream encountered");
       return;
    }
 
-   my (@res) = $self->event (recv_stanza_xml => $node);
-   @res = grep $_, @res;
-   return if @res;
+   if ($self->is_connected
+       && grep { $stanza->type eq $_ } qw/iq presence message/) {
+       $self->recv ($stanza);
+       return;
+   }
 
-   my $def_ns = $self->default_namespace;
+   my $type = $stanza->type;
 
-   if ($node->eq (stream => 'features')) {
-      $self->event (stream_features => $node);
-      $self->{features} = $node;
-      $self->handle_stream_features ($node);
+   if ($type eq 'features') {
+      $self->{features} = $stanza;
 
-   } elsif ($node->eq (tls => 'proceed')) {
+      if (not ($self->{disable_ssl})
+          && not ($self->{ssl_enabled})
+          && $stanza->tls) {
+         $self->write_data ($self->{writer}->starttls);
+
+      } elsif (not $self->{authenticated}) {
+         $self->start_authenticator ($stanza);
+
+      } elsif ($stanza->bind) {
+         $self->bind_resource;
+      }
+
+   } elsif ($type eq 'tls_proceed') {
       $self->enable_ssl;
       $self->{parser}->init;
       $self->{writer}->init;
-      $self->{writer}->send_init_stream (
-         $self->{language}, $self->{domain}, $self->default_namespace
+      $self->write_data (
+         $self->{writer}->init_stream ($self->{language}, $self->{domain})
       );
 
-   } elsif ($node->eq (tls => 'failure')) {
-      $self->event ('tls_error');
-      $self->disconnect ('TLS failure on TLS negotiation.');
+   } elsif ($type eq 'tls_failure') {
+      $self->error (
+         my $err = AnyEvent::XMPP::Error->new (text => 'tls negotiation failed')
+      );
+      $self->disconnect ("TLS handshake failure");
 
-   } elsif ($node->eq (sasl => 'challenge')) {
-      $self->handle_sasl_challenge ($node);
-
-   } elsif ($node->eq (sasl => 'success')) {
-      $self->handle_sasl_success ($node);
-
-   } elsif ($node->eq (sasl => 'failure')) {
-      my $error = AnyEvent::XMPP::Error::SASL->new (node => $node);
-      $self->event (sasl_error => $error);
-      $self->disconnect ('SASL authentication failure: ' . $error->string);
-
-   } elsif ($node->eq ($def_ns => 'iq')) {
-      $self->event (iq_xml => $node);
-
-   } elsif ($node->eq ($def_ns => 'message')) {
-      $self->event (message_xml => $node);
-
-   } elsif ($node->eq ($def_ns => 'presence')) {
-      $self->event (presence_xml => $node);
-
-   } elsif ($node->eq (stream => 'error')) {
-      $self->handle_error ($node);
+   } elsif ($type eq 'error') {
+      $self->error (
+         my $err = AnyEvent::XMPP::Error::Stream->new (node => $stanza->{node})
+      );
+      $self->disconnect ("stream error");
    }
 }
 
@@ -739,6 +617,167 @@ These events can be registered on with C<reg_cb>:
 
 =over 4
 
+=item connected
+
+This event is emitted when the TCP connection could be established.
+Please wait for the C<stream_ready> event before you start sending
+data.
+
+=cut
+
+sub connected {
+   my ($self) = @_;
+
+   if ($DEBUG) {
+      print "connected to $self->{peer_host}:$self->{peer_port}\n";
+   }
+
+   if ($self->{old_style_ssl}) {
+      $self->enable_ssl;
+   }
+
+   $self->write_data (
+      $self->{writer}->init_stream (
+         $self->{language},
+         $self->{domain},
+         $self->{stream_version_override}
+      )
+   );
+
+   $self->{connected} = 1;
+}
+
+=item disconnected => $peer_host, $peer_port, $reason
+
+This event is emitted when the TCP connection was disconnected, either remotely
+or locally. C<$peerhost> and C<$peerport> are the host and port of the other
+TCP endpoint. And C<$reason> is a human readable string which indicates the
+reason for the disconnect.
+
+=cut
+
+sub disconnected {
+   my ($self, $host, $port, $message) = @_;
+
+   if ($DEBUG) {
+      print "disconnected from $host:$port: $message\n";
+   }
+
+   $self->cleanup;
+};
+
+=item recv => $stanza
+
+This event is emitted whenever either an IQ, presence or message XMPP stanza
+has been received over a connected and authenticated connection.
+
+This is the even you usually want to register callbacks on.
+
+=cut
+
+sub recv {}
+
+=item send_buffer_empty
+
+Whenever the write queue to the TCP connection becomes empty this
+event is emitted. It is useful if you want to wait until all the
+messages you've given to the connection is written out to the kernel.
+
+FIXME: insert example here when stanza handling/sending is done
+
+=cut
+
+sub send_buffer_empty {
+   my ($self) = @_;
+
+   # event
+}
+
+=item handle_stanza => $stanza
+
+This event is emitted whenever a L<AnyEvent::XMPP::Stanza> object is being
+received from the parser. This event is mainly aimed at people who are up to no
+good and want to intercept a stanza before L<AnyEvent::XMPP::Connection> gets a
+chance to look at it. Here is an example if you want to do that:
+
+   $con->reg_cb (before_handle_stanza => sub {
+      my ($con, $stanza) = @_;
+
+      if ($stanza ...) {
+         # this stops further handling of the event
+         $con->current->stop;
+      }
+   });
+
+B<NOTE>: Please only do this if you know what you are doing. For normal stanza
+handling please see the C<recv> event.
+
+=item send_stanza => $stanza
+
+This event is emitted when an L<AnyEvent::XMPP::Stanza> object is about to be
+written out.
+
+=cut
+
+sub send_stanza {
+}
+
+=item recv_stanza => $node
+
+This event is emitted when a complete stanza has been received.
+C<$node> is the L<AnyEvent::XMPP::Node> object which represents the XML stanza.
+You might want to use the C<as_string> method of L<AnyEvent::XMPP::Node> for
+debugging output:
+
+   $con->reg_cb (recv_stanza => sub {
+      my ($con, $node) = @_;
+      warn "recv: " . $node->as_string . "\n";
+   });
+
+=cut
+
+sub recv_stanza {
+   my ($self, $node) = @_;
+
+   if ($DEBUG) {
+      print ">>>>> $self->{peer_host}:$self->{peer_port} >>>>>\n"
+            . dump_twig_xml ($node->as_string)
+            . "\n";
+   }
+}
+
+=item debug_recv => $data
+
+Whenever a chunk of data has been received from the TCP/TLS connection this
+event is emitted with that chunk in C<$data>. Please note that that chunk might
+B<NOT> contain a complete XML stanza, it might contain a partial one or
+multiple stanzas.
+
+If you want to debug which stanzas have actually been received use
+the C<recv_stanza> event!
+
+=cut
+
+sub debug_recv {}
+
+=item debug_send => $data
+
+The C<debug_send> event is emitted when the data has been given to
+L<AnyEvent::Handle> for writing. C<$data> is the unicode encoded XML string
+which contains exactly one stanza which has been sent.
+
+=cut
+
+sub debug_send {
+   my ($self, $data) = @_;
+
+   if ($DEBUG) {
+      print "<<<<< $self->{peer_host}:$self->{peer_port} <<<<<\n"
+            . dump_twig_xml ($data)
+            . "\n";
+   }
+}
+
 =item error => $error
 
 This event is generated whenever some error occurred. C<$error> is an instance
@@ -748,41 +787,14 @@ of L<AnyEvent::XMPP::Error>. Trivial error reporting may look like this:
 
 =cut
 
-sub error { my ($self, $errorobj) = @_ }
+sub error {
+   my ($self, $errorobj) = @_;
 
-# TODO: document events and extend Object::Event to allow attribute based
-#       priorities of these methods.
-
-sub connected {
-   my ($self) = @_;
-
-   if ($self->{old_style_ssl}) {
-      $self->enable_ssl;
+   if ($DEBUG) {
+      print "EEEEE $self->{peer_host}:$self->{peer_port} EEEE: "
+            . $errorobj->string . "\n";
    }
-
-   $self->{writer}->send_init_stream (
-      $self->{language},
-      $self->{domain},
-      $self->default_namespace,
-      $self->{stream_version_override}
-   );
-
-   $self->{connected} = 1;
 }
-
-sub disconnected {
-   my ($self, $host, $port, $message) = @_;
-   $self->cleanup;
-};
-
-sub send_buffer_empty {
-   my ($self) = @_;
-   # event
-}
-
-sub send_stanza_data {}
-sub debug_recv {}
-sub debug_send {}
 
 =back
 

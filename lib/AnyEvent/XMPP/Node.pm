@@ -139,6 +139,14 @@ sub attr {
    $_[0]->[ATTRS]->{$_[1]};
 }
 
+=item B<attrs>
+
+Returns a hash reference of attributes of this node.
+
+=cut
+
+sub attrs { $_[0]->[ATTRS] || {} }
+
 =item B<add_node ($node)>
 
 Adds a sub-node to the current node.
@@ -220,7 +228,6 @@ sub write_on {
    my ($self, $w) = @_;
    $w->raw ($self->as_string);
 }
-
 
 =item B<as_string ()>
 

@@ -8,6 +8,31 @@ use AnyEvent::XMPP::Util qw/simxml filter_xml_chars filter_xml_attr_hash_chars/;
 use Digest::SHA1 qw/sha1_hex/;
 use Encode;
 
+our %STANZA_ERRORS = (
+   'bad-request'             => ['modify', 400],
+   'conflict'                => ['cancel', 409],
+   'feature-not-implemented' => ['cancel', 501],
+   'forbidden'               => ['auth',   403],
+   'gone'                    => ['modify', 302],
+   'internal-server-error'   => ['wait',   500],
+   'item-not-found'          => ['cancel', 404],
+   'jid-malformed'           => ['modify', 400],
+   'not-acceptable'          => ['modify', 406],
+   'not-allowed'             => ['cancel', 405],
+   'not-authorized'          => ['auth',   401],
+   'payment-required'        => ['auth',   402],
+   'recipient-unavailable'   => ['wait',   404],
+   'redirect'                => ['modify', 302],
+   'registration-required'   => ['auth',   407],
+   'remote-server-not-found' => ['cancel', 404],
+   'remote-server-timeout'   => ['wait',   504],
+   'resource-constraint'     => ['wait',   500],
+   'service-unavailable'     => ['cancel', 503],
+   'subscription-required'   => ['auth',   407],
+   'undefined-condition'     => ['cancel', 500],
+   'unexpected-request'      => ['wait',   400],
+);
+
 =head1 NAME
 
 AnyEvent::XMPP::Writer - "XML" writer for XMPP
@@ -90,29 +115,14 @@ XML-like, and some XML utilities allow you to process this kind of XML.".
 
 =item B<new (%args)>
 
-This methods takes following arguments:
-
-=over 4
-
-=item write_cb
-
-The callback that is called when a XML stanza was completely written and is
-ready for transfer. The first argument of the callback will be the character
-data to send to the socket.
-
-=back
-
-And calls C<init>.
+Basic constructor, which calls C<init>.
 
 =cut
 
 sub new {
    my $this = shift;
    my $class = ref($this) || $this;
-   my $self = {
-      write_cb     => sub {},
-      @_
-   };
+   my $self = { @_ };
    bless $self, $class;
    $self->init;
    return $self;
@@ -126,10 +136,18 @@ sub new {
 
 sub init {
    my ($self) = @_;
-   $self->{write_buf} = "";
+   $self->{ns} = xmpp_ns ($self->{stream_ns});
+   $self->{write_buf} = '';
+
    $self->{writer} =
-      XML::Writer->new (OUTPUT => \$self->{write_buf}, NAMESPACES => 1, UNSAFE => 1);
+      XML::Writer->new (
+         OUTPUT => \$self->{write_buf},
+         NAMESPACES => 1,
+         UNSAFE => 1
+      );
 }
+
+sub ns { (shift)->{ns} }
 
 =item B<flush ()>
 
@@ -140,10 +158,10 @@ callback. (see also C<new ()> above)
 
 sub flush {
    my ($self) = @_;
-   $self->{write_cb}->(substr $self->{write_buf}, 0, (length $self->{write_buf}), '');
+   substr $self->{write_buf}, 0, (length $self->{write_buf}), ''
 }
 
-=item B<send_init_stream ($language, $domain, $namespace)>
+=item B<init_stream ($language, $domain, $namespace)>
 
 This method will generate a XMPP stream header. C<$domain> has to be the
 domain of the server (or endpoint) we want to connect to.
@@ -153,77 +171,78 @@ for the stream namespace. (This is used by L<AnyEvent::XMPP::Component> to conne
 as component to a server). C<$namespace> can also be undefined, in this case
 the C<client> namespace will be used.
 
+The return value is the unicode character string of the generated header.
+
 =cut
 
-sub send_init_stream {
-   my ($self, $language, $domain, $ns, $vers_override) = @_;
-
-   $ns ||= 'client';
+sub init_stream {
+   my ($self, $language, $domain, $vers_override) = @_;
 
    my $w = $self->{writer};
    $w->xmlDecl ();
    $w->addPrefix (xmpp_ns ('stream'), 'stream');
-   $w->addPrefix (xmpp_ns ($ns), '');
-   $w->forceNSDecl (xmpp_ns ($ns));
+   $w->addPrefix ($self->ns, '');
+   $w->forceNSDecl ($self->ns);
    $w->startTag (
       [xmpp_ns ('stream'), 'stream'],
       to      => $domain,
       version => (defined $vers_override ? $vers_override : '1.0'),
       [xmpp_ns ('xml'), 'lang'] => $language
    );
-   $self->flush;
+
+   $self->flush
 }
 
-=item B<send_whitespace_ping>
+=item B<whitespace_ping>
 
-This method sends a single space to the server.
+This method generates a single space for the server and returns it.
 
 =cut
 
-sub send_whitespace_ping {
+sub whitespace_ping {
    my ($self) = @_;
    $self->{writer}->raw (' ');
-   $self->flush;
+   $self->flush
 }
 
-=item B<send_handshake ($streamid, $secret)>
+=item B<component_handshake ($streamid, $secret)>
 
-This method sends a component handshake. Please note that C<$secret>
+This method generates a component handshake. Please note that C<$secret>
 must be XML escaped!
 
 =cut
 
-sub send_handshake {
+sub component_handshake {
    my ($self, $id, $secret) = @_;
    my $out_secret = encode ("UTF-8", $secret);
    my $out = lc sha1_hex ($id . $out_secret);
    simxml ($self->{writer}, defns => 'component', node => {
       ns => 'component', name => 'handshake', childs => [ $out ]
    });
-   $self->flush;
+   $self->flush
 }
 
-=item B<send_end_of_stream>
+=item B<end_of_stream>
 
-Sends end of the stream.
+Generates a end of the stream.
 
 =cut
 
-sub send_end_of_stream {
+sub end_of_stream {
    my ($self) = @_;
    my $w = $self->{writer};
    $w->endTag ([xmpp_ns ('stream'), 'stream']);
-   $self->flush;
+   $self->flush
 }
 
-=item B<send_sasl_auth ($mechanisms, $user, $hostname, $pass)>
+=item B<sasl_auth ($mechanisms, $user, $hostname, $pass)>
 
-This methods sends the start of a SASL authentication. C<$mechanisms> is
-an array reference, containing the mechanism names that are to be tried.
+This methods generates the start of a SASL authentication. C<$mechanisms> is an
+array reference, containing the mechanism names that are to be tried.
 
 =cut
 
-sub send_sasl_auth {
+sub sasl_auth {
    my ($self, $mechs, $user, $hostname, $pass) = @_;
 
    my $data;
@@ -262,17 +281,18 @@ sub send_sasl_auth {
    $w->startTag ([xmpp_ns ('sasl'), 'auth'], mechanism => $self->{sasl}->mechanism);
    $w->characters (MIME::Base64::encode_base64 ($data, ''));
    $w->endTag;
-   $self->flush;
+
+   $self->flush
 }
 
-=item B<send_sasl_response ($challenge)>
+=item B<sasl_response ($challenge)>
 
 This method generated the SASL authentication response to a C<$challenge>.
 You must not call this method without calling C<send_sasl_auth ()> before.
 
 =cut
 
-sub send_sasl_response {
+sub sasl_response {
    my ($self, $challenge) = @_;
    $challenge = MIME::Base64::decode_base64 ($challenge);
    my $ret = '';
@@ -287,21 +307,23 @@ sub send_sasl_response {
    $w->startTag ([xmpp_ns ('sasl'), 'response']);
    $w->characters (MIME::Base64::encode_base64 ($ret, ''));
    $w->endTag;
-   $self->flush;
+
+   $self->flush
 }
 
-=item B<send_starttls>
+=item B<starttls>
 
-Sends the starttls command to the server.
+Generates the starttls command for the server.
 
 =cut
 
-sub send_starttls {
+sub starttls {
    my ($self) = @_;
    my $w = $self->{writer};
    $w->addPrefix (xmpp_ns ('tls'),   '');
    $w->emptyTag ([xmpp_ns ('tls'), 'starttls']);
-   $self->flush;
+
+   $self->flush
 }
 
 =item B<send_iq ($id, $type, $create_cb, %attrs)>
@@ -430,9 +452,7 @@ sub _generate_key_xmls {
          $w->endTag;
       }
    } else {
-      $w->startTag ($key);
-      $w->characters (filter_xml_chars $value);
-      $w->endTag;
+      _generate_key_xml ($w, $key, $value);
    }
 }
 
@@ -570,76 +590,72 @@ sub send_message {
    $self->flush;
 }
 
-
-=item B<write_error_tag ($error_stanza_node, $error_type, $error)>
-
-C<$error_type> is one of 'cancel', 'continue', 'modify', 'auth' and 'wait'.
-C<$error> is the name of the error tag child element. If C<$error> is one of
-the following:
-
-   'bad-request', 'conflict', 'feature-not-implemented', 'forbidden', 'gone',
-   'internal-server-error', 'item-not-found', 'jid-malformed', 'not-acceptable',
-   'not-allowed', 'not-authorized', 'payment-required', 'recipient-unavailable',
-   'redirect', 'registration-required', 'remote-server-not-found',
-   'remote-server-timeout', 'resource-constraint', 'service-unavailable',
-   'subscription-required', 'undefined-condition', 'unexpected-request'
-
-then a default can be select for C<$error_type>, and the argument can be undefined.
-
-Note: This method is currently a bit limited in the generation of the xml
-for the errors, if you need more please contact me.
-
-=cut
-
-our %STANZA_ERRORS = (
-   'bad-request'             => ['modify', 400],
-   'conflict'                => ['cancel', 409],
-   'feature-not-implemented' => ['cancel', 501],
-   'forbidden'               => ['auth',   403],
-   'gone'                    => ['modify', 302],
-   'internal-server-error'   => ['wait',   500],
-   'item-not-found'          => ['cancel', 404],
-   'jid-malformed'           => ['modify', 400],
-   'not-acceptable'          => ['modify', 406],
-   'not-allowed'             => ['cancel', 405],
-   'not-authorized'          => ['auth',   401],
-   'payment-required'        => ['auth',   402],
-   'recipient-unavailable'   => ['wait',   404],
-   'redirect'                => ['modify', 302],
-   'registration-required'   => ['auth',   407],
-   'remote-server-not-found' => ['cancel', 404],
-   'remote-server-timeout'   => ['wait',   504],
-   'resource-constraint'     => ['wait',   500],
-   'service-unavailable'     => ['cancel', 503],
-   'subscription-required'   => ['auth',   407],
-   'undefined-condition'     => ['cancel', 500],
-   'unexpected-request'      => ['wait',   400],
-);
-
-sub write_error_tag {
-   my ($self, $errstanza, $type, $error) = @_;
+sub stanza {
+   my ($self, $name, $attrs, $internal_cb) = @_;
 
    my $w = $self->{writer};
 
-   $_->write_on ($w) for $errstanza->nodes;
+   $w->addPrefix ($self->ns, '');
 
-   my @add;
-
-   unless (defined $type and defined $STANZA_ERRORS{$error}) {
-      $type = $STANZA_ERRORS{$error}->[0];
+   if ($internal_cb) {
+      $w->startTag ([$self->ns, $name], %$attrs);
+      $internal_cb->($w);
+      $w->endTag;
+   } else {
+      $w->emptyTag ([$self->ns, $name], %$attrs);
    }
 
-   push @add, (code => $STANZA_ERRORS{$error}->[1]);
-
-   my %add = @add;
-   filter_xml_attr_hash_chars \%add;
-
-   $w->addPrefix (xmpp_ns ('client'), '');
-   $w->startTag ([xmpp_ns ('client') => 'error'], type => $type, %add);
-      $w->addPrefix (xmpp_ns ('stanzas'), '');
-      $w->emptyTag ([xmpp_ns ('stanzas') => filter_xml_chars $error]);
-   $w->endTag;
+   $self->flush
 }
+
+
+#=item B<error_tag ($error_stanza_node, $error_type, $error)>
+#
+#C<$error_type> is one of 'cancel', 'continue', 'modify', 'auth' and 'wait'.
+#C<$error> is the name of the error tag child element. If C<$error> is one of
+#the following:
+#
+#   'bad-request', 'conflict', 'feature-not-implemented', 'forbidden', 'gone',
+#   'internal-server-error', 'item-not-found', 'jid-malformed', 'not-acceptable',
+#   'not-allowed', 'not-authorized', 'payment-required', 'recipient-unavailable',
+#   'redirect', 'registration-required', 'remote-server-not-found',
+#   'remote-server-timeout', 'resource-constraint', 'service-unavailable',
+#   'subscription-required', 'undefined-condition', 'unexpected-request'
+#
+#then a default can be select for C<$error_type>, and the argument can be undefined.
+#
+#Note: This method is currently a bit limited in the generation of the XML
+#for the errors, if you need more please contact me.
+#
+#=cut
+#
+#
+#sub error_tag {
+#   my ($self, $errstanza, $type, $error) = @_;
+#
+#   my $w = $self->{writer};
+#
+#   $_->write_on ($w) for $errstanza->nodes;
+#
+#   my @add;
+#
+#   unless (defined $type and defined $STANZA_ERRORS{$error}) {
+#      $type = $STANZA_ERRORS{$error}->[0];
+#   }
+#
+#   push @add, (code => $STANZA_ERRORS{$error}->[1]);
+#
+#   my %add = @add;
+#   filter_xml_attr_hash_chars \%add;
+#
+#   $w->addPrefix (xmpp_ns ('client'), '');
+#   $w->startTag ([xmpp_ns ('client') => 'error'], type => $type, %add);
+#      $w->addPrefix (xmpp_ns ('stanzas'), '');
+#      $w->emptyTag ([xmpp_ns ('stanzas') => filter_xml_chars $error]);
+#   $w->endTag;
+#
+#   $self->flush
+#}
 
 =back
 

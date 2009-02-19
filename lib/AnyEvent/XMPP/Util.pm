@@ -291,6 +291,7 @@ Where node is:
                 attrs => [ 'name', 'value', 'name2', 'value2', ... ],
                 childs => [ <node>, ... ]
              }
+           | [ sub { my ($w) = @_; ... }, ... ]
            | sub { my ($w) = @_; ... } # with $w being a XML::Writer object
            | "textnode"
 
@@ -344,6 +345,7 @@ sub simxml {
    if (my $n = $desc{defns}) {
       $w->addPrefix (xmpp_ns_maybe ($n), '');
    }
+
    unless (exists $desc{fb_ns}) {
       $desc{fb_ns} = $desc{defns};
    }
@@ -361,6 +363,9 @@ sub simxml {
 
    } elsif (ref ($node) eq 'CODE') {
       $node->($w);
+
+   } elsif (ref ($node) eq 'ARRAY') {
+      $_->($w) for @$node;
 
    } elsif (ref ($node)) {
       my $ns = $node->{dns} ? $node->{dns} : $node->{ns};
