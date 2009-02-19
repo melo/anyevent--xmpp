@@ -11,8 +11,8 @@ use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Error;
 use AnyEvent::XMPP::Stanza;
 use Object::Event;
-use Digest::SHA1 qw/sha1_hex/;
 use Encode;
+use Carp qw/croak/;
 
 use base qw/Object::Event/;
 
@@ -40,16 +40,17 @@ AnyEvent::XMPP::Connection - XML stream that implements the XMPP RFC 3920.
 
 =head1 DESCRIPTION
 
-This module represents a XMPP stream as described in RFC 3920. You can issue
-the basic XMPP XML stanzas with methods like C<send_iq>, C<send_message> and
-C<send_presence>.
+This module represents a XMPP stream as described in RFC 3920.
 
-FIXME: DOCUMENTATION
+It implements the L<AnyEvent::XMPP::Delivery> interface for stanza delivery.
+And it inherits the event interface from L<Object::Event::Methods>. Please
+see L<Object::Event> and L<Object::Event::Methods> for further information.
 
-And receive events with the C<reg_cb> event framework from the connection.
+This module only handles basic XMPP stream connecting, authentication
+and resource binding.
 
-If you need instant messaging stuff please take a look at
-C<AnyEvent::XMPP::IM::Connection>.
+For an implementation of the features described in RFC 3921 please
+consult the C<AnyEvent::XMPP::IM> module.
 
 =head1 METHODS
 
@@ -225,6 +226,14 @@ sub new {
       $self->{resource} = $res if defined $res;
    }
 
+   unless (defined $self->{username}) {
+      croak "username or node part of JID required\n";
+   }
+
+   unless (defined $self->{username}) {
+      croak "password required\n";
+   }
+
    $self->{host} = $self->{domain}    unless defined $self->{host};
    $self->{port} = 'xmpp-client=5222' unless defined $self->{port};
 
@@ -325,17 +334,19 @@ sub init {
 Try to connect (non blocking) to the domain and port passed in C<new>.
 
 The connection is performed non blocking, so this method will just
-trigger the connection process. The event C<connect> will be emitted
+trigger the connection process. The event C<connected> will be emitted
 when the connection was successfully established.
 
-If the connection try was not successful a C<disconnect> event
-will be generated with an error message.
+When the C<connected> event was triggered the connection will do further
+authentication and resource registration handshakes. When all handshakes
+are done the C<stream_ready> event will be emitted.
 
-NOTE: Please note that you can't reconnect a L<AnyEvent::XMPP::Connection>
-object. You need to recreate it if you want to reconnect.
+If the connection try was not successful a C<disconnected> event
+will be generated and maybe also an C<error> event with a more detailed
+error report.
 
-NOTE: The "XML" stream initiation is sent when the connection
-was successfully connected.
+You can reconnect anytime by calling this method again, which
+will close an existing connection and reinitialize everything.
 
 =cut
 
@@ -466,6 +477,18 @@ method.
 
 sub jid { $_[0]->{jid} }
 
+=item B<credentials>
+
+This method returns the configured account credentials as list:
+username, password and desired resource (may be undefined).
+
+=cut
+
+sub credentials {
+   my ($self) = @_;
+   ($self->{username}, $self->{password}, $self->{resource})
+}
+
 =item B<features>
 
 Returns the last received C<features> stanza in form of a
@@ -483,6 +506,15 @@ This is the ID of this stream that was given us by the server.
 
 sub stream_id { $_[0]->{stream_id} }
 
+=item B<generate_id>
+
+This function generates a unique ID for use as the 'id' field for stanzas or
+other unique identifiers which belong to this connection.
+
+=cut
+
+sub generate_id { "c_" . ++$_[0]->{stanza_id_cnt} }
+
 =item B<send ($stanza)>
 
 This method is used to send an XMPP stanza directly over
@@ -494,7 +526,7 @@ sub send {
    my ($self, $stanza) = @_;
 
    if ($stanza->want_id) {
-      $stanza->set_id ('c_' . ++$self->{stanza_id_cnt})
+      $stanza->set_id ($self->generate_id);
    }
 
    $self->send_stanza ($stanza);
@@ -504,18 +536,21 @@ sub send {
 sub start_authenticator {
    my ($self, $stanza) = @_;
 
-   $self->send (new_iq (set => undef, 'elmex@192.168.5.10', create => sub {
-      $_[0]->emptyTag ('def');
-   }));
-
-   return;
-
    $self->{authenticator}
       = AnyEvent::XMPP::Authenticator->new (connection => $self);
+
    $self->{authenticator}->reg_cb (
       auth => sub {
+         my ($auth, $jid) = @_;
          delete $self->{authenticator};
          $self->{authenticated} = 1;
+
+         if (defined $jid) {
+            $self->add_resource ($jid);
+            $self->stream_ready;
+         } else {
+            $self->bind_resource;
+         }
       },
       auth_fail => sub {
          my ($auth, $error) = @_;
@@ -525,6 +560,11 @@ sub start_authenticator {
    );
 
    $self->{authenticator}->start ($stanza);
+}
+
+sub add_resource {
+   my ($self, $jid) = @_;
+   $self->{resources}->{stringprep_jid $jid} = 1;
 }
 
 sub bind_resource {
@@ -647,6 +687,15 @@ sub connected {
    $self->{connected} = 1;
 }
 
+=item stream_ready
+
+This event is emitted when authentication was performed and a resource
+was bound.
+
+=cut
+
+sub stream_ready { }
+
 =item disconnected => $peer_host, $peer_port, $reason
 
 This event is emitted when the TCP connection was disconnected, either remotely
@@ -741,8 +790,7 @@ sub recv_stanza {
 
    if ($DEBUG) {
       print ">>>>> $self->{peer_host}:$self->{peer_port} >>>>>\n"
-            . dump_twig_xml ($node->as_string)
-            . "\n";
+            . dump_twig_xml ($node->as_string);
    }
 }
 
@@ -773,8 +821,7 @@ sub debug_send {
 
    if ($DEBUG) {
       print "<<<<< $self->{peer_host}:$self->{peer_port} <<<<<\n"
-            . dump_twig_xml ($data)
-            . "\n";
+            . dump_twig_xml ($data);
    }
 }
 

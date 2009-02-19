@@ -1,6 +1,7 @@
 package AnyEvent::XMPP::Stanza;
 use strict;
 no warnings;
+use AnyEvent::XMPP::Util qw/simxml/;
 require Exporter;
 
 our @ISA = qw/Exporter/;
@@ -56,16 +57,16 @@ sub analyze {
       $type = 'end'
 
    } elsif ($node->eq ($stream_ns => 'presence')) {
-      return AnyEvent::XMPP::Presence->new ($node, type => 'presence');
+      return AnyEvent::XMPP::Presence->new ($node, type => 'presence', stream_ns => $stream_ns);
 
    } elsif ($node->eq ($stream_ns => 'iq')) {
-      return AnyEvent::XMPP::IQ->new ($node, type => 'iq');
+      return AnyEvent::XMPP::IQ->new ($node, type => 'iq', stream_ns => $stream_ns);
 
    } elsif ($node->eq ($stream_ns => 'message')) {
-      return AnyEvent::XMPP::Message->new ($node, type => 'message');
+      return AnyEvent::XMPP::Message->new ($node, type => 'message', stream_ns => $stream_ns);
 
    } elsif ($node->eq (stream => 'features')) {
-      return AnyEvent::XMPP::FeatureStanza->new ($node, type => 'features');
+      return AnyEvent::XMPP::FeatureStanza->new ($node, type => 'features', stream_ns => $stream_ns);
 
    } elsif ($node->eq (tls => 'proceed')) {
       $type = 'tls_proceed';
@@ -87,7 +88,7 @@ sub analyze {
 
    }
 
-   AnyEvent::XMPP::Stanza->new ($node, type => $type);
+   AnyEvent::XMPP::Stanza->new ($node, type => $type, stream_ns => $stream_ns);
 }
 
 =head2 METHODS
@@ -115,10 +116,12 @@ sub new {
    return $self
 }
 
-sub want_id { $_[0]->{want_id} && not defined $_[0]->{id} }
-sub set_id { $_[0]->{id} = $_[1] }
+sub want_id { $_[0]->{want_id} && not defined $_[0]->{attrs}->{id} }
+sub set_id { $_[0]->{attrs}->{id} = $_[1] }
+sub id { $_[0]->{attrs}->{id} }
 
 sub type { $_[0]->{type} }
+sub node { $_[0]->{node} }
 
 sub construct {
    my ($self) = @_;
@@ -127,6 +130,7 @@ sub construct {
 sub internal_analyze {
    my ($self) = @_;
    my $node = $self->{node};
+   $self->{name}  = $node->name;
    $self->{attrs} = $node->attrs;
 }
 
@@ -251,6 +255,19 @@ sub construct {
    $self->{attrs}->{to}   = $to;
    $self->{attrs}->{from} = $from;
    $self->{attrs}->{type} = $type;
+}
+
+sub is_reply {
+   my ($self) = @_;
+
+   $self->{attrs}->{type} eq 'result'
+   || $self->{attrs}->{type} eq 'error'
+}
+
+sub iq_type {
+   my ($self) = @_;
+
+   $self->{attrs}->{type}
 }
 
 package AnyEvent::XMPP::Presence;

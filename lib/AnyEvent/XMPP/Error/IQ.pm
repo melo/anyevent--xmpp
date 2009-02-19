@@ -14,9 +14,8 @@ Subclass of L<AnyEvent::XMPP::Error::Stanza>
 
 sub init {
    my ($self) = @_;
-   my $node = $self->xml_node;
 
-   unless (defined $node) {
+   unless (defined $self->stanza) {
       $self->{error_cond} = 'client-timeout';
       $self->{error_type} = 'cancel';
       return;

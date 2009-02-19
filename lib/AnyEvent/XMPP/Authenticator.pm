@@ -1,6 +1,11 @@
 package AnyEvent::XMPP::Authenticator;
 use strict;
 no warnings;
+use AnyEvent::XMPP::Stanza;
+use AnyEvent::XMPP::IQTracker;
+use Digest::SHA1 qw/sha1_hex/;
+
+use base qw/Object::Event::Methods/;
 
 =head1 NAME
 
@@ -29,56 +34,136 @@ C<$con>.
 sub new {
    my $this  = shift;
    my $class = ref($this) || $this;
-   my $self  = { @_ };
-   bless $self, $class;
+   my $self  = $class->SUPER::new (@_);
 
-   $self->{connection}->reg_cb (
-      ext_before_handle_stanza => sub {
-         my ($con, $stanza) = @_;
+#   $self->{connection}->reg_cb (
+#      ext_before_handle_stanza => sub {
+#         my ($con, $stanza) = @_;
+#
+##   } elsif ($node->eq (sasl => 'challenge')) {
+##      $self->handle_sasl_challenge ($node);
+##
+##   } elsif ($node->eq (sasl => 'success')) {
+##      $self->handle_sasl_success ($node);
+##
+##   } elsif ($node->eq (sasl => 'failure')) {
+##      my $error = AnyEvent::XMPP::Error::SASL->new (node => $node);
+##      $self->event (sasl_error => $error);
+##      $self->disconnect ('SASL authentication failure: ' . $error->string);
+##
+#
+#      }
+#   );
 
-#   } elsif ($node->eq (sasl => 'challenge')) {
-#      $self->handle_sasl_challenge ($node);
-#
-#   } elsif ($node->eq (sasl => 'success')) {
-#      $self->handle_sasl_success ($node);
-#
-#   } elsif ($node->eq (sasl => 'failure')) {
-#      my $error = AnyEvent::XMPP::Error::SASL->new (node => $node);
-#      $self->event (sasl_error => $error);
-#      $self->disconnect ('SASL authentication failure: ' . $error->string);
-#
-
-      }
-   );
+   $self->{tracker} =
+      AnyEvent::XMPP::IQTracker->new (
+         delivery => $self->{connection},
+         pre_auth => 1
+      );
 
    return $self
 }
 
-# This is a hack for jabberd 1.4.2, VERY OLD Jabber stuff.
-sub start_old_style_authentication {
+sub do_iq_auth {
    my ($self) = @_;
 
-   $self->{features}
-      = AnyEvent::XMPP::Node->new (
-          'http://etherx.jabber.org/streams', 'features', [], $self->{parser}
-        );
-
-   my $continue = 1;
-   my (@ret) = $self->event (stream_pre_authentication => \$continue);
-   $continue = pop @ret if @ret;
-   if ($continue) {
-      $self->do_iq_auth;
-   }
+#   if ($self->{anal_iq_auth}) {
+#
+#      $self->send_iq (get => {
+#         defns => 'auth', node => { ns => 'auth', name => 'query',
+#            # heh, something i've seen on some ejabberd site:
+#            # childs => [ { name => 'username', childs => [ $self->{username} ] } ] 
+#         }
+#      }, sub {
+#         my ($n, $e) = @_;
+#         if ($e) {
+#            $self->event (iq_auth_error =>
+#               AnyEvent::XMPP::Error::IQAuth->new (context => 'iq_error', iq_error => $e)
+#            );
+#         } else {
+#            my $fields = {};
+#            my (@query) = $n->find_all ([qw/auth query/]);
+#            if (@query) {
+#               for (qw/username password digest resource/) {
+#                  if ($query[0]->find_all ([qw/auth/, $_])) {
+#                     $fields->{$_} = 1;
+#                  }
+#               }
+#
+#               $self->do_iq_auth_send ($fields);
+#            } else {
+#               $self->event (iq_auth_error =>
+#                  AnyEvent::XMPP::Error::IQAuth->new (context => 'no_fields')
+#               );
+#            }
+#         }
+#      });
+#
+#   } else {
+      $self->do_iq_auth_send ({
+         username => 1, 
+         password => 1,
+         resource => 1
+      });
+#   }
 }
 
+sub do_iq_auth_send {
+   my ($self, $fields) = @_;
+
+   my ($username, $password, $resource) =
+      $self->{connection}->credentials;
+
+   if ($fields->{digest}) {
+      my $out_password = encode ("UTF-8", $password);
+      my $out          = lc sha1_hex ($self->stream_id () . $out_password);
+
+      $fields = {
+         username => $username,
+         digest   => $out,
+      }
+
+   } else {
+      $fields = {
+         username => $username,
+         password => $password
+      }
+   }
+
+   if ($fields->{resource} && defined $self->{resource}) {
+      $fields->{resource} = $self->{resource}
+   }
+
+   $self->{tracker}->send (new_iq (set => undef, undef, create => {
+      defns => 'auth',
+      node => {
+         name => 'query',
+         childs => [
+            map { {
+               name => $_,
+               childs => [ $fields->{$_} ]
+            } } reverse sort keys %$fields
+         ]
+      }
+   }), sub {
+      my ($res, $err) = @_;
+
+      if ($err) {
+         $self->auth_fail ($err);
+      } else {
+         $self->auth (join_jid ($self->{username}, $self->{domain}, $self->{resource}));
+      }
+   });
+}
 
 sub start {
    my ($self, $stanza) = @_;
 
-   unless ($stanza) {
-      $self->start_old_style_authentication;
+ #  unless ($stanza) {
+      # this is old-style authentication:
+      $self->do_iq_auth;
       return;
-   }
+ #  }
 }
 
 sub send_sasl_auth {
@@ -154,92 +239,33 @@ sub handle_sasl_success {
 }
 
 
-sub do_iq_auth {
-   my ($self) = @_;
+=head2 EVENTS
 
-   if ($self->{anal_iq_auth}) {
-      $self->send_iq (get => {
-         defns => 'auth', node => { ns => 'auth', name => 'query',
-            # heh, something i've seen on some ejabberd site:
-            # childs => [ { name => 'username', childs => [ $self->{username} ] } ] 
-         }
-      }, sub {
-         my ($n, $e) = @_;
-         if ($e) {
-            $self->event (iq_auth_error =>
-               AnyEvent::XMPP::Error::IQAuth->new (context => 'iq_error', iq_error => $e)
-            );
-         } else {
-            my $fields = {};
-            my (@query) = $n->find_all ([qw/auth query/]);
-            if (@query) {
-               for (qw/username password digest resource/) {
-                  if ($query[0]->find_all ([qw/auth/, $_])) {
-                     $fields->{$_} = 1;
-                  }
-               }
+=over 4
 
-               $self->do_iq_auth_send ($fields);
-            } else {
-               $self->event (iq_auth_error =>
-                  AnyEvent::XMPP::Error::IQAuth->new (context => 'no_fields')
-               );
-            }
-         }
-      });
-   } else {
-      $self->do_iq_auth_send ({ username => 1, password => 1, resource => 1 });
-   }
-}
+=item auth => $jid
 
-sub do_iq_auth_send {
-   my ($self, $fields) = @_;
+This event is emitted when we successfully authenticated.
+C<$jid> is defined if the authentication also bound a resource for
+you. If C<$jid> is undefined no resource was bound yet.
 
-   for (qw/username password resource/) {
-      die "No '$_' argument given to new, but '$_' is required\n"
-         unless defined $self->{$_};
-   }
+=cut
 
-   my $do_resource = $fields->{resource};
-   my $password = $self->{password};
+sub auth { }
 
-   if ($fields->{digest}) {
-      my $out_password = encode ("UTF-8", $password);
-      my $out = lc sha1_hex ($self->stream_id () . $out_password);
-      $fields = {
-         username => $self->{username},
-         digest => $out,
-      }
+=item auth_fail => $error
 
-   } else {
-      $fields = {
-         username => $self->{username},
-         password => $password
-      }
-   }
+This event is emitted when an authentication failure occurred.
+The C<$error> object will either be a L<AnyEvent::XMPP::Error::IQ>
+object or ...
 
-   if ($do_resource && defined $self->{resource}) {
-      $fields->{resource} = $self->{resource}
-   }
+FIXME TODO
 
-   $self->send_iq (set => {
-      defns => 'auth',
-      node => { ns => 'auth', name => 'query', childs => [
-         map { { name => $_, childs => [ $fields->{$_} ] } } reverse sort keys %$fields
-      ]}
-   }, sub {
-      my ($n, $e) = @_;
-      if ($e) {
-         $self->event (iq_auth_error =>
-            AnyEvent::XMPP::Error::IQAuth->new (context => 'iq_error', iq_error => $e)
-         );
-      } else {
-         $self->{authenticated} = 1;
-         $self->{jid} = join_jid ($self->{username}, $self->{domain}, $self->{resource});
-         $self->event (stream_ready => $self->{jid});
-      }
-   });
-}
+=cut
+
+sub auth_fail { }
+
+=back
 
 =head1 AUTHOR
 

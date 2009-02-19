@@ -13,16 +13,16 @@ Subclass of L<AnyEvent::XMPP::Error>
 
 sub init {
    my ($self) = @_;
-   my $node = $self->xml_node;
+   my $sta = $self->stanza;
 
-   unless (defined $node) {
+   unless (defined $sta) {
       $self->{error_cond} = 'client-timeout';
       $self->{error_type} = 'cancel';
       return;
    }
 
    my @error;
-   my ($err) = $node->find_all ([qw/client error/]);
+   my ($err) = $sta->node->find_all ([$sta->{stream_ns}, 'error']);
 
    unless ($err) {
       warn "No error element found in error stanza!";
@@ -74,18 +74,18 @@ sub init {
 
 =over 4
 
-=item B<xml_node ()>
+=item B<stanza ()>
 
-Returns the L<AnyEvent::XMPP::Node> object for this Stanza error.
-This method returns undef if the Stanza timeouted.
+Returns the L<AnyEvent::XMPP::Stanza> object for this Stanza error.
+This method returns undef if the stanza timeouted.
 
 In the case of a timeout the C<condition> method returns C<client-timeout>,
 C<type> returns 'cancel' and C<code> undef.
 
 =cut
 
-sub xml_node {
-   $_[0]->{node}
+sub stanza {
+   $_[0]->{stanza}
 }
 
 =item B<type ()>
