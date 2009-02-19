@@ -5,16 +5,18 @@ use AnyEvent::Socket;
 use AnyEvent::Handle;
 use AnyEvent::XMPP::Parser;
 use AnyEvent::XMPP::Writer;
+use AnyEvent::XMPP::IQTracker;
 use AnyEvent::XMPP::Authenticator;
-use AnyEvent::XMPP::Util qw/split_jid join_jid simxml dump_twig_xml/;
+use AnyEvent::XMPP::Util qw/split_jid join_jid simxml dump_twig_xml stringprep_jid/;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Error;
 use AnyEvent::XMPP::Stanza;
+use AnyEvent::XMPP::ResourceManager;
 use Object::Event;
 use Encode;
 use Carp qw/croak/;
 
-use base qw/Object::Event/;
+use base qw/Object::Event::Methods/;
 
 our $DEBUG = 1;
 
@@ -238,12 +240,18 @@ sub new {
    $self->{port} = 'xmpp-client=5222' unless defined $self->{port};
 
    $self->set_exception_cb (sub {
-      my ($ex) = @_;
+      my ($ev, $ex) = @_;
+
       $self->event (error =>
          AnyEvent::XMPP::Error::Exception->new (
-            exception => $ex, context => 'event callback'
+            exception => "(" . $ev->dump . "): $ex", context => 'event callback'
          )
       );
+   });
+
+   $self->reg_cb (after_pre_authentication => sub {
+      my ($self, $stanza) = @_;
+      $self->start_authenticator ($stanza);
    });
 
    return $self;
@@ -258,11 +266,11 @@ sub cleanup {
 
    delete $self->{server_jid};
    delete $self->{connected};
-   delete $self->{authenticator};
    delete $self->{authenticated};
    delete $self->{ssl_enabled};
    delete $self->{peer_host};
    delete $self->{peer_port};
+   delete $self->{res_manager};
 
    if ($self->{writer}) {
       delete $self->{writer};
@@ -272,6 +280,16 @@ sub cleanup {
       $self->{parser}->remove_all_callbacks;
       $self->{parser}->cleanup;
       delete $self->{parser};
+   }
+
+   if ($self->{tracker}) {
+      $self->{tracker}->disconnect;
+      delete $self->{tracker};
+   }
+
+   if ($self->{authenticator}) {
+      $self->{authenticator}->disconnect;
+      delete $self->{authenticator};
    }
 }
 
@@ -295,7 +313,7 @@ sub init {
              && not ($self->{disable_iq_auth})
              && not ($self->{disable_old_jabber_authentication})) {
 
-            $self->start_authenticator;
+            $self->pre_authentication;
          }
       },
       received_stanza_xml => sub {
@@ -326,7 +344,26 @@ sub init {
       }
    );
 
-   $self->{writer} = AnyEvent::XMPP::Writer->new (stream_ns => $self->default_namespace);
+   $self->{writer} =
+      AnyEvent::XMPP::Writer->new (
+         stream_ns => $self->default_namespace
+      );
+   $self->{tracker} = AnyEvent::XMPP::IQTracker->new;
+   $self->{res_manager} =
+      AnyEvent::XMPP::ResourceManager->new (
+         connection => $self
+      );
+}
+
+sub reinit {
+   my ($self) = @_;
+
+   $self->{parser}->init;
+   $self->{writer}->init;
+   $self->write_data (
+      # version override should only be neccessary at the first init stream.
+      $self->{writer}->init_stream ($self->{language}, $self->{domain})
+   );
 }
 
 =item B<connect ()>
@@ -480,13 +517,13 @@ sub jid { $_[0]->{jid} }
 =item B<credentials>
 
 This method returns the configured account credentials as list:
-username, password and desired resource (may be undefined).
+username, domain, password and desired resource (may be undefined).
 
 =cut
 
 sub credentials {
    my ($self) = @_;
-   ($self->{username}, $self->{password}, $self->{resource})
+   ($self->{username}, $self->{domain}, $self->{password}, $self->{resource})
 }
 
 =item B<features>
@@ -525,13 +562,10 @@ the connection.
 sub send {
    my ($self, $stanza) = @_;
 
-   if ($stanza->want_id) {
-      $stanza->set_id ($self->generate_id);
-   }
-
    $self->send_stanza ($stanza);
    $self->write_data ($stanza->serialize ($self->{writer}));
 }
+
 
 sub start_authenticator {
    my ($self, $stanza) = @_;
@@ -542,48 +576,36 @@ sub start_authenticator {
    $self->{authenticator}->reg_cb (
       auth => sub {
          my ($auth, $jid) = @_;
-         delete $self->{authenticator};
          $self->{authenticated} = 1;
 
          if (defined $jid) {
-            $self->add_resource ($jid);
+            $self->{res_manager}->add ($jid);
             $self->stream_ready;
+
          } else {
-            $self->bind_resource;
+            $self->reinit;
          }
+
+         $self->{authenticator}->disconnect;
+         delete $self->{authenticator};
       },
       auth_fail => sub {
          my ($auth, $error) = @_;
          $self->error ($error);
          $self->disconnect ("authentication failed");
+
+         $self->{authenticator}->disconnect;
+         delete $self->{authenticator};
       }
    );
 
    $self->{authenticator}->start ($stanza);
 }
 
-sub add_resource {
-   my ($self, $jid) = @_;
-   $self->{resources}->{stringprep_jid $jid} = 1;
-}
-
-sub bind_resource {
-   my ($self) = @_;
-
-}
-
-sub get_first_bound_resource_jid {
-   my ($self) = @_;
-   return unless %{$self->{bound_resources} || {}};
-
-   my ($k) = keys %{$self->{bound_resources}};
-   $self->{bound_resources}->{$k}
-}
-
 sub handle_stanza {
    my ($self, $stanza) = @_;
 
-   if (defined (my $resjid = $self->get_first_bound_resource_jid)) {
+   if (defined (my $resjid = $self->{res_manager}->any_jid)) {
       $stanza->set_default_to ($resjid);
    }
 
@@ -595,6 +617,8 @@ sub handle_stanza {
       $self->disconnect ("end of 'XML' stream encountered");
       return;
    }
+
+   $self->{tracker}->handle_stanza ($stanza);
 
    if ($self->is_connected
        && grep { $stanza->type eq $_ } qw/iq presence message/) {
@@ -613,19 +637,26 @@ sub handle_stanza {
          $self->write_data ($self->{writer}->starttls);
 
       } elsif (not $self->{authenticated}) {
-         $self->start_authenticator ($stanza);
+         $self->pre_authentication ($stanza);
 
       } elsif ($stanza->bind) {
-         $self->bind_resource;
+         $self->{res_manager}->bind ($self->{resource}, sub {
+            my ($jid, $error) = @_;
+
+            if ($error) {
+               # TODO FIXME: make proper error?!
+               $self->error ($error);
+
+            } else {
+               $self->{jid} = $jid;
+               $self->stream_ready;
+            }
+         });
       }
 
    } elsif ($type eq 'tls_proceed') {
       $self->enable_ssl;
-      $self->{parser}->init;
-      $self->{writer}->init;
-      $self->write_data (
-         $self->{writer}->init_stream ($self->{language}, $self->{domain})
-      );
+      $self->reinit;
 
    } elsif ($type eq 'tls_failure') {
       $self->error (
@@ -687,6 +718,15 @@ sub connected {
    $self->{connected} = 1;
 }
 
+=item pre_authentication
+
+This is an event that is emitted when the XMPP stream reached a
+stage when all preliminary handshaking is done and authentication
+is about to begin.
+
+This is a good place to start in band registration, see also
+L<AnyEvent::XMPP::Ext::Registration>.
+
 =item stream_ready
 
 This event is emitted when authentication was performed and a resource
@@ -694,7 +734,11 @@ was bound.
 
 =cut
 
-sub stream_ready { }
+sub stream_ready { 
+   if ($DEBUG) {
+      print "stream ready!\n";
+   }
+}
 
 =item disconnected => $peer_host, $peer_port, $reason
 
@@ -769,6 +813,9 @@ written out.
 =cut
 
 sub send_stanza {
+   my ($self, $stanza) = @_;
+
+   $self->{tracker}->register ($stanza);
 }
 
 =item recv_stanza => $node

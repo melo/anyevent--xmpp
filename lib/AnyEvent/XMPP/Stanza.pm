@@ -24,7 +24,52 @@ which are used to represent the 3 main stanza types of XMPP:
 
 =head2 FUNCTIONS
 
-=item B<new_iq ($type, $from, $to, %args)>
+=item B<new_iq ($type, %args)>
+
+This function generates a new L<AnyEvent::XMPP::IQ> object for you.
+
+C<$type> may be one of these 4 values:
+
+   set
+   get
+   result
+   error
+
+The destination and source of the stanza should be given by the C<to> and
+C<from> attributes in C<%args>. C<%args> may also contain additional XML attributes
+or these keys:
+
+=over 4
+
+=item create => C<$creation>
+
+This is the most important parameter for any XMPP stanza, it
+allows you to create the content of the stanza.
+
+TODO: Document it!
+
+=item cb => $callback
+
+If you expect a reply to this IQ stanza you have to set a C<$callback>.
+That callback will be called when either a response stanza was received
+or the timeout triggered.
+
+If the result was successful then the first argument of the callback
+will be the result stanza.
+
+If the result was an error or a timeout the first argument will be undef
+and the second will contain an L<AnyEvent::XMPP::Error::IQ> object,
+describing the error.
+
+=item timeout => $seconds
+
+This sets the timeout for this IQ stanza. It's entirely optional and
+will be set to a default IQ timeout (see also L<AnyEvent::XMPP::Connection>
+and L<AnyEvent::XMPP::IQTracker> for more details).
+
+If you set the timeout to 0 no timeout will be generated.
+
+=back
 
 =cut
 
@@ -116,12 +161,17 @@ sub new {
    return $self
 }
 
-sub want_id { $_[0]->{want_id} && not defined $_[0]->{attrs}->{id} }
+sub want_id { $_[0]->{reply_cb} && not defined $_[0]->{attrs}->{id} }
 sub set_id { $_[0]->{attrs}->{id} = $_[1] }
 sub id { $_[0]->{attrs}->{id} }
 
 sub type { $_[0]->{type} }
 sub node { $_[0]->{node} }
+
+sub reply_cb     { $_[0]->{reply_cb} }
+sub set_reply_cb { $_[0]->{reply_cb} = $_[1] }
+sub timeout      { $_[0]->{timeout} }
+sub set_timeout  { $_[0]->{timeout} = $_[1] }
 
 sub construct {
    my ($self) = @_;
@@ -130,8 +180,8 @@ sub construct {
 sub internal_analyze {
    my ($self) = @_;
    my $node = $self->{node};
-   $self->{name}  = $node->name;
-   $self->{attrs} = $node->attrs;
+   $self->{type}  ||= $node->name;
+   $self->{attrs}   = $node->attrs;
 }
 
 sub set_default_to {
@@ -181,7 +231,7 @@ sub serialize {
    $self->{attrs} ||= {};
 
    $writer->stanza (
-      $self->{name},
+      $self->{type},
       {
          (map { $_ => $self->{attrs}->{$_} }
             grep { defined $self->{attrs}->{$_} }
@@ -242,18 +292,24 @@ no warnings;
 use base qw/AnyEvent::XMPP::Stanza/;
 
 sub construct {
-   my ($self, $type, $from, $to, %args) = @_;
+   my ($self, $type, %args) = @_;
 
    if (my $int = delete $args{create}) {
       $self->add ($int);
    }
 
+   if (my $cb = delete $args{cb}) {
+      $self->set_reply_cb ($cb);
+   }
+
+   if (my $to = delete $args{timeout}) {
+      $self->set_timeout ($to);
+   }
+
    $self->{want_id} = 1;
 
-   $self->{name}          = 'iq';
+   $self->{type}          = 'iq';
    $self->{attrs}         = \%args;
-   $self->{attrs}->{to}   = $to;
-   $self->{attrs}->{from} = $from;
    $self->{attrs}->{type} = $type;
 }
 
@@ -293,6 +349,7 @@ sub internal_analyze {
    my @tls   = $node->find_all ([qw/tls starttls/]);
    my @mechs = $node->find_all ([qw/sasl mechanisms/], [qw/sasl mechanism/]);
 
+
    $self->{sasl_mechs} = [ map { $_->text } @mechs ]
       if @mechs;
    $self->{tls}  = 1 if @tls;
@@ -306,7 +363,7 @@ sub internal_analyze {
 }
 
 sub tls        { (shift)->{tls} }
-sub bind       { (shift)->{tls} }
-sub sasl_mechs { (shift)->{tls} }
+sub bind       { (shift)->{bind} }
+sub sasl_mechs { (shift)->{sasl_mechs} }
 
 1;

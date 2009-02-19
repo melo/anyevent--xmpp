@@ -3,6 +3,7 @@ use strict;
 use AnyEvent::XMPP::Util;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Ext::RegisterForm;
+use AnyEvent::XMPP::Stanza;
 
 =head1 NAME
 
@@ -11,17 +12,17 @@ AnyEvent::XMPP::Ext::Registration - Handles all tasks of in band registration
 =head1 SYNOPSIS
 
    my $con = AnyEvent::XMPP::Connection->new (...);
+   my $reg = AnyEvent::XMPP::Ext::Registration->new (delivery => $con);
 
-   $con->reg_cb (stream_pre_authentication => sub {
+   $con->reg_cb (pre_authentication => sub {
       my ($con) = @_;
-      my $reg = AnyEvent::XMPP::Ext::Registration->new (connection => $con);
+      my $event = $con->current;
 
       $reg->send_registration_request (sub {
          my ($reg, $form, $error) = @_;
 
          if ($error) {
-            # error handling
-
+            # error handlin
          } else {
             my $af = $form->try_fillout_registration ("tester", "secret");
 
@@ -29,7 +30,8 @@ AnyEvent::XMPP::Ext::Registration - Handles all tasks of in band registration
                my ($reg, $ok, $error, $form) = @_;
 
                if ($ok) { # registered successfully!
-                  $con->authenticate
+                  # continue authentication
+                  $event->continue;
 
                } else {   # error
                   if ($form) { # we got an alternative form!
@@ -37,10 +39,9 @@ AnyEvent::XMPP::Ext::Registration - Handles all tasks of in band registration
                   }
                }
             });
+
          }
       });
-
-      0
    });
 
 =head1 DESCRIPTION
@@ -55,16 +56,15 @@ as submitting and retrieving a form.
 
 =over 4
 
-=item B<new (%args)>
+=item new (%args)
 
 This is the constructor for a registration object.
 
 =over 4
 
-=item connection
+=item delivery
 
-This must be a L<AnyEvent::XMPP::Connection> (or some other subclass of that) object.
-
+This must be an object implementing the L<AnyEvent::XMPP::Delivery> interface.
 This argument is required.
 
 =back
@@ -75,16 +75,10 @@ sub new {
    my $this = shift;
    my $class = ref($this) || $this;
    my $self = bless { @_ }, $class;
-   $self->init;
    $self
 }
 
-sub init {
-   my ($self) = @_;
-   #...
-}
-
-=item B<send_registration_request ($cb)>
+=item $reg->send_registration_request ($cb->($reg, $form, $error))
 
 This method sends a register form request.
 C<$cb> will be called when either the form arrived or
@@ -108,42 +102,40 @@ See also L<try_fillout_registration> in L<AnyEvent::XMPP::Ext::RegisterForm>.
 sub send_registration_request {
    my ($self, $cb) = @_;
 
-   my $con = $self->{connection};
-
-   $con->send_iq (get => {
-      defns => 'register',
-      node => { ns => 'register', name => 'query' }
-   }, sub {
-      my ($node, $error) = @_;
+   $self->{delivery}->send (new_iq (get => create => {
+      defns => 'register', node => { name => 'query' }
+   }, cb => sub {
+      my ($stanza, $error) = @_;
 
       my $form;
-      if ($node) {
+      if ($stanza) {
          $form = AnyEvent::XMPP::Ext::RegisterForm->new;
-         $form->init_from_node ($node);
+         $form->init_from_stanza ($stanza);
+
       } else {
          $error =
             AnyEvent::XMPP::Error::Register->new (
-               node => $error->xml_node, register_state => 'register'
+               stanza => $error->stanza, register_state => 'register'
             );
       }
 
       $cb->($self, $form, $error);
-   });
+   }));
 }
 
 sub _error_or_form_cb {
    my ($self, $e, $cb) = @_;
 
-   $e = $e->xml_node;
+   $e = $e->stanza;
 
    my $error =
       AnyEvent::XMPP::Error::Register->new (
-         node => $e, register_state => 'submit'
+         stanza => $e, register_state => 'submit'
       );
 
-   if ($e->find_all ([qw/register query/], [qw/data_form x/])) {
+   if ($e->node->find_all ([qw/register query/], [qw/data_form x/])) {
       my $form = AnyEvent::XMPP::Ext::RegisterForm->new;
-      $form->init_from_node ($e);
+      $form->init_from_stanza ($e);
 
       $cb->($self, 0, $error, $form)
    } else {
@@ -151,12 +143,12 @@ sub _error_or_form_cb {
    }
 }
 
-=item B<send_unregistration_request ($cb)>
+=item send_unregistration_request ($cb->($reg, $ok, $error, $form))
 
 This method sends an unregistration request.
 
 For description of the semantics of the callback in C<$cb>
-plase look in the description of the C<submit_form> method below.
+please look in the description of the C<submit_form> method below.
 
 =cut
 
@@ -171,8 +163,9 @@ sub send_unregistration_request {
          { ns => 'register', name => 'remove' }
       ]}
    }, sub {
-      my ($node, $error) = @_;
-      if ($node) {
+      my ($stanza, $error) = @_;
+
+      if ($stanza) {
          $cb->($self, 1)
       } else {
          $self->_error_or_form_cb ($error, $cb);
@@ -180,13 +173,13 @@ sub send_unregistration_request {
    });
 }
 
-=item B<send_password_change_request ($username, $password, $cb)>
+=item send_password_change_request ($username, $password, $cb->($reg, $ok, $error, $form))
 
 This method sends a password change request for the user C<$username>
 with the new password C<$password>.
 
 For description of the semantics of the callback in C<$cb>
-plase look in the description of the C<submit_form> method below.
+please look in the description of the C<submit_form> method below.
 
 =cut
 
@@ -202,25 +195,27 @@ sub send_password_change_request {
          { ns => 'register', name => 'password', childs => [ $password ] },
       ]}
    }, sub {
-      my ($node, $error) = @_;
-      if ($node) {
+      my ($stanza, $error) = @_;
+
+      if ($stanza) {
          $cb->($self, 1, undef, undef)
+
       } else {
          $self->_error_or_form_cb ($error, $cb);
       }
    });
 }
 
-=item B<submit_form ($form, $cb)>
+=item submit_form ($form, $cb->($reg, $ok, $error, $form))
 
 This method submits the C<$form> which should be of
 type L<AnyEvent::XMPP::Ext::RegisterForm> and should be an answer
 form.
 
-C<$con> is the connection on which to send this form.
-
 C<$cb> is the callback that will be called once the form has been submitted and
-either an error or success was received.  The first argument to the callback
+either an error or success was received.
+
+The first argument to the callback
 will be the L<AnyEvent::XMPP::Ext::Registration> object, the second will be a
 boolean value that is true when the form was successfully transmitted and
 everything is fine.  If the second argument is false then the third argument is
@@ -236,22 +231,62 @@ For the semantics of such an error form see also XEP-0077.
 sub submit_form {
    my ($self, $form, $cb) = @_;
 
-   my $con = $self->{connection};
-
-   $con->send_iq (set => {
+   $self->{delivery}->send (new_iq (set => create => {
       defns => 'register',
       node => { ns => 'register', name => 'query', childs => [
          $form->answer_form_to_simxml
       ]}
-   }, sub {
-      my ($n, $e) = @_;
+   }, cb => sub {
+      my ($stanza, $error) = @_;
 
-      if ($n) {
+      if ($stanza) {
          $cb->($self, 1, undef, undef)
+
       } else {
-         $self->_error_or_form_cb ($e, $cb);
+         $self->_error_or_form_cb ($error, $cb);
       }
-   });
+   }));
+}
+
+=back
+
+=head1 AnyEvent::XMPP::Error::Register;
+
+This is an error class for in-band registration errors,
+it's derived from L<AnyEvent::XMPP::Error::IQ>.
+
+=cut
+
+package AnyEvent::XMPP::Error::Register;
+use AnyEvent::XMPP::Error;
+use strict;
+use base qw/AnyEvent::XMPP::Error::IQ/;
+
+=head1 METHODS
+
+=over 4
+
+=item register_state ()
+
+Returns the state of registration, one of:
+
+   register
+   unregister
+   submit
+
+=cut
+
+sub register_state {
+   my ($self) = @_;
+   $self->{register_state}
+}
+
+sub string {
+   my ($self) = @_;
+
+   sprintf "ibb registration error (in %s): %s",
+      $self->register_state,
+      $self->SUPER::string
 }
 
 =back

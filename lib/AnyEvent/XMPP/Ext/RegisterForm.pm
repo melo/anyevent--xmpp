@@ -7,58 +7,19 @@ use AnyEvent::XMPP::Ext::OOB;
 
 =head1 NAME
 
-AnyEvent::XMPP::Ext::RegisterForm - Handle for in band registration
+AnyEvent::XMPP::Ext::RegisterForm - Form handle for in band registration
 
 =head1 SYNOPSIS
 
-   my $con = AnyEvent::XMPP::Connection->new (...);
-   ...
-   $con->do_in_band_register (sub {
-      my ($form, $error) = @_;
-      if ($error) { print "ERROR: ".$error->string."\n" }
-      else {
-         if ($form->type eq 'simple') {
-            if ($form->has_field ('username') && $form->has_field ('password')) {
-               $form->set_field (
-                  username => 'test',
-                  password => 'qwerty',
-               );
-               $form->submit (sub {
-                  my ($form, $error) = @_;
-                  if ($error) { print "SUBMIT ERROR: ".$error->string."\n" }
-                  else {
-                     print "Successfully registered as ".$form->field ('username')."\n"
-                  }
-               });
-            } else {
-               print "Couldn't fill out the form: " . $form->field ('instructions') ."\n";
-            }
-         } elsif ($form->type eq 'data_form' {
-            my $dform = $form->data_form;
-            ... fill out the form $dform (of type AnyEvent::XMPP::DataForm) ...
-            $form->submit_data_form ($dform, sub {
-               my ($form, $error) = @_;
-               if ($error) { print "DATA FORM SUBMIT ERROR: ".$error->string."\n" }
-               else {
-                  print "Successfully registered as ".$form->field ('username')."\n"
-               }
-            })
-         }
-      }
-   });
-
 =head1 DESCRIPTION
 
-This module represents an in band registration form
-which can be filled out and submitted.
-
-You can get an instance of this class only by requesting it
-from a L<AnyEvent::XMPP::Connection> by calling the C<request_inband_register_form>
-method.
+This module represents an in band registration form which can be filled out and
+submitted. You receive instances of this class from
+L<AnyEvent::XMPP::Ext::Registration>.
 
 =over 4
 
-=item B<new (%args)>
+=item new (%args)
 
 Usually the constructor takes no arguments except when you want to construct
 an answer form, then you call the constructor like this:
@@ -86,7 +47,7 @@ sub new {
    $self
 }
 
-=item B<try_fillout_registration ($username, $password)>
+=item try_fillout_registration ($username, $password)
 
 This method tries to fill out a form which was received from the
 other end. It enters the username and password and returns a
@@ -102,7 +63,7 @@ forms can be different from server to server and require different information.
 Please also have a look at XEP-0077.
 
 Note that if the form is more complicated this method will not work
-and it's not guranteed that the registration will be successful.
+and it's not guaranteed that the registration will be successful.
 
 Calling this method on a answer form (where C<is_answer_form> returns true)
 will have an undefined result.
@@ -151,9 +112,9 @@ sub is_answer_form {
 
 =item B<is_already_registered>
 
-This method returns true if the received form
-were just the current registration data. Basically this method returns
-true when you are already registered to the server.
+This method returns true if the received form were just the current
+registration data. Basically this method returns true when you are already
+registered to the server.
 
 =cut
 
@@ -216,11 +177,11 @@ sub init_new_form {
 }
 
 sub _get_legacy_form {
-   my ($self, $node) = @_;
+   my ($self, $stanza) = @_;
 
    my $form = {};
 
-   my ($qnode) = $node->find_all ([qw/register query/]);
+   my ($qnode) = $stanza->node->find_all ([qw/register query/]);
 
    return $form unless $qnode;
 
@@ -233,16 +194,18 @@ sub _get_legacy_form {
    $form
 }
 
-sub init_from_node {
-   my ($self, $node) = @_;
+sub init_from_stanza {
+   my ($self, $stanza) = @_;
 
-   if (my (@form) = $node->find_all ([qw/register query/], [qw/data_form x/])) {
+   if (my (@form) = $stanza->node->find_all ([qw/register query/], [qw/data_form x/])) {
       $self->init_new_form (@form);
    }
-   if (my ($xoob) = $node->find_all ([qw/register query/], [qw/x_oob x/])) {
+
+   if (my ($xoob) = $stanza->node->find_all ([qw/register query/], [qw/x_oob x/])) {
       $self->{oob} = AnyEvent::XMPP::Ext::OOB::url_from_node ($xoob);
    }
-   $self->{legacy_form} = $self->_get_legacy_form ($node);
+
+   $self->{legacy_form} = $self->_get_legacy_form ($stanza);
 }
 
 =item B<answer_form_to_simxml>

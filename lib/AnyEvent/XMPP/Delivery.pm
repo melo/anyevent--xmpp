@@ -33,13 +33,6 @@ the server.
 
 Other delivery objects might have other semantics w.r.t. sending a stanza.
 
-=item B<generate_id>
-
-Every delivery object has to provide a way to generate unique IDs
-for use as the 'id' attribute of XMPP stanzas.
-
-This method should return a unique ID as string.
-
 =back
 
 =head2 EVENTS

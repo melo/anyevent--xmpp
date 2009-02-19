@@ -3,7 +3,6 @@
 use strict;
 use Test::More;
 use AnyEvent::XMPP::TestClient;
-use AnyEvent::XMPP::IM::Message;
 use AnyEvent::XMPP::Util qw/bare_jid split_jid/;
 use AnyEvent::XMPP::Ext::Registration;
 

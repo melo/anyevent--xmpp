@@ -2,7 +2,6 @@ package AnyEvent::XMPP::Error;
 use strict;
 use AnyEvent::XMPP::Util qw/stringprep_jid prep_bare_jid/;
 use AnyEvent::XMPP::Error;
-use AnyEvent::XMPP::Error::SASL;
 use AnyEvent::XMPP::Error::IQ;
 use AnyEvent::XMPP::Error::Register;
 use AnyEvent::XMPP::Error::Stanza;
@@ -11,7 +10,6 @@ use AnyEvent::XMPP::Error::Presence;
 use AnyEvent::XMPP::Error::Message;
 use AnyEvent::XMPP::Error::Parser;
 use AnyEvent::XMPP::Error::Exception;
-use AnyEvent::XMPP::Error::IQAuth;
 
 =head1 NAME
 

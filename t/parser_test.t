@@ -8,7 +8,7 @@ plan tests => 1;
 my $p = AnyEvent::XMPP::Parser->new;
 
 my $recv;
-$p->set_stanza_cb (sub {
+$p->reg_cb (received_stanza_xml => sub {
    my ($p, $node) = @_;
    $recv = $node->as_string;
 });

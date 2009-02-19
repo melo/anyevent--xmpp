@@ -161,7 +161,7 @@ sub flush {
    substr $self->{write_buf}, 0, (length $self->{write_buf}), ''
 }
 
-=item B<init_stream ($language, $domain, $namespace)>
+=item B<init_stream ($language, $domain, $version_override)>
 
 This method will generate a XMPP stream header. C<$domain> has to be the
 domain of the server (or endpoint) we want to connect to.

@@ -10,9 +10,8 @@ AnyEvent::XMPP::IQTracker - A request tracker for IQ stanzas.
 
 =head2 DESCRIPTION
 
-This is a simple helper module for tracking IQ requests.
-It requires an object which implements the L<AnyEvent::XMPP::Delivery>
-API.
+This is a simple helper module for tracking IQ requests,
+it's used by L<AnyEvent::XMPP::Connection>.
 
 =head2 METHODS
 
@@ -25,21 +24,10 @@ keys:
 
 =over 4
 
-=item delivery => $delivery
-
-This is the delivery object, which is used to receive and
-send stanzas. It must implement the L<AnyEvent::XMPP::Delivery> API.
-
 =item default_iq_timeout => $seconds
 
 This is the default timeout for IQ requests. It's default
 is 60 seconds. (If C<$seconds> is 0, timeouts are disabled).
-
-=item pre_auth => $bool
-
-This is an internal flag. Which is mainly used to tell the tracker to register
-to the C<handle_stanza> event instead to the C<recv> event of the C<$delivery>
-object.
 
 =back
 
@@ -52,97 +40,57 @@ sub new {
    bless $self, $class;
 
    $self->{default_iq_timeout} = 60;
-
-   my $recv_ev = $self->{pre_auth} ? 'handle_stanza' : 'recv';
-
-   $self->{regid} =
-      $self->{delivery}->reg_cb (
-         $recv_ev => sub {
-            my ($del, $stanza) = @_;
-
-            if ($stanza->is_reply && $self->{tracked}->{$stanza->id}) {
-               $self->handle_reply ($stanza);
-               $del->current->stop;
-            }
-         }
-      );
+   $self->{id} = 0;
 
    return $self
 }
 
-=item B<send ($stanza, $cb, $timeout)>
+=item B<register ($stanza)>
 
-This method will assist you in sending the stanza.
-C<$stanza> should be an IQ stanza. C<$timeout> is optional,
-use 0 if you want to disable the timeout.
-
-C<$cb> is the callback that will be invoked when a result,
-and error or a timeout was received.
-
-   $cb->($result_stanza, $error)
-
-The first argument will be the result stanza if no error
-was received. The second argument will be undefined if
-the request was successful.
-
-But if an error occurred the first argument will be undefined
-and the second will contain an L<AnyEvent::XMPP::Error::IQ>
-object, describing the problem.
-
-Here is an example:
-
-   use AnyEvent::XMPP::Stanza;
-
-   # ...
-
-   $tracker->send (
-      new_iq ('set', undef, undef, create => {
-         defns => 'disco_info',
-         node => {
-           name => 'query',
-           attrs => [ node => 'test_node' ]
-         }
-      }),
-      sub {
-         my ($result, $error) = @_;
-
-         if ($error) {
-            warn "An error was received: " . $error->string . "\n";
-            return;
-         }
-
-         # ... do something with $result ...
-      }
-   );
+This method will inspect the C<$stanza> and if required it will store tracking
+information about the stanza.
 
 =cut
 
-sub send {
-   my ($self, $stanza, $cb, $timeout) = @_;
+sub register {
+   my ($self, $stanza) = @_;
+
+   return unless $stanza->type eq 'iq';
+
+   my ($cb, $timeout) = ($stanza->reply_cb, $stanza->timeout);
+
+   return unless $cb;
 
    if (not defined $timeout) {
       $timeout = $self->{default_iq_timeout};
    }
 
-   $stanza->set_id ($self->{delivery}->generate_id);
+   $stanza->set_id (++$self->{id});
    my $track = $self->{tracked}->{$stanza->id} = [ $cb ];
 
    if ($timeout) {
       $track->[1] =
          AnyEvent->timer (
-            after => $self->{iq_timeout},
+            after => $timeout,
             cb => sub {
                delete $self->{tracked}->{$stanza->id};
                $cb->(undef, AnyEvent::XMPP::Error::IQ->new);
             }
          );
    }
-
-   $self->{delivery}->send ($stanza);
 }
 
-sub handle_reply {
+=item B<handle_stanza ($stanza)>
+
+This method inspects the incoming C<$stanza> if it is a reply
+to some request which was C<register>ed before.
+
+=cut
+
+sub handle_stanza {
    my ($self, $stanza) = @_;
+
+   return if $stanza->type ne 'iq';
 
    my $track = delete $self->{tracked}->{$stanza->id}
       or return;
@@ -167,9 +115,7 @@ registered event callbacks, result callbacks and tracking information.
 
 sub disconnect {
    my ($self) = @_;
-   $self->{delivery}->unreg_cb ($self->{regid});
    delete $self->{tracked};
-   delete $self->{delivery};
 }
 
 =head1 AUTHOR
