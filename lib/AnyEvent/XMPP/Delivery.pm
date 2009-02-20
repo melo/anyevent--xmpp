@@ -41,6 +41,12 @@ Every 'delivery' object must provide these events:
 
 =over 4
 
+=item send => $stanza
+
+This event is emitted when the C<$stanza> is on it's way to the
+destination. Stopping this event usually results in the stanza not
+being sent.
+
 =item recv => $stanza
 
 This event should be generated whenever a stanza for

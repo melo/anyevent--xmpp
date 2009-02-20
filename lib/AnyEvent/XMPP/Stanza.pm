@@ -161,6 +161,24 @@ sub new {
    return $self
 }
 
+sub to   { $_[0]->{attrs}->{to}   }
+sub set_to {
+   my ($self, $to) = @_;
+   $self->{attrs}->{to} = $to;
+   unless (defined $to) {
+      delete $self->{attrs}->{to};
+   }
+}
+
+sub from { $_[0]->{attrs}->{from} }
+sub set_from {
+   my ($self, $from) = @_;
+   $self->{attrs}->{from} = $from;
+   unless (defined $from) {
+      delete $self->{attrs}->{from};
+   }
+}
+
 sub want_id { $_[0]->{reply_cb} && not defined $_[0]->{attrs}->{id} }
 sub set_id { $_[0]->{attrs}->{id} = $_[1] }
 sub id { $_[0]->{attrs}->{id} }
@@ -345,15 +363,13 @@ sub internal_analyze {
 
    my $node = $self->{node};
 
-   my @bind  = $node->find_all ([qw/bind bind/]);
-   my @tls   = $node->find_all ([qw/tls starttls/]);
    my @mechs = $node->find_all ([qw/sasl mechanisms/], [qw/sasl mechanism/]);
-
-
    $self->{sasl_mechs} = [ map { $_->text } @mechs ]
       if @mechs;
-   $self->{tls}  = 1 if @tls;
-   $self->{bind} = 1 if @bind;
+
+   $self->{tls}     = 1 if $node->find_all ([qw/tls starttls/]);
+   $self->{bind}    = 1 if $node->find_all ([qw/bind bind/]);
+   $self->{session} = 1 if $node->find_all ([qw/session session/]);
 
    # and yet another weird thingie: in XEP-0077 it's said that
    # the register feature MAY be advertised by the server. That means:
@@ -362,8 +378,9 @@ sub internal_analyze {
    # my @reg   = $node->find_all ([qw/register register/]);
 }
 
-sub tls        { (shift)->{tls} }
-sub bind       { (shift)->{bind} }
+sub tls        { (shift)->{tls}        }
+sub bind       { (shift)->{bind}       }
+sub session    { (shift)->{session}    }
 sub sasl_mechs { (shift)->{sasl_mechs} }
 
 1;

@@ -1,27 +1,41 @@
 package AnyEvent::XMPP::IM::Connection;
 use strict;
 no warnings;
-use AnyEvent::XMPP::Connection;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
-use AnyEvent::XMPP::IM::Roster;
-use AnyEvent::XMPP::IM::Message;
 use AnyEvent::XMPP::Util qw/cmp_bare_jid/;
-our @ISA = qw/AnyEvent::XMPP::Connection/;
+
+use base qw/AnyEvent::XMPP::Connection/;
 
 =head1 NAME
 
-AnyEvent::XMPP::IM::Connection - "XML" stream that implements the XMPP RFC 3921.
+AnyEvent::XMPP::IM::Connection - "XML" stream that implements session establishment for XMPP RFC 3921.
 
 =head1 SYNOPSIS
 
-   use AnyEvent::XMPP::Connection;
+   use AnyEvent::XMPP::IM::Connection;
 
-   my $con = AnyEvent::XMPP::Connection->new;
+   my $con = AnyEvent::XMPP::IM::Connection->new (
+       jid      => 'test@jabber.org',
+       password => 'secret123',
+   );
+
+   $con->reg_cb (
+      session_ready => sub {
+         # here you can manually initiate sending initial presence
+         # or retrieving the roster...
+      }
+   );
+
+   $con->connect;
 
 =head1 DESCRIPTION
 
 This module represents a XMPP instant messaging connection and implements
-RFC 3921.
+session establishment for RFC 3921. It will also try to handle cases
+of RFC 3921bis, where session establishment has been removed.
+
+This class is a subclass of L<AnyEvent::XMPP::Connection> and all events
+that are available there are also available for this connection.
 
 This module is a subclass of C<AnyEvent::XMPP::Connection> and inherits all methods.
 For example C<reg_cb> and the stanza sending routines.

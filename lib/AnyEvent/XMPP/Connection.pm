@@ -7,7 +7,7 @@ use AnyEvent::XMPP::Parser;
 use AnyEvent::XMPP::Writer;
 use AnyEvent::XMPP::IQTracker;
 use AnyEvent::XMPP::Authenticator;
-use AnyEvent::XMPP::Util qw/split_jid join_jid simxml dump_twig_xml stringprep_jid/;
+use AnyEvent::XMPP::Util qw/split_jid join_jid simxml dump_twig_xml stringprep_jid cmp_jid/;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Error;
 use AnyEvent::XMPP::Stanza;
@@ -195,6 +195,12 @@ the server.
 Please note that the old authentication method will fail if C<disable_iq_auth>
 is true.
 
+=item default_stream_namespace => $namespace_uri
+
+B<NOTE:> Only use this if you B<really> know what you are doing!
+
+This will set the default stream "XML" namespace. The default is 'client'.
+
 =item stream_version_override => $version
 
 B<NOTE:> Only use if you B<really> know what you are doing!
@@ -207,10 +213,6 @@ set C<$version> to '0.9' for testing IQ authentication with ejabberd.
 
 =cut
 
-sub default_namespace {
-   return 'client';
-}
-
 sub new {
    my $this = shift;
    my $class = ref($this) || $this;
@@ -218,6 +220,7 @@ sub new {
       $class->SUPER::new (
          language                 => 'en',
          whitespace_ping_interval => 60,
+         default_stream_namespace => 'client',
          @_
       );
 
@@ -252,6 +255,25 @@ sub new {
    $self->reg_cb (after_pre_authentication => sub {
       my ($self, $stanza) = @_;
       $self->start_authenticator ($stanza);
+   }, ext_before_stream_ready => sub {
+      my ($self) = @_;
+      delete $self->{timeout};
+   }, ext_after_send => sub {
+      my ($self, $stanza) = @_;
+
+      $self->{tracker}->register ($stanza);
+
+      if (xmpp_ns ($self->{default_stream_namespace}) eq xmpp_ns ('client')) {
+         if (cmp_jid ($stanza->to, $self->{server_jid})) {
+            $stanza->set_to (undef);
+         }
+
+         if (cmp_jid ($stanza->from, $self->{jid})) {
+            $stanza->set_from (undef);
+         }
+      }
+
+      $self->write_data ($stanza->serialize ($self->{writer}));
    });
 
    return $self;
@@ -271,6 +293,7 @@ sub cleanup {
    delete $self->{peer_host};
    delete $self->{peer_port};
    delete $self->{res_manager};
+   delete $self->{timeout};
 
    if ($self->{writer}) {
       delete $self->{writer};
@@ -291,6 +314,10 @@ sub cleanup {
       $self->{authenticator}->disconnect;
       delete $self->{authenticator};
    }
+
+   if ($self->{res_manager}) {
+      delete $self->{res_manager};
+   }
 }
 
 sub init {
@@ -299,7 +326,7 @@ sub init {
    $self->cleanup;
    $self->{stanza_id_cnt} = 0;
 
-   $self->{parser} = new AnyEvent::XMPP::Parser $self->default_namespace;
+   $self->{parser} = new AnyEvent::XMPP::Parser $self->{default_stream_namespace};
    $self->{parser}->reg_cb (
       stream_start => sub {
          my ($parser, $node) = @_;
@@ -346,7 +373,7 @@ sub init {
 
    $self->{writer} =
       AnyEvent::XMPP::Writer->new (
-         stream_ns => $self->default_namespace
+         stream_ns => $self->{default_stream_namespace}
       );
    $self->{tracker} = AnyEvent::XMPP::IQTracker->new;
    $self->{res_manager} =
@@ -437,7 +464,14 @@ sub connect {
                },
             );
          
-         $self->connected
+         if ($timeout) {
+            $self->{timeout} =
+               AnyEvent->timer (after => $timeout, cb => sub {
+                  $self->disconnect ("XMPP stream establishment timeout");
+               });
+         }
+
+         $self->connected ($peerhost, $peerport);
          
       }, sub { $timeout };
 }
@@ -486,11 +520,11 @@ C<$msg> is a human readable message for logging purposes.
 sub disconnect {
    my ($self, $msg) = @_;
 
+   if ($self->{connected}) {
+      $self->disconnected ($self->{peer_host}, $self->{peer_port}, $msg);
+   }
+
    $self->cleanup;
-
-   return unless $self->{connected};
-
-   $self->disconnected ($self->{peer_host}, $self->{peer_port}, $msg);
 }
 
 =item $con->is_connected ()
@@ -558,14 +592,6 @@ This method is used to send an XMPP stanza directly over
 the connection. 
 
 =cut
-
-sub send {
-   my ($self, $stanza) = @_;
-
-   $self->send_stanza ($stanza);
-   $self->write_data ($stanza->serialize ($self->{writer}));
-}
-
 
 sub start_authenticator {
    my ($self, $stanza) = @_;
@@ -688,7 +714,7 @@ These events can be registered on with C<reg_cb>:
 
 =over 4
 
-=item connected
+=item connected => $peer_host, $peer_port
 
 This event is emitted when the TCP connection could be established.
 Please wait for the C<stream_ready> event before you start sending
@@ -697,10 +723,10 @@ data.
 =cut
 
 sub connected {
-   my ($self) = @_;
+   my ($self, $ph, $pp) = @_;
 
    if ($DEBUG) {
-      print "connected to $self->{peer_host}:$self->{peer_port}\n";
+      print "connected to $ph:$pp\n";
    }
 
    if ($self->{old_style_ssl}) {
@@ -742,10 +768,10 @@ sub stream_ready {
 
 =item disconnected => $peer_host, $peer_port, $reason
 
-This event is emitted when the TCP connection was disconnected, either remotely
-or locally. C<$peerhost> and C<$peerport> are the host and port of the other
-TCP endpoint. And C<$reason> is a human readable string which indicates the
-reason for the disconnect.
+This event is emitted when the TCP connection was disconnected or couldn't be
+established, either remotely or locally. C<$peerhost> and C<$peerport> are the
+host and port of the other TCP endpoint. And C<$reason> is a human readable
+string which indicates the reason for the disconnect.
 
 =cut
 
@@ -758,6 +784,11 @@ sub disconnected {
 
    $self->cleanup;
 };
+
+=item send => $stanza
+
+This event is emitted when an L<AnyEvent::XMPP::Stanza> object is about to be
+written out. Stopping this event will prevent the stanza from being written out.
 
 =item recv => $stanza
 
@@ -809,19 +840,6 @@ chance to look at it. Here is an example if you want to do that:
 
 B<NOTE>: Please only do this if you know what you are doing. For normal stanza
 handling please see the C<recv> event.
-
-=item send_stanza => $stanza
-
-This event is emitted when an L<AnyEvent::XMPP::Stanza> object is about to be
-written out.
-
-=cut
-
-sub send_stanza {
-   my ($self, $stanza) = @_;
-
-   $self->{tracker}->register ($stanza);
-}
 
 =item recv_stanza => $node
 
