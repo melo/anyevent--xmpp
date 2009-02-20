@@ -2,7 +2,8 @@ package AnyEvent::XMPP::Component;
 use strict;
 use AnyEvent::XMPP::Connection;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
-our @ISA = qw/AnyEvent::XMPP::Connection/;
+
+use base qw/Object::Event/;
 
 =head1 NAME
 
@@ -18,7 +19,7 @@ AnyEvent::XMPP::Component - "XML" stream that implements the XEP-0114
                 port   => 5347,
                 secret => 'insecurepasswordforthehackers'
              );
-   $con->reg_cb (session_ready => sub { ... });
+   $con->reg_cb (stream_ready => sub { ... });
    $con->connect;
 
 =head1 DESCRIPTION
@@ -73,67 +74,117 @@ sub new {
    my $this = shift;
    my $class = ref($this) || $this;
 
-   my %args = @_;
+   my $self = $class->SUPER::new (@_);
 
-   unless (exists $args{initial_presence}) {
-      $args{stream_namespace} = 'component';
-   }
-   
-   $args{host} ||= delete $args{server};
-   $args{host}
-      or die "Required 'host' argument missing to new for this component!";
+   my $con = $self->{con} = AnyEvent::XMPP::Connection->new (
+      host => $self->{host} || $self->{server},
+      port => $self->{port} || 5347,
+      default_stream_namespace => 'component',
+      %{$self->{connection_args} || {}},
+      username => 'test',
+      domain => $self->{host} || $self->{server},
+   );
 
-   unless (defined $args{port}) {
-      $args{port} = 5347;
-   }
+   $con->reg_cb (
+      [stream_start => -1] => sub {
+         my ($con, $node) = @_;
+         $con->current->stop;
 
-   my $self = $class->SUPER::new (%args);
+         my $secret = $con->{parser}->{parser}->xml_escape ($self->{secret});
 
-   $self->{parser}->set_stream_cb (sub {
-      my $secret = $self->{parser}->{parser}->xml_escape ($self->{secret});
-      my $id = $self->{stream_id} = $_[0]->attr ('id');
-      $self->{writer}->send_handshake ($id, $secret);
-   });
+         $con->write_data ($con->{writer}->component_handshake ($con->{stream_id}, $secret));
+      },
+      [handle_stanza => 1] => sub {
+         my ($con, $stanza) = @_;
 
-   $self->reg_cb (recv_stanza_xml => sub {
-      my ($self, $node) = @_;
-      if ($node->eq (component => 'handshake')) {
-         $self->{authenticated} = 1;
-         $self->event ('session_ready');
+         # intercept _all_ stanzas
+         $con->current->stop;
+
+         if ($self->{authenticated}) {
+            $self->recv ($stanza);
+         } else {
+            if ($stanza->node->eq (component => 'handshake')) {
+               $self->{authenticated} = 1;
+               $self->stream_ready;
+            }
+         }
+      },
+      connected => sub {
+         my ($con, @args) = @_;
+         $self->connected (@args);
+      },
+      error => sub {
+         my ($con, @args) = @_;
+         $self->error (@args);
+      },
+      disconnected => sub {
+         my ($con, @args) = @_;
+         $self->disconnected (@args);
       }
-   },
-   stream_pre_authentication => sub {
-      my ($self, $rcon) = @_;
-      $$rcon = 0;
-   });
+   );
+
+   $self->reg_cb (
+      ext_after_send => sub {
+         my ($self, $stanza) = @_;
+         $self->{con}->send ($stanza);
+      }
+   );
 
    $self
 }
 
-sub default_namespace {
-   return 'component';
+sub connect {
+   my ($self) = @_;
+   $self->{con}->connect;
 }
 
-sub authenticate {
-   warn "authenticate called! Please read the documentation of "
-       ."AnyEvent::XMPP::Component why this is an error!"
-}
+=item $comp->send ($stanza)
+
+Sends an L<AnyEvent::XMPP::Stanza> to the server.
 
 =back
 
 =head1 EVENTS
 
-These additional events can be registered on with C<reg_cb>:
-
-NOTE: The event C<stream_pre_authentication> should _not_ be handled
-and just ignored. Don't attach callbacks to it!
+These events can be registered on with C<reg_cb>:
 
 =over 4
 
-=item session_ready
+=item stream_ready
 
 This event indicates that the component has connected successfully
 and can now be used to transmit stanzas.
+
+=cut
+
+sub stream_ready { }
+
+=item send => $stanza
+
+Emitted when a stanza is about to be sent to the server.
+Stopping the event will result in the stanza not being sent.
+
+=item recv => $stanza
+
+Emitted when a stanza has been received from the server.
+
+=item connected => ...
+
+TODO
+
+=item error => ...
+
+TODO
+
+=item disconnected => ...
+
+TODO
+
+=cut
+
+sub connected    { }
+sub error        { }
+sub disconnected { }
 
 =back
 

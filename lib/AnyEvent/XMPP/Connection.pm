@@ -252,29 +252,55 @@ sub new {
       );
    });
 
-   $self->reg_cb (after_pre_authentication => sub {
-      my ($self, $stanza) = @_;
-      $self->start_authenticator ($stanza);
-   }, ext_before_stream_ready => sub {
-      my ($self) = @_;
-      delete $self->{timeout};
-   }, ext_after_send => sub {
-      my ($self, $stanza) = @_;
+   $self->reg_cb (
+      ext_before_stream_start => sub {
+         my ($self, $node) = @_;
 
-      $self->{tracker}->register ($stanza);
+         $self->{stream_id}  = $node->attr ('id');
+         $self->{server_jid} = $node->attr ('from');
+      },
+      ext_after_stream_start => sub {
+         my ($self, $node) = @_;
 
-      if (xmpp_ns ($self->{default_stream_namespace}) eq xmpp_ns ('client')) {
-         if (cmp_jid ($stanza->to, $self->{server_jid})) {
-            $stanza->set_to (undef);
+         # This is some very bad "hack" for _very_ old jabber
+         # servers to work with AnyEvent::XMPP
+         if (not (defined $node->attr ('version'))
+             && not ($self->{disable_iq_auth})
+             && not ($self->{disable_old_jabber_authentication})
+             && not ($self->{authenticated})) {
+
+            $self->pre_authentication;
          }
+      },
+      ext_after_pre_authentication => sub {
+         my ($self, $stanza) = @_;
+         $self->start_authenticator ($stanza);
+      },
+      ext_before_stream_ready => sub {
+         my ($self) = @_;
+         delete $self->{timeout};
+      },
+      send => sub {
+         my ($self, $stanza) = @_;
 
-         if (cmp_jid ($stanza->from, $self->{jid})) {
-            $stanza->set_from (undef);
+         $self->{tracker}->register ($stanza);
+
+         if (xmpp_ns ($self->{default_stream_namespace}) eq xmpp_ns ('client')) {
+            if (cmp_jid ($stanza->to, $self->{server_jid})) {
+               $stanza->set_to (undef);
+            }
+
+            if (cmp_jid ($stanza->from, $self->{jid})) {
+               $stanza->set_from (undef);
+            }
          }
+      },
+      ext_after_send => sub {
+         my ($self, $stanza) = @_;
+
+         $self->write_data ($stanza->serialize ($self->{writer}));
       }
-
-      $self->write_data ($stanza->serialize ($self->{writer}));
-   });
+   );
 
    return $self;
 }
@@ -331,17 +357,7 @@ sub init {
       stream_start => sub {
          my ($parser, $node) = @_;
 
-         $self->{stream_id} = $node->attr ('id');
-         $self->{server_jid} = $node->attr ('from');
-
-         # This is some very bad "hack" for _very_ old jabber
-         # servers to work with AnyEvent::XMPP
-         if (not (defined $node->attr ('version'))
-             && not ($self->{disable_iq_auth})
-             && not ($self->{disable_old_jabber_authentication})) {
-
-            $self->pre_authentication;
-         }
+         $self->stream_start ($node);
       },
       received_stanza_xml => sub {
          my ($parser, $node) = @_;
@@ -912,6 +928,13 @@ sub error {
             . $errorobj->string . "\n";
    }
 }
+
+=item stream_start => $node
+
+This is a special event which is emitted when the stream start tag
+has been received from the server.
+
+=cut
 
 =back
 
