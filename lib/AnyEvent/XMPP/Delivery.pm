@@ -11,7 +11,7 @@ AnyEvent::XMPP::Delivery - A stanza delivery interface
 This is just the definition of an interface for sending and receiving stanzas.
 Following modules implement it:
 
-   AnyEvent::XMPP::Connection
+   AnyEvent::XMPP::Stream
 
 This module merely defines a convention which methods and
 events are provided.
@@ -28,7 +28,7 @@ C<$stanza> must be an object of the class L<AnyEvent::XMPP::Stanza>
 or a subclass of it.
 
 This method should deliver the C<$stanza> as if it was 'sent'.  For
-L<AnyEvent::XMPP::Connection> this means that the C<$stanza> will be sent to
+L<AnyEvent::XMPP::Stream> this means that the C<$stanza> will be sent to
 the server.
 
 Other delivery objects might have other semantics w.r.t. sending a stanza.

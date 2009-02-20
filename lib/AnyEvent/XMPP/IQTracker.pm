@@ -10,8 +10,9 @@ AnyEvent::XMPP::IQTracker - A request tracker for IQ stanzas.
 
 =head2 DESCRIPTION
 
-This is a simple helper module for tracking IQ requests,
-it's used by L<AnyEvent::XMPP::Connection>.
+This is a simple helper module for tracking IQ requests.
+It's used by L<AnyEvent::XMPP::Stream>. And can also be used by
+any other module that would like to track IQ requests.
 
 =head2 METHODS
 
@@ -55,7 +56,7 @@ information about the stanza.
 sub register {
    my ($self, $stanza) = @_;
 
-   return unless $stanza->type eq 'iq';
+   return unless $stanza->type eq 'iq' && $stanza->want_id;
 
    my ($cb, $timeout) = ($stanza->reply_cb, $stanza->timeout);
 

@@ -19,7 +19,7 @@ AnyEvent::XMPP::Authenticator - Authenticator helper module
 
 =head2 DESCRIPTION
 
-This is a helper module for L<AnyEvent::XMPP::Connection>, it
+This is a helper module for L<AnyEvent::XMPP::Stream>, it
 handles all the tiny bigs of client authentication.
 
 =head2 METHODS
@@ -28,7 +28,7 @@ handles all the tiny bigs of client authentication.
 
 =item new (connection => $con)
 
-Creates a new authenticator object for the L<AnyEvent::XMPP::Connection>
+Creates a new authenticator object for the L<AnyEvent::XMPP::Stream>
 C<$con>.
 
 =cut
