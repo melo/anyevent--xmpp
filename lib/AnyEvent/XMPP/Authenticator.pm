@@ -199,54 +199,6 @@ sub start {
    }
 }
 
-=item B<authenticate>
-
-This method should be called after the C<stream_pre_authentication> event
-was emitted to continue authentication of the stream.
-
-Usually this method only has to be called when you want to register before
-you authenticate. See also the documentation of the C<stream_pre_authentication>
-event below.
-
-=cut
-
-sub authenticate {
-   my ($self) = @_;
-   my $node = $self->{features};
-   my @mechs = $node->find_all ([qw/sasl mechanisms/], [qw/sasl mechanism/]);
-
-   # Yes, and also iq-auth isn't correctly advertised in the
-   # stream features! We all love the depreacted XEP-0078, eh?
-   my @iqa = $node->find_all ([qw/iqauth auth/]);
-
-   if (not ($self->{disable_sasl}) && @mechs) {
-      $self->send_sasl_auth (@mechs)
-
-   } elsif (not $self->{disable_iq_auth}) {
-      if ($self->{anal_iq_auth} && !@iqa) {
-         if (@iqa) {
-            $self->do_iq_auth;
-         } else {
-            die "No authentication method left after anal iq auth, neither SASL or IQ auth.\n";
-         }
-      } else {
-         $self->do_iq_auth;
-      }
-
-   } else {
-      die "No authentication method left, neither SASL or IQ auth.\n";
-   }
-}
-
-sub handle_sasl_challenge {
-   my ($self, $node) = @_;
-}
-
-sub handle_sasl_success {
-   my ($self, $node) = @_;
-
-}
-
 =head2 EVENTS
 
 =over 4

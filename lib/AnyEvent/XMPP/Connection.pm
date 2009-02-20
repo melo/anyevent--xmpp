@@ -58,7 +58,7 @@ consult the C<AnyEvent::XMPP::IM> module.
 
 =over 4
 
-=item B<new (%args)>
+=item $con = AnyEvent::XMPP::Connection->new (%args)
 
 Following arguments can be passed in C<%args>:
 
@@ -366,7 +366,7 @@ sub reinit {
    );
 }
 
-=item B<connect ()>
+=item $con->connect ()
 
 Try to connect (non blocking) to the domain and port passed in C<new>.
 
@@ -461,7 +461,7 @@ sub enable_ssl {
 }
 
 
-=item B<close>
+=item $con->close ()
 
 This method will send a closing stream stanza if we are connected.
 Please use this method whenever you want to close a connection gracefully.
@@ -476,7 +476,7 @@ sub close {
    }
 }
 
-=item B<disconnect ($msg)>
+=item $con->disconnect ($msg)
 
 Call this method if you want to kill the connection forcefully.
 C<$msg> is a human readable message for logging purposes.
@@ -493,7 +493,7 @@ sub disconnect {
    $self->disconnected ($self->{peer_host}, $self->{peer_port}, $msg);
 }
 
-=item B<is_connected ()>
+=item $con->is_connected ()
 
 Returns true if the connection is still connected and authenticated, so
 stanzas can be sent.
@@ -505,7 +505,7 @@ sub is_connected {
    $self->{authenticated}
 }
 
-=item B<jid>
+=item $con->jid ()
 
 After the stream has been bound to a resource the JID can be retrieved via this
 method.
@@ -514,7 +514,7 @@ method.
 
 sub jid { $_[0]->{jid} }
 
-=item B<credentials>
+=item $con->credentials ()
 
 This method returns the configured account credentials as list:
 username, domain, password and desired resource (may be undefined).
@@ -526,7 +526,7 @@ sub credentials {
    ($self->{username}, $self->{domain}, $self->{password}, $self->{resource})
 }
 
-=item B<features>
+=item $con->features ()
 
 Returns the last received C<features> stanza in form of a
 L<AnyEvent::XMPP::FeatureStanza> object.
@@ -535,7 +535,7 @@ L<AnyEvent::XMPP::FeatureStanza> object.
 
 sub features { $_[0]->{features} }
 
-=item B<stream_id>
+=item $con->stream_id ()
 
 This is the ID of this stream that was given us by the server.
 
@@ -543,7 +543,7 @@ This is the ID of this stream that was given us by the server.
 
 sub stream_id { $_[0]->{stream_id} }
 
-=item B<generate_id>
+=item $con->generate_id ()
 
 This function generates a unique ID for use as the 'id' field for stanzas or
 other unique identifiers which belong to this connection.
@@ -552,7 +552,7 @@ other unique identifiers which belong to this connection.
 
 sub generate_id { "c_" . ++$_[0]->{stanza_id_cnt} }
 
-=item B<send ($stanza)>
+=item $con->send ($stanza)
 
 This method is used to send an XMPP stanza directly over
 the connection. 
@@ -776,7 +776,12 @@ Whenever the write queue to the TCP connection becomes empty this
 event is emitted. It is useful if you want to wait until all the
 messages you've given to the connection is written out to the kernel.
 
-FIXME: insert example here when stanza handling/sending is done
+Example:
+
+   $con->reg_cb (send_buffer_empty => sub {
+      $con->disconnect ('done sending');
+   });
+   $con->send (new_msg (....));
 
 =cut
 
@@ -898,7 +903,7 @@ Robin Redeker, C<< <elmex at ta-sa.org> >>, JID: C<< <elmex at jabber.org> >>
 
 =head1 CONTRIBUTORS
 
-melo - minor fixes
+melo - design suggestions
 
 =head1 COPYRIGHT & LICENSE
 

@@ -8,15 +8,18 @@ use AnyEvent::XMPP::Stanza;
 
 AnyEvent::XMPP::ResourceManager - An XMPP stream resource manager
 
-=head1 SYNOPSIS
-
 =head2 DESCRIPTION
+
+This module handles binding resources. Currently there is
+only one resource per connection, but XEP-0193 is on the way.
+
+This class is used by L<AnyEvent::XMPP::Connection> directly.
 
 =head2 METHODS
 
 =over 4
 
-=item B<new (%args)>
+=item AnyEvent::XMPP::ResourceManager->new (%args)
 
 =cut
 
@@ -81,6 +84,8 @@ sub bind {
       }
    }));
 }
+
+=back
 
 =head1 AUTHOR
 
