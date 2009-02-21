@@ -190,6 +190,8 @@ sub id { $_[0]->{attrs}->{id} }
 sub type { $_[0]->{type} }
 sub node { $_[0]->{node} }
 
+sub set_sent_cb  { $_[0]->{sent_cb} = $_[1] }
+sub sent_cb      { $_[0]->{sent_cb} }
 sub reply_cb     { $_[0]->{reply_cb} }
 sub set_reply_cb { $_[0]->{reply_cb} = $_[1] }
 sub timeout      { $_[0]->{timeout} }
