@@ -172,6 +172,8 @@ sub update_connections {
    }
 }
 
+=back
+
 =head1 EVENTS
 
 These events are emitted by this object via the L<Object::Event::Methods> API:

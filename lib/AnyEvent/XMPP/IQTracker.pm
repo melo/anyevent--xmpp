@@ -119,6 +119,8 @@ sub disconnect {
    delete $self->{tracked};
 }
 
+=back
+
 =head1 AUTHOR
 
 Robin Redeker, C<< <elmex@ta-sa.org> >>

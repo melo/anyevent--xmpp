@@ -24,6 +24,8 @@ which are used to represent the 3 main stanza types of XMPP:
 
 =head2 FUNCTIONS
 
+=over 4
+
 =item B<new_iq ($type, %args)>
 
 This function generates a new L<AnyEvent::XMPP::IQ> object for you.
@@ -135,6 +137,8 @@ sub analyze {
 
    AnyEvent::XMPP::Stanza->new ($node, type => $type, stream_ns => $stream_ns);
 }
+
+=back
 
 =head2 METHODS
 
@@ -281,6 +285,8 @@ one of these:
    sasl_failure
 
 =cut
+
+=back
 
 =head1 AUTHOR
 

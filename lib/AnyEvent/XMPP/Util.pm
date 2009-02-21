@@ -3,6 +3,7 @@ use strict;
 no warnings;
 use Encode;
 use Net::LibIDN qw/idn_prep_name idn_prep_resource idn_prep_node/;
+use AnyEvent::Socket;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns_maybe/;
 require Exporter;
 our @EXPORT_OK = qw/resourceprep nodeprep prep_join_jid join_jid

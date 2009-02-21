@@ -199,6 +199,8 @@ sub start {
    }
 }
 
+=back
+
 =head2 EVENTS
 
 =over 4
@@ -289,6 +291,7 @@ sub string {
       $self->condition
 }
 
+=back
 
 =head1 AUTHOR
 

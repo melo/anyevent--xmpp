@@ -161,22 +161,23 @@ sub flush {
    substr $self->{write_buf}, 0, (length $self->{write_buf}), ''
 }
 
-=item B<init_stream ($language, $domain, $version_override)>
+=item B<init_stream ($language, $version, %attrs)>
 
-This method will generate a XMPP stream header. C<$domain> has to be the
-domain of the server (or endpoint) we want to connect to.
+This method will generate a XMPP stream header. The namespace of the stream
+has to be given in the arguments to C<new> (see above).
 
-C<$namespace> is the namespace URI or the tag (from L<AnyEvent::XMPP::Namespaces>)
-for the stream namespace. (This is used by L<AnyEvent::XMPP::Component> to connect
-as component to a server). C<$namespace> can also be undefined, in this case
-the C<client> namespace will be used.
+C<$langauge> is the stream language, default is 'en'. C<$version>
+is the stream version, default is '1.0'.
+
+C<%attrs> should contain further attributes for the stream header.
+Most popular is 'to', for the domain name.
 
 The return value is the unicode character string of the generated header.
 
 =cut
 
 sub init_stream {
-   my ($self, $language, $domain, $vers_override) = @_;
+   my ($self, $language, $vers, %attrs) = @_;
 
    my $w = $self->{writer};
    $w->xmlDecl ();
@@ -185,9 +186,9 @@ sub init_stream {
    $w->forceNSDecl ($self->ns);
    $w->startTag (
       [xmpp_ns ('stream'), 'stream'],
-      to      => $domain,
-      version => (defined $vers_override ? $vers_override : '1.0'),
-      [xmpp_ns ('xml'), 'lang'] => $language
+      %attrs,
+      version => $vers || '1.0',
+      [xmpp_ns ('xml'), 'lang'] => $language || 'en'
    );
 
    $self->flush
