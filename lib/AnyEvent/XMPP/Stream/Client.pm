@@ -23,7 +23,7 @@ AnyEvent::XMPP::Stream - XMPP client stream (RFC 3920).
    use AnyEvent::XMPP::Stream::Client;
 
    my $con =
-      AnyEvent::XMPP::Stream->new (
+      AnyEvent::XMPP::Stream::Client->new (
          username => "abc",
          domain   => "jabber.org",
          resource => "AnyEvent::XMPP",
@@ -39,14 +39,16 @@ AnyEvent::XMPP::Stream - XMPP client stream (RFC 3920).
 This module represents a XMPP stream as described in RFC 3920.
 
 It implements the L<AnyEvent::XMPP::Delivery> interface for stanza delivery.
-And it inherits the event interface from L<Object::Event::Methods>. Please
-see L<Object::Event> and L<Object::Event::Methods> for further information.
+It's a subclass of L<AnyEvent::XMPP::Stream> and it inherits the event
+interface of L<Object::Event::Methods>. Please see L<Object::Event> and
+L<Object::Event::Methods> for further information about registering event
+callbacks.
 
-This module only handles basic XMPP stream connecting, authentication
-and resource binding.
-
-For an implementation of the features described in RFC 3921 please
-consult the C<AnyEvent::XMPP::IM> module.
+This module only handles basic XMPP stream connecting, authentication and
+resource binding and not advanced stuff like roster management, presence
+handling and account management. For a more advanced class see
+L<AnyEvent::XMPP::IM>, which provides most of the features described in RFC
+3921.
 
 =head1 METHODS
 
