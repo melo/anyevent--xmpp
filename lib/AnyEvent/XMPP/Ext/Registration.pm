@@ -78,6 +78,42 @@ sub new {
    $self
 }
 
+=item $reg->quick_registration ($username, $password, $cb->($error))
+
+This method will invoke C<send_registration_request>, C<try_fillout_registration>
+and C<submit_form> for you in a quick and dirty fashion. It's more or less a
+heuristic, as the information required for a registration form might differ
+a lot from server to server, and deployment to deployment. And it usually requires
+user interaction.
+
+If C<$error> is undef the registration was 'probably' successful :-)
+
+=cut
+
+sub quick_registration {
+   my ($self, $username, $password, $cb) = @_;
+
+   $self->send_registration_request (sub {
+      my ($reg, $form, $error) = @_;
+
+      if ($error) {
+         $cb->($error);
+         return;
+      } 
+
+      my $af = $form->try_fillout_registration ($username, $password);
+      $reg->submit_form ($af, sub {
+         my ($reg, $ok, $error, $form) = @_;
+
+         if ($ok) {
+            $cb->();
+         } else {
+            $cb->($error);
+         }
+      });
+   });
+}
+
 =item $reg->send_registration_request ($cb->($reg, $form, $error))
 
 This method sends a register form request.
@@ -157,12 +193,10 @@ sub send_unregistration_request {
 
    my $con = $self->{connection};
 
-   $con->send_iq (set => {
+   $self->{delivery}->send (new_iq (set => create => {
       defns => 'register',
-      node => { ns => 'register', name => 'query', childs => [
-         { ns => 'register', name => 'remove' }
-      ]}
-   }, sub {
+      node => { name => 'query', childs => [ { name => 'remove' } ] }
+   }, cb => sub {
       my ($stanza, $error) = @_;
 
       if ($stanza) {
@@ -170,7 +204,7 @@ sub send_unregistration_request {
       } else {
          $self->_error_or_form_cb ($error, $cb);
       }
-   });
+   }));
 }
 
 =item send_password_change_request ($username, $password, $cb->($reg, $ok, $error, $form))

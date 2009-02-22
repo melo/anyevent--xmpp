@@ -1,6 +1,9 @@
 package AnyEvent::XMPP::Authenticator;
 use strict;
 no warnings;
+use MIME::Base64;
+use Digest::SHA1 qw/sha1_hex/;
+use Authen::SASL qw/Perl/;
 use AnyEvent::XMPP::Stanza;
 use AnyEvent::XMPP::IQTracker;
 use AnyEvent::XMPP::Util qw/join_jid/;
@@ -40,13 +43,13 @@ sub new {
 
    $self->{regid} =
       $self->{connection}->reg_cb (
-         ext_before_handle_stanza => sub {
+         ext_before_recv => sub {
             my ($con, $stanza) = @_;
 
             my $type = $stanza->type;
 
             if ($type eq 'sasl_challenge') {
-               $con->write_data ($con->{writer}->sasl_response ($stanza->node->text));
+               $self->construct_sasl_response ($stanza->node->text);
 
             } elsif ($type eq 'sasl_success') {
                $self->auth;
@@ -63,6 +66,71 @@ sub new {
    return $self
 }
 
+sub construct_sasl_auth {
+   my ($self, $mechs, $user, $hostname, $pass) = @_;
+
+   my $data;
+    
+   my $found_mech = 0;
+   while (!$found_mech) {
+      my $sasl = Authen::SASL->new (
+         mechanism => join (' ', @$mechs),
+         callback => {
+            # XXX: removed authname, because it ensures maximum connectivitiy
+            #      along multiple server implementations - XMPP is such a crap
+            #        authname => $user . '@' . $domain,
+            user => $user,
+            pass => $pass,
+         }
+      );
+
+      my $mech = $sasl->client_new ('xmpp', $hostname);
+      $data = $mech->client_start;
+
+      if (my $e = $mech->error) {
+         @$mechs = grep { $_ ne $mech->mechanism } @$mechs;
+         die "No usable SASL mechanism found (tried: "
+             . join (', ', @$mechs)
+             . ")!\n"
+            unless @$mechs;
+         next;
+      }
+
+      $found_mech = 1;
+      $self->{sasl} = $mech;
+   }
+
+   $self->{connection}->send (AnyEvent::XMPP::Stanza->new ({
+      defns => 'sasl', node => {
+         name => 'auth', attrs => [ mechanism => $self->{sasl}->mechanism ],
+         childs => [
+            MIME::Base64::encode_base64 ($data, '')
+         ]
+      }
+   }));
+}
+
+sub construct_sasl_response {
+   my ($self, $challenge) = @_;
+
+   $challenge = MIME::Base64::decode_base64 ($challenge);
+   my $ret = '';
+
+   unless ($challenge =~ /rspauth=/) { # rspauth basically means: we are done
+      $ret = $self->{sasl}->client_step ($challenge);
+
+      if (my $e = $self->{sasl}->error) {
+         die "Error in SASL authentication in client step with challenge: '" . $e . "'\n";
+      }
+   }
+
+   $self->{connection}->send (AnyEvent::XMPP::Stanza->new ({
+      defns => 'sasl', node => {
+         name => 'response', childs => [ MIME::Base64::encode_base64 ($ret, '') ]
+      }
+   }));
+}
+
 sub send_sasl_auth {
    my ($self, $mechs) = @_;
 
@@ -70,12 +138,12 @@ sub send_sasl_auth {
 
    my ($username, $domain, $password, $resource) = $con->credentials;
 
-   $con->write_data ($con->{writer}->sasl_auth (
+   $self->construct_sasl_auth (
       $mechs,
       $username,
       ($con->{use_host_as_sasl_hostname} ? $con->{host} : $domain),
       $password
-   ));
+   );
 }
 
 sub request_iq_fields {
@@ -232,6 +300,7 @@ sub disconnect {
    my ($self) = @_;
    $self->remove_all_callbacks;
    $self->{connection}->unreg_cb ($self->{regid});
+   delete $self->{sasl};
    delete $self->{connection};
 }
 

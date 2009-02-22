@@ -7,6 +7,31 @@ require Exporter;
 our @ISA = qw/Exporter/;
 our @EXPORT = qw/new_iq new_msg new_pres/;
 
+our %STANZA_ERRORS = (
+   'bad-request'             => ['modify', 400],
+   'conflict'                => ['cancel', 409],
+   'feature-not-implemented' => ['cancel', 501],
+   'forbidden'               => ['auth',   403],
+   'gone'                    => ['modify', 302],
+   'internal-server-error'   => ['wait',   500],
+   'item-not-found'          => ['cancel', 404],
+   'jid-malformed'           => ['modify', 400],
+   'not-acceptable'          => ['modify', 406],
+   'not-allowed'             => ['cancel', 405],
+   'not-authorized'          => ['auth',   401],
+   'payment-required'        => ['auth',   402],
+   'recipient-unavailable'   => ['wait',   404],
+   'redirect'                => ['modify', 302],
+   'registration-required'   => ['auth',   407],
+   'remote-server-not-found' => ['cancel', 404],
+   'remote-server-timeout'   => ['wait',   504],
+   'resource-constraint'     => ['wait',   500],
+   'service-unavailable'     => ['cancel', 503],
+   'subscription-required'   => ['auth',   407],
+   'undefined-condition'     => ['cancel', 500],
+   'unexpected-request'      => ['wait',   400],
+);
+
 =head1 NAME
 
 AnyEvent::XMPP::Stanza - XMPP Stanza base class
@@ -151,7 +176,7 @@ sub new {
    my $self  = { };
    $self = bless $self, $class;
 
-   if (ref ($_[0])) {
+   if (ref ($_[0]) eq 'AnyEvent::XMPP::Node') {
       my $node = shift;
       (%$self) = (node => $node, @_);
       $self->internal_analyze;
@@ -195,8 +220,13 @@ sub timeout      { $_[0]->{timeout} }
 sub set_timeout  { $_[0]->{timeout} = $_[1] }
 
 sub construct {
-   my ($self, %args) = @_;
-   $self->{$_} = $args{$_} for keys %args;
+   my ($self, @args) = @_;
+   if (ref $args[0]) {
+      $self->{create_cb} = $args[0];
+   } else {
+      my %args = @args;
+      $self->{$_} = $args{$_} for keys %args;
+   }
 }
 
 sub internal_analyze {
@@ -244,25 +274,50 @@ sub _writer_serialize {
 sub serialize {
    my ($self, $writer) = @_;
 
-   my @add;
+   my $create_cb;
 
-   if (defined $self->{id}) {
-      push @add, (id => $self->{id})
-   }
+   if ($self->{create_cb}) {
+      $create_cb = sub { _writer_serialize ($_[1], $self->{create_cb}) };
 
-   $self->{attrs} ||= {};
+   } else {
+      my @add;
 
-   $writer->stanza (
-      $self->{type},
-      {
+      if (defined $self->{id}) {
+         push @add, (id => $self->{id})
+      }
+
+      $self->{attrs} ||= {};
+
+      my $name = $self->{type};
+
+      my $attrs = {
          (map { $_ => $self->{attrs}->{$_} }
             grep { defined $self->{attrs}->{$_} }
                keys %{$self->{attrs}}),
          @add
-      },
-      $self->{cbs}
-         ? (sub { _writer_serialize ($_[0], $self->{cbs}) }) : ()
-   )
+      };
+
+      my $internal_cb;
+      if ($self->{cbs}) {
+         $internal_cb = sub { _writer_serialize ($_[0], $self->{cbs}) };
+      }
+
+      $create_cb = sub {
+         my ($writer, $w) = @_;
+
+         $w->addPrefix ($writer->ns, '');
+
+         if ($internal_cb) {
+            $w->startTag ([$writer->ns, $name], %$attrs);
+            $internal_cb->($w);
+            $w->endTag;
+         } else {
+            $w->emptyTag ([$writer->ns, $name], %$attrs);
+         }
+      };
+   }
+
+   $writer->call_writer ($create_cb)
 }
 
 =item B<type>
@@ -388,5 +443,42 @@ sub tls        { (shift)->{tls}        }
 sub bind       { (shift)->{bind}       }
 sub session    { (shift)->{session}    }
 sub sasl_mechs { (shift)->{sasl_mechs} }
+
+package AnyEvent::XMPP::StreamStartStanza;
+use strict;
+no warnings;
+
+use base qw/AnyEvent::XMPP::Stanza/;
+
+sub construct {
+   my ($self, @args) = @_;
+
+   $self->{type} = 'start';
+   $self->{init_args} = \@args;
+}
+
+sub serialize {
+   my ($self, $writer) = @_;
+
+   $writer->init_stream (@{$self->{init_args} || []});
+}
+
+package AnyEvent::XMPP::StreamEndStanza;
+use strict;
+no warnings;
+
+use base qw/AnyEvent::XMPP::Stanza/;
+
+sub construct {
+   my ($self) = @_;
+
+   $self->{type} = 'end';
+}
+
+sub serialize {
+   my ($self, $writer) = @_;
+
+   $writer->end_of_stream;
+}
 
 1;

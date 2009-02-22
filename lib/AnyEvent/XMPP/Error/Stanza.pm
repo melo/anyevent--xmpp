@@ -1,4 +1,5 @@
 package AnyEvent::XMPP::Error::Stanza;
+use AnyEvent::XMPP::Stanza;
 use AnyEvent::XMPP::Error;
 use strict;
 our @ISA = qw/AnyEvent::XMPP::Error/;
@@ -54,8 +55,8 @@ sub init {
    }
 
    if (not ($self->{error_cond}) && defined $self->{error_code}) {
-      for my $er (keys %AnyEvent::XMPP::Writer::STANZA_ERRORS) {
-         my $ern = $AnyEvent::XMPP::Writer::STANZA_ERRORS{$er};
+      for my $er (keys %AnyEvent::XMPP::Stanza::STANZA_ERRORS) {
+         my $ern = $AnyEvent::XMPP::Stanza::STANZA_ERRORS{$er};
          if ($ern->[1] == $self->{error_code} && $ern->[0] eq $self->{error_type}) {
             $self->{error_cond} = $er;
             last;
@@ -64,7 +65,7 @@ sub init {
    }
 
    if (!(defined $self->{error_code}) && $self->{error_cond}) {
-      my $ern = $AnyEvent::XMPP::Writer::STANZA_ERRORS{$self->{error_cond}};
+      my $ern = $AnyEvent::XMPP::Stanza::STANZA_ERRORS{$self->{error_cond}};
       $self->{error_type} = $ern->[0];
       $self->{error_code} = $ern->[1];
    }

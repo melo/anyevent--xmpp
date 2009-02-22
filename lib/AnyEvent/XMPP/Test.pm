@@ -7,7 +7,7 @@ use Test::More;
 require Exporter;
 our @ISA = qw/Exporter/;
 
-our @EXPORT = qw/$HOST $PORT $SECRET $SERVICE/;
+our @EXPORT = qw/$HOST $PORT $SECRET $SERVICE $JID1 $JID2 $PASS/;
 
 =head1 NAME
 
@@ -24,18 +24,28 @@ AnyEvent::XMPP::Test - desc
 =cut
 
 our ($HOST, $PORT, $SECRET, $SERVICE);
+our ($JID1, $JID2, $PASS);
 
 sub check {
    my ($what) = @_;
 
    if ($what eq 'component') {
-      if ($ENV{ANYEVENT_XMPP_TEST_COMPONENT}) {
-         ($HOST, $PORT, $SERVICE, $SECRET) =
-            split /:/, $ENV{ANYEVENT_XMPP_TEST_COMPONENT};
-      } else {
+      unless ($ENV{ANYEVENT_XMPP_TEST_COMPONENT}) {
          plan skip_all => "ANYEVENT_XMPP_TEST_COMPONENT environment variable not set.";
          exit 0;
       }
+
+      ($HOST, $PORT, $SERVICE, $SECRET) =
+         split /:/, $ENV{ANYEVENT_XMPP_TEST_COMPONENT};
+
+   } elsif ($what eq 'client') {
+      unless ($ENV{ANYEVENT_XMPP_TEST_CLIENT}) {
+         plan skip_all => "ANYEVENT_XMPP_TEST_CLIENT environment variable not set.";
+         exit 0;
+      }
+
+      ($HOST, $PORT, $JID1, $JID2, $PASS) =
+         split /:/, $ENV{ANYEVENT_XMPP_TEST_CLIENT};
    }
 }
 

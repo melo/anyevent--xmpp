@@ -24,9 +24,7 @@ AnyEvent::XMPP::Stream - XMPP client stream (RFC 3920).
 
    my $con =
       AnyEvent::XMPP::Stream::Client->new (
-         username => "abc",
-         domain   => "jabber.org",
-         resource => "AnyEvent::XMPP",
+         jid => "abc@jabber.org/AnyEvent::XMPP",
          password => 'secret123',
       );
 
@@ -235,7 +233,7 @@ sub new {
    $self->set_exception_cb (sub {
       my ($ev, $ex) = @_;
 
-      $self->error =>
+      $self->error (
          AnyEvent::XMPP::Error::Exception->new (
             exception => "(" . $ev->dump . "): $ex", context => 'event callback'
          )
@@ -267,11 +265,13 @@ sub new {
       connected => sub {
          my ($self) = @_;
 
-         $self->{timeout} =
-            AnyEvent->timer (after => $self->{connect_timeout}, cb => sub {
-               delete $self->{timeout};
-               $self->disconnect ("connection timeout reached in authentication.");
-            });
+         if ($self->{connect_timeout}) {
+            $self->{timeout} =
+               AnyEvent->timer (after => $self->{connect_timeout}, cb => sub {
+                  delete $self->{timeout};
+                  $self->disconnect ("connection timeout reached in authentication.");
+               });
+         }
       },
       ext_before_stream_ready => sub {
          my ($self) = @_;
@@ -285,16 +285,21 @@ sub new {
                $self->current->stop;
 
                $self->send (
-                  AnyEvent::XMPP::Stanza->new (type => 'starttls', ns => xmpp_ns ('tls'))
+                  AnyEvent::XMPP::Stanza->new ({
+                     defns => 'tls', node => { name => 'starttls' }
+                  })
                );
 
                $self->reg_cb (
-                  handle_stanza => sub {
+                  ext_before_recv => sub {
                      my ($self, $stanza) = @_;
+
+                     my $type = $stanza->type;
 
                      if ($type eq 'tls_proceed') {
                         $self->starttls;
                         $self->current->unreg_me;
+                        $self->send_header;
 
                      } elsif ($type eq 'tls_failure') {
                         $self->error (
@@ -389,6 +394,14 @@ sub init {
       );
 }
 
+sub send_header {
+   my ($self) = @_;
+
+   $self->SUPER::send_header (
+      $self->{language}, $self->{stream_version_override}, to => $self->{domain}
+   );
+}
+
 =item $con->connect ()
 
 This method will try to connect to the XMPP server, specified by the
@@ -478,6 +491,7 @@ sub start_authenticator {
 
          } else {
             $self->reinit;
+            $self->send_header;
          }
 
          $self->{authenticator}->disconnect;
@@ -494,11 +508,6 @@ sub start_authenticator {
    );
 
    $self->{authenticator}->start ($stanza);
-}
-
-sub handle_stanza {
-   my ($self, $stanza) = @_;
-
 }
 
 =back
@@ -542,7 +551,16 @@ sub stream_ready {
 
 sub error { my $self = shift; $self->SUPER::error (@_) }
 
-sub connected { my $self = shift; $self->SUPER::connected (@_) }
+sub connected {
+   my ($self, @args) = @_;
+   $self->SUPER::connected (@args);
+
+   if ($self->{old_style_ssl}) {
+      $self->starttls;
+   }
+
+   $self->send_header;
+}
 
 sub connect_error { my $self = shift; $self->SUPER::connect_error (@_) }
 
@@ -551,6 +569,8 @@ sub disconnected { my $self = shift; $self->SUPER::disconnected (@_) }
 sub stream_start { my $self = shift; $self->SUPER::stream_start (@_) }
 
 sub stream_end { my $self = shift; $self->SUPER::stream_end (@_) }
+
+sub sent_stanza_xml { my $self = shift; $self->SUPER::sent_stanza_xml (@_) }
 
 sub recv_stanza_xml { my $self = shift; $self->SUPER::recv_stanza_xml (@_) }
 

@@ -6,6 +6,7 @@ use AnyEvent::Handle;
 use AnyEvent::XMPP::Parser;
 use AnyEvent::XMPP::Writer;
 use AnyEvent::XMPP::Error::Exception;
+use AnyEvent::XMPP::Util qw/dump_twig_xml/;
 use Encode;
 
 our $DEBUG = 0;
@@ -178,7 +179,8 @@ sub new {
 
          push @{$self->{write_done_queue}}, $stanza->sent_cb
             if $stanza->sent_cb;
-         $self->write_data ($stanza->serialize ($self->{writer}));
+         $self->write_data (my $stanza_data = $stanza->serialize ($self->{writer}));
+         $self->sent_stanza_xml ($stanza_data);
       },
       ext_after_error => sub {
          my ($self, $error) = @_;
@@ -394,7 +396,8 @@ sub send_header {
    my ($self, $lang, $version, %attrs) = @_;
    return unless $self->{connected};
 
-   $self->write_data ($self->{writer}->init_stream ($lang, $version, %attrs));
+   $self->send (AnyEvent::XMPP::StreamStartStanza->new ($lang, $version, %attrs));
+ #  $self->write_data ($self->{writer}->init_stream ($lang, $version, %attrs));
 }
 
 =item $stream->send_end ()
@@ -530,7 +533,13 @@ are the hostname and port number of the other TCP endpoint.
 
 =cut
 
-sub connected { }
+sub connected { 
+   my ($self, $ph, $pp) = @_;
+
+   if ($DEBUG) {
+      warn "connected to $ph:$pp\n";
+   }
+}
 
 =item connect_error => $error_string
 
@@ -541,7 +550,13 @@ couldn't be made.
 
 =cut
 
-sub connect_error { }
+sub connect_error {
+   my ($self, $str) = @_;
+
+   if ($DEBUG) {
+      warn "couldn't connect: $str\n";
+   }
+}
 
 =item disconnected => $peer_host, $peer_port, $reason
 
@@ -549,7 +564,13 @@ This event is emitted when the connection disconnected for some C<$reason>.
 
 =cut
 
-sub disconnected { }
+sub disconnected {
+   my ($self, $ph, $pp, $reas) = @_;
+
+   if ($DEBUG) {
+      warn "disconnected from $ph:$pp: $reas\n";
+   }
+}
 
 =item stream_start => $node
 
@@ -580,12 +601,41 @@ sub stream_end {
 
 This is a debugging event, which is invoked for any "XML" elements that have 
 been received (also for the tag received in C<stream_start>, see above).
+Please also note that two C<$node> elements are generated for the start tag and 
+the end tag of the stream. The first one will contain the text of the start
+and the last one of the end, so that you get a consistent debugging output
+when you use the C<as_string> method of C<$node>.
 
 C<$node> is an L<AnyEvent::XMPP::Node> object.
 
 =cut
 
-sub recv_stanza_xml { }
+sub recv_stanza_xml {
+   my ($self, $node) = @_;
+
+   if ($DEBUG) {
+      warn ">>> $self->{peer_host}:$self->{peer_port} >>>\n"
+           . dump_twig_xml ($node->as_string);
+   }
+}
+
+=item sent_stanza_xml => $data
+
+This debugging event is generated when a L<AnyEvent::XMPP::Stanza> has been
+serialized and sent out. You will catch 99% of the outside traffic with this,
+maybe except exotic things like whitespace pings.
+For a 100% coverage always use the C<debug_send> event!
+
+=cut
+
+sub sent_stanza_xml {
+   my ($self, $data) = @_;
+
+   if ($DEBUG) {
+      warn "<<< $self->{peer_host}:$self->{peer_port} <<<\n"
+           . dump_twig_xml ($data);
+   }
+}
 
 =item recv => $stanza
 
@@ -640,8 +690,8 @@ has been received. C<$data> is the received unicode character data chunk.
 sub debug_recv {
    my ($self, $data) = @_;
 
-   if ($DEBUG > 1) {
-      warn "RECV>\n$data\n";
+   if ($DEBUG > 10) {
+      warn ">>> RECV($self->{peer_host}:$self->{peer_port}) >>>\n[[$data]]\n";
    }
 }
 
@@ -655,8 +705,8 @@ C<$data> is sent outward.
 sub debug_send {
    my ($self, $data) = @_;
 
-   if ($DEBUG > 1) {
-      warn "SEND>\n$data\n";
+   if ($DEBUG > 10) {
+      warn "<<< SEND($self->{peer_host}:$self->{peer_port}) <<<\n[[$data]]\n";
    }
 }
 

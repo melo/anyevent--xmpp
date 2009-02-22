@@ -59,6 +59,7 @@ sub cb_start_tag {
    if (not @{$self->{nodestack}}) {
       $self->received_stanza_xml ($node);
       $self->stream_start ($node);
+      $node = AnyEvent::XMPP::Node->new ($p->namespace ($el), $el, {}, $self);
    }
 
    push @{$self->{nodestack}}, $node;
@@ -107,6 +108,7 @@ sub cb_end_tag {
 
    } elsif (@{$self->{nodestack}} == 0) {
       $self->received_stanza_xml ($node);
+
       $self->stream_end ($node);
    }
 }

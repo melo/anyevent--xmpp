@@ -134,6 +134,8 @@ sub stream_start {
    $self->send ($stanza);
 }
 
+sub sent_stanza_xml { my $self = shift; $self->SUPER::sent_stanza_xml (@_) }
+
 sub recv_stanza_xml { my $self = shift; $self->SUPER::recv_stanza_xml (@_) }
 
 sub recv {

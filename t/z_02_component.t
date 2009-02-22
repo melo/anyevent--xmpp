@@ -7,6 +7,8 @@ use AnyEvent::XMPP::Test;
 use AnyEvent::Socket;
 use AnyEvent::XMPP::Stream::Component;
 
+$AnyEvent::XMPP::Stream::DEBUG = 2;
+
 AnyEvent::XMPP::Test::check ('component');
 
 my $cv = AnyEvent->condvar;
@@ -23,7 +25,7 @@ $stream->reg_cb (
    },
    disconnected => sub {
       my ($stream, $h, $p, $reas) = @_;
-      if ($reas =~ /handshake/i) {
+      if ($reas =~ /handshake|not-author/i) {
          print "ok 1 - disconnected due to wrong password\n";
          $stream->{secret} = $SECRET;
          $stream->connect ($HOST, $PORT);
