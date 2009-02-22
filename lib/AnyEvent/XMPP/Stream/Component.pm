@@ -82,6 +82,8 @@ sub new {
    $self
 }
 
+=back
+
 =head1 EVENTS
 
 All events that are emitted by L<AnyEvent::XMPP::Stream> are also

@@ -96,6 +96,13 @@ Sets the XML namespace of the stream. The default for C<$namespace> is
 'client'.  Other classes like L<AnyEvent::XMPP::Stream::Component> set it to
 'component' for instance.
 
+=item stream_end_timeout => $seconds
+
+This is the timeout that is used for closing the connection from our
+end gracefully. In case we don't receive a stream closing tag for our
+sent stream closing tag, this timeout will take care to disconnect the
+connection anyway. See also C<send_end> method below.
+
 =back
 
 =cut
@@ -105,6 +112,7 @@ sub new {
    my $class = ref($this) || $this;
    my $self  = $class->SUPER::new (
       default_stream_namespace => 'client',
+      stream_end_timeout       => 30,
       @_
    );
 
@@ -193,6 +201,7 @@ sub cleanup_flags {
    delete $self->{peer_port};
    delete $self->{write_done_queue};
    delete $self->{error};
+   delete $self->{disconnect_timer};
 }
 
 =item $stream->reinit ()
@@ -358,6 +367,9 @@ Please see L<AnyEvent::Handle> for more details and L<Net::SSLeay> about
 certificate validation (which you really should do, and which, arguably, should
 be done by L<AnyEvent::XMPP> conveniently - patches welcome :-)
 
+B<NOTE>: This method will call the C<reinit> method for you. As you need a new
+parsing/writing context anyways.
+
 =cut
 
 sub starttls {
@@ -367,6 +379,7 @@ sub starttls {
 
    $self->{handle}->starttls ($state, $ctx);
    $self->{ssl_enabled} = 1;
+   $self->reinit;
 }
 
 =item $stream->send_header ($lang, $version, %attrs)
@@ -384,10 +397,15 @@ sub send_header {
    $self->write_data ($self->{writer}->init_stream ($lang, $version, %attrs));
 }
 
-=item $con->send_end ()
+=item $stream->send_end ()
 
 This method will send a closing stream stanza if we are connected.
 Please use this method whenever you want to close a connection gracefully.
+It will not immediately disconnect the stream, but wait for the stream
+end of the other side and then disconnect the tcp stream.
+
+There is a timeout installed, in case the other side doesn't send any stream
+end. See C<stream_end_timeout> argument to C<new>.
 
 =cut
 
@@ -396,9 +414,13 @@ sub send_end {
    return unless $self->{connected};
 
    $self->write_data ($self->{writer}->end_of_stream);
+   $self->{disconnect_timer} =
+      AnyEvent->timer (after => $self->{stream_end_timeout}, cb => sub {
+         $self->disconnect ("receival of stream end timeouted.");
+      });
 }
 
-=item $con->disconnect ($msg)
+=item $stream->disconnect ($msg)
 
 Call this method if you want to kill the connection forcefully.
 C<$msg> is a human readable message for logging purposes.
@@ -424,7 +446,7 @@ sub disconnect {
    $self->cleanup_flags;
 }
 
-=item $con->is_connected ()
+=item $stream->is_connected ()
 
 Returns true if the connection is connected and ready to send and receive
 any kind of stanzas or protocol messages.
@@ -545,7 +567,14 @@ This event is emitted whenever the stream end tag has been received.
 
 =cut
 
-sub stream_end { }
+sub stream_end {
+   my ($self) = @_;
+
+   if ($self->{disconnect_timer}) {
+      delete $self->{disconnect_timer};
+      $self->disconnect ("recevied expected stream end.");
+   }
+}
 
 =item recv_stanza_xml => $node
 

@@ -1,4 +1,4 @@
-package AnyEvent::XMPP::Stream;
+package AnyEvent::XMPP::Stream::Client;
 use strict;
 use AnyEvent;
 use AnyEvent::XMPP::IQTracker;
@@ -210,14 +210,10 @@ set C<$version> to '0.9' for testing IQ authentication with ejabberd.
 sub new {
    my $this = shift;
    my $class = ref($this) || $this;
-   my $self =
-      $class->SUPER::new (
-         whitespace_ping_interval => 60,
-         @_
-      );
+   my $self = $class->SUPER::new (@_);
 
    if ($self->{jid}) {
-      my ($user, $host, $res) = split_jid ($self->{jid});
+      my ($user, $host, $res) = split_jid (delete $self->{jid});
       $self->{username} = $user;
       $self->{domain}   = $host;
       $self->{resource} = $res if defined $res;
@@ -250,13 +246,15 @@ sub new {
 
          $self->{stream_id}  = $node->attr ('id');
          $self->{server_jid} = $node->attr ('from');
+         $self->{stream_start_cnt}++;
       },
       ext_after_stream_start => sub {
          my ($self, $node) = @_;
 
          # This is some very bad "hack" for _very_ old jabber
          # servers to work with AnyEvent::XMPP
-         if (not (defined $node->attr ('version'))
+         if ($self->{stream_start_cnt} == 1 # only for first stream!
+             && not (defined $node->attr ('version'))
              && not ($self->{disable_iq_auth})
              && not ($self->{disable_old_jabber_authentication})
              && not ($self->{authenticated})) {
@@ -264,46 +262,96 @@ sub new {
             $self->pre_authentication;
          }
       },
-      ext_after_pre_authentication => sub {
-         my ($self, $stanza) = @_;
-         $self->start_authenticator ($stanza);
+      connected => sub {
+         my ($self) = @_;
+
+         $self->{timeout} =
+            AnyEvent->timer (after => $self->{connect_timeout}, cb => sub {
+               delete $self->{timeout};
+               $self->disconnect ("connection timeout reached in authentication.");
+            });
       },
       ext_before_stream_ready => sub {
          my ($self) = @_;
          delete $self->{timeout};
       },
-      send => sub {
+      [features => 50] => sub {
          my ($self, $stanza) = @_;
 
-         $self->{tracker}->register ($stanza);
+         if (not ($self->{disable_ssl}) && $stanza->tls) {
+            if (not $self->{ssl_enabled}) {
+               $self->current->stop;
 
-         if (xmpp_ns ($self->{default_stream_namespace}) eq xmpp_ns ('client')) {
-            if (cmp_jid ($stanza->to, $self->{server_jid})) {
-               $stanza->set_to (undef);
-            }
+               $self->send (
+                  AnyEvent::XMPP::Stanza->new (type => 'starttls', ns => xmpp_ns ('tls'))
+               );
 
-            if (cmp_jid ($stanza->from, $self->{jid})) {
-               $stanza->set_from (undef);
+               $self->reg_cb (
+                  handle_stanza => sub {
+                     my ($self, $stanza) = @_;
+
+                     if ($type eq 'tls_proceed') {
+                        $self->starttls;
+                        $self->current->unreg_me;
+
+                     } elsif ($type eq 'tls_failure') {
+                        $self->error (
+                           AnyEvent::XMPP::Error->new (text => 'tls negotiation failed')
+                        );
+                        $self->disconnect ("TLS handshake failure");
+                        $self->current->unreg_me;
+                     }
+                  }
+               );
             }
          }
       },
-      ext_after_send => sub {
+      [features => 40] => sub {
          my ($self, $stanza) = @_;
 
-         $self->write_data ($stanza->serialize ($self->{writer}));
-      }
+         if (not $self->{authenticated}) {
+            $self->current->stop;
+            $self->pre_authentication ($stanza);
+         }
+      },
+      ext_after_pre_authentication => sub {
+         my ($self, $stanza) = @_;
+
+         $self->start_authenticator ($stanza);
+      },
+      [features => 30] => sub {
+         my ($self, $stanza) = @_;
+
+         if (not defined ($self->{jid}) && $stanza->bind) {
+            $self->{res_manager}->bind ($self->{resource}, sub {
+               my ($jid, $error) = @_;
+
+               if ($error) {
+                  # TODO FIXME: make proper error?!
+                  $self->error ($error);
+
+               } else {
+                  $self->{jid} = $jid;
+                  $self->stream_ready;
+               }
+            });
+         }
+      },
    );
 
    return $self;
 }
 
-sub cleanup {
+sub cleanup_state {
    my ($self) = @_;
 
+   delete $self->{jid};
+   delete $self->{timeout};
    delete $self->{server_jid};
    delete $self->{stream_id};
    delete $self->{authenticated};
    delete $self->{res_manager};
+   delete $self->{stream_start_cnt};
 
    if ($self->{tracker}) {
       $self->{tracker}->disconnect;
@@ -320,18 +368,39 @@ sub cleanup {
    }
 }
 
+sub cleanup {
+   my ($self) = @_;
+
+   $self->cleanup_state;
+   $self->SUPER::cleanup;
+}
+
 sub init {
    my ($self) = @_;
 
-   $self->cleanup;
-
-   $self->{con}->init;
+   $self->cleanup_state;
 
    $self->{tracker} = AnyEvent::XMPP::IQTracker->new;
    $self->{res_manager} =
       AnyEvent::XMPP::ResourceManager->new (
          connection => $self
       );
+}
+
+=item $con->connect ()
+
+This method will try to connect to the XMPP server, specified by the
+C<domain> or C<host> parameters to C<new>. The emitted events
+are the same as documented for the C<connect> method of L<AnyEvent::XMPP::Stream>.
+
+=cut
+
+sub connect {
+   my ($self) = @_;
+
+   $self->init;
+
+   $self->SUPER::connect ($self->{host}, $self->{port}, $self->{connect_timeout});
 }
 
 =item $con->jid ()
@@ -371,6 +440,17 @@ This is the ID of this stream that was given us by the server.
 =cut
 
 sub stream_id { $_[0]->{stream_id} }
+
+=item $con->is_ready ()
+
+Returns a true value if the stream is ready (connected, authenticated and
+a resource is bound).
+
+=cut
+
+sub is_ready {
+   $_[0]->is_connected && $_[0]->{authenticated} && defined $_[0]->{jid}
+}
 
 =item $con->send ($stanza)
 
@@ -417,127 +497,24 @@ sub start_authenticator {
 sub handle_stanza {
    my ($self, $stanza) = @_;
 
-   if (defined (my $resjid = $self->{res_manager}->any_jid)) {
-      $stanza->set_default_to ($resjid);
-   }
-
-   if (defined $self->{server_jid}) {
-      $stanza->set_default_from ($self->{server_jid});
-   }
-
-   if ($stanza->type eq 'end') {
-      $self->disconnect ("end of 'XML' stream encountered");
-      return;
-   }
-
-   $self->{tracker}->handle_stanza ($stanza);
-
-   if ($self->is_connected
-       && grep { $stanza->type eq $_ } qw/iq presence message/) {
-       $self->recv ($stanza);
-       return;
-   }
-
-   my $type = $stanza->type;
-
-   if ($type eq 'features') {
-      $self->{features} = $stanza;
-
-      if (not ($self->{disable_ssl})
-          && not ($self->{ssl_enabled})
-          && $stanza->tls) {
-         $self->write_data ($self->{writer}->starttls);
-
-      } elsif (not $self->{authenticated}) {
-         $self->pre_authentication ($stanza);
-
-      } elsif ($stanza->bind) {
-         $self->{res_manager}->bind ($self->{resource}, sub {
-            my ($jid, $error) = @_;
-
-            if ($error) {
-               # TODO FIXME: make proper error?!
-               $self->error ($error);
-
-            } else {
-               $self->{jid} = $jid;
-               $self->stream_ready;
-            }
-         });
-      }
-
-   } elsif ($type eq 'tls_proceed') {
-      $self->enable_ssl;
-      $self->reinit;
-
-   } elsif ($type eq 'tls_failure') {
-      $self->error (
-         my $err = AnyEvent::XMPP::Error->new (text => 'tls negotiation failed')
-      );
-      $self->disconnect ("TLS handshake failure");
-
-   } elsif ($type eq 'error') {
-      $self->error (
-         my $err = AnyEvent::XMPP::Error::Stream->new (node => $stanza->{node})
-      );
-      $self->disconnect ("stream error");
-   }
 }
 
 =back
 
 =head1 EVENTS
 
-The L<AnyEvent::XMPP::Stream> class is derived from the L<Object::Event> class,
-and thus inherits the event callback registering system from it. Consult the
-documentation of L<Object::Event> about more details.
+The L<AnyEvent::XMPP::Stream::Client> class is derived from
+L<AnyEvent::XMPP::Stream>, all events that are emitted there are also emitted
+by objects of this class.  Please consult the documentation for
+L<AnyEvent::XMPP:Stream> and L<Object::Event::Methods> for details about
+registering event callbacks.
 
 NODE: Every callback gets as it's first argument the L<AnyEvent::XMPP::Stream>
-object. The further callback arguments are described in the following listing of
-events.
+object. 
 
-These events can be registered on with C<reg_cb>:
+These events are additional or changed events are available:
 
 =over 4
-
-=item connected => $peer_host, $peer_port
-
-This event is emitted when the TCP connection could be established.
-Please wait for the C<stream_ready> event before you start sending
-data.
-
-=cut
-
-sub connected {
-   my ($self, $ph, $pp) = @_;
-
-   if ($DEBUG) {
-      print "connected to $ph:$pp\n";
-   }
-
-   if ($self->{old_style_ssl}) {
-      $self->enable_ssl;
-   }
-
-   $self->write_data (
-      $self->{writer}->init_stream (
-         $self->{language},
-         $self->{domain},
-         $self->{stream_version_override}
-      )
-   );
-
-   # TODO:
-   #if ($timeout) {
-   #   $self->{timeout} =
-   #      AnyEvent->timer (after => $timeout, cb => sub {
-   #         $self->disconnect ("XMPP stream establishment timeout");
-   #      });
-   #}
-
-
-   $self->{connected} = 1;
-}
 
 =item pre_authentication
 
@@ -561,159 +538,92 @@ sub stream_ready {
    }
 }
 
-=item disconnected => $peer_host, $peer_port, $reason
+sub error { my $self = shift; $self->SUPER::error (@_) }
 
-This event is emitted when the TCP connection was disconnected or couldn't be
-established, either remotely or locally. C<$peerhost> and C<$peerport> are the
-host and port of the other TCP endpoint. And C<$reason> is a human readable
-string which indicates the reason for the disconnect.
+sub connected { my $self = shift; $self->SUPER::connected (@_) }
 
-=cut
+sub connect_error { my $self = shift; $self->SUPER::connect_error (@_) }
 
-sub disconnected {
-   my ($self, $host, $port, $message) = @_;
+sub disconnected { my $self = shift; $self->SUPER::disconnected (@_) }
 
-   if ($DEBUG) {
-      print "disconnected from $host:$port: $message\n";
-   }
+sub stream_start { my $self = shift; $self->SUPER::stream_start (@_) }
 
-   $self->cleanup;
-};
+sub stream_end { my $self = shift; $self->SUPER::stream_end (@_) }
 
-=item send => $stanza
-
-This event is emitted when an L<AnyEvent::XMPP::Stanza> object is about to be
-written out. Stopping this event will prevent the stanza from being written out.
+sub recv_stanza_xml { my $self = shift; $self->SUPER::recv_stanza_xml (@_) }
 
 =item recv => $stanza
 
-This event is emitted whenever either an IQ, presence or message XMPP stanza
-has been received over a connected and authenticated connection.
+See also L<AnyEvent::XMPP::Stream> about the semantics of this event.
 
-This is the even you usually want to register callbacks on.
+The special thing with L<AnyEvent::XMPP::Stream::Client> is that all C<recv>
+events for stanzas before the stream C<is_ready> (see above) are intercepted.
+This means, you will only receive this event for iq, message and presence
+stanzas when the stream was successfully established, authenticated and bound.
 
-=cut
+This is also the main event for L<AnyEvent::XMPP::Stream::Client> to handle any
+kind of incoming stanzas. So if you register an event callback for
+C<before_recv> you are able to intercept any stanzas before this class gets a
+chance to look at them. (Please only do this if you know what you are doing, of
+course).
 
-sub recv {}
-
-=item send_buffer_empty
-
-Whenever the write queue to the TCP connection becomes empty this
-event is emitted. It is useful if you want to wait until all the
-messages you've given to the connection is written out to the kernel.
-
-Example:
-
-   $con->reg_cb (send_buffer_empty => sub {
-      $con->disconnect ('done sending');
-   });
-   $con->send (new_msg (....));
+Please note that upon receiving a stanza the C<from> and C<to> fields of
+it are defaulted to the server JID (C<from>) and your full JID (C<to>).
 
 =cut
 
-sub send_buffer_empty {
-   my ($self) = @_;
+sub recv {
+   my ($self, $stanza) = @_;
 
-   # event
+   $self->SUPER::recv ($stanza);
+
+   unless ($self->is_ready) {
+      $self->current->stop;
+   }
+
+   if (defined (my $resjid = $self->{res_manager}->any_jid)) {
+      $stanza->set_default_to ($resjid);
+   }
+
+   if (defined $self->{server_jid}) {
+      $stanza->set_default_from ($self->{server_jid});
+   }
+
+   $self->{tracker}->handle_stanza ($stanza);
+
+   my $type = $stanza->type;
+
+   if ($type eq 'features') {
+      $self->{features} = $stanza;
+      $self->features ($stanza);
+   }
 }
 
-=item handle_stanza => $stanza
+sub send {
+   my ($self, $stanza) = @_;
 
-This event is emitted whenever a L<AnyEvent::XMPP::Stanza> object is being
-received from the parser. This event is mainly aimed at people who are up to no
-good and want to intercept a stanza before L<AnyEvent::XMPP::Stream> gets a
-chance to look at it. Here is an example if you want to do that:
+   $self->{tracker}->register ($stanza);
 
-   $con->reg_cb (before_handle_stanza => sub {
-      my ($con, $stanza) = @_;
-
-      if ($stanza ...) {
-         # this stops further handling of the event
-         $con->current->stop;
+   if (xmpp_ns ($self->{default_stream_namespace}) eq xmpp_ns ('client')) {
+      if (cmp_jid ($stanza->to, $self->{server_jid})) {
+         $stanza->set_to (undef);
       }
-   });
 
-B<NOTE>: Please only do this if you know what you are doing. For normal stanza
-handling please see the C<recv> event.
-
-=item recv_stanza => $node
-
-This event is emitted when a complete stanza has been received.
-C<$node> is the L<AnyEvent::XMPP::Node> object which represents the XML stanza.
-You might want to use the C<as_string> method of L<AnyEvent::XMPP::Node> for
-debugging output:
-
-   $con->reg_cb (recv_stanza => sub {
-      my ($con, $node) = @_;
-      warn "recv: " . $node->as_string . "\n";
-   });
-
-=cut
-
-sub recv_stanza {
-   my ($self, $node) = @_;
-
-   if ($DEBUG) {
-      print ">>>>> $self->{peer_host}:$self->{peer_port} >>>>>\n"
-            . dump_twig_xml ($node->as_string);
+      if (cmp_jid ($stanza->from, $self->{jid})) {
+         $stanza->set_from (undef);
+      }
    }
+
+   $self->SUPER::send ($stanza);
+
+   # the real sending is done by the super class in ext_after_send
 }
 
-=item debug_recv => $data
+sub send_buffer_empty { my $self = shift; $self->SUPER::send_buffer_empty (@_) }
 
-Whenever a chunk of data has been received from the TCP/TLS connection this
-event is emitted with that chunk in C<$data>. Please note that that chunk might
-B<NOT> contain a complete XML stanza, it might contain a partial one or
-multiple stanzas.
+sub debug_recv { my $self = shift; $self->SUPER::debug_recv (@_) }
 
-If you want to debug which stanzas have actually been received use
-the C<recv_stanza> event!
-
-=cut
-
-sub debug_recv {}
-
-=item debug_send => $data
-
-The C<debug_send> event is emitted when the data has been given to
-L<AnyEvent::Handle> for writing. C<$data> is the unicode encoded XML string
-which contains exactly one stanza which has been sent.
-
-=cut
-
-sub debug_send {
-   my ($self, $data) = @_;
-
-   if ($DEBUG) {
-      print "<<<<< $self->{peer_host}:$self->{peer_port} <<<<<\n"
-            . dump_twig_xml ($data);
-   }
-}
-
-=item error => $error
-
-This event is generated whenever some error occurred. C<$error> is an instance
-of L<AnyEvent::XMPP::Error>. Trivial error reporting may look like this:
-
-   $con->reg_cb (error => sub { warn "xmpp error: " . $_[1]->string . "\n" });
-
-=cut
-
-sub error {
-   my ($self, $errorobj) = @_;
-
-   if ($DEBUG) {
-      print "EEEEE $self->{peer_host}:$self->{peer_port} EEEE: "
-            . $errorobj->string . "\n";
-   }
-}
-
-=item stream_start => $node
-
-This is a special event which is emitted when the stream start tag
-has been received from the server.
-
-=cut
+sub debug_send { my $self = shift; $self->SUPER::debug_send (@_) }
 
 =back
 

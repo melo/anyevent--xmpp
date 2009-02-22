@@ -1,6 +1,7 @@
 package AnyEvent::XMPP::Error::Stream;
 use AnyEvent::XMPP::Error;
 use strict;
+no warnings;
 our @ISA = qw/AnyEvent::XMPP::Error/;
 
 =head1 NAME
