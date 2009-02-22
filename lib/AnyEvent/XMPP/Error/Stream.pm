@@ -13,7 +13,7 @@ Subclass of L<AnyEvent::XMPP::Error>
 
 sub init {
    my ($self) = @_;
-   my $node = $self->xml_node;
+   my $node = $self->stanza->node;
 
    my @txt = $node->find_all ([qw/streams text/]);
    my $error;
@@ -40,22 +40,22 @@ sub init {
       }
    }
 
-   $self->{error_name} = $error;
-   $self->{error_text} = @txt ? $txt[0]->text : '';
+   $self->{error_name} = $error ne '' ? $error : 'unknown-error';
+   $self->{error_text} = @txt ? $txt[0]->text : $node->text;
 }
 
 =head2 METHODS
 
 =over 4
 
-=item B<xml_node ()>
+=item B<stanza ()>
 
-Returns the L<AnyEvent::XMPP::Node> object for this stream error.
+Returns the L<AnyEvent::XMPP::Stanza> object for this stream error.
 
 =cut
 
-sub xml_node {
-   $_[0]->{node}
+sub stanza {
+   $_[0]->{stanza}
 }
 
 =item B<name ()>
@@ -87,6 +87,11 @@ strings or some other string that has been discovered by a heuristic
    unsupported-stanza-type
    unsupported-version
    xml-not-well-formed
+
+And in case we've got an error we couldn't analyze, due to
+old protocol for instance:
+
+   unknown-error
 
 =cut
 

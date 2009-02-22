@@ -100,10 +100,7 @@ sub analyze {
    my $type;
    my $obj;
 
-   if (not defined $node) {
-      $type = 'end'
-
-   } elsif ($node->eq ($stream_ns => 'presence')) {
+   if ($node->eq ($stream_ns => 'presence')) {
       return AnyEvent::XMPP::Presence->new ($node, type => 'presence', stream_ns => $stream_ns);
 
    } elsif ($node->eq ($stream_ns => 'iq')) {
@@ -198,7 +195,8 @@ sub timeout      { $_[0]->{timeout} }
 sub set_timeout  { $_[0]->{timeout} = $_[1] }
 
 sub construct {
-   my ($self) = @_;
+   my ($self, %args) = @_;
+   $self->{$_} = $args{$_} for keys %args;
 }
 
 sub internal_analyze {

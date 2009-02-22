@@ -107,10 +107,7 @@ sub cb_end_tag {
 
    } elsif (@{$self->{nodestack}} == 0) {
       $self->received_stanza_xml ($node);
-
-      $self->received_stanza (
-         AnyEvent::XMPP::Stanza::analyze ($node, $self->{stream_ns})
-      );
+      $self->stream_end ($node);
    }
 }
 
@@ -202,6 +199,14 @@ sub feed {
 }
 
 sub stream_start {
+   my ($self, $node) = @_;
+}
+
+sub stream_end {
+   my ($self, $node) = @_;
+}
+
+sub received_stanza_xml {
    my ($self, $node) = @_;
    # subclass/event callback responsibility
 }

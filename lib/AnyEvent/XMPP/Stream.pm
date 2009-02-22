@@ -8,6 +8,8 @@ use AnyEvent::XMPP::Writer;
 use AnyEvent::XMPP::Error::Exception;
 use Encode;
 
+our $DEBUG = 0;
+
 use base qw/Object::Event::Methods/;
 
 =head1 NAME
@@ -119,13 +121,24 @@ sub new {
          my ($parser, $node) = @_;
          $self->stream_start ($node);
       },
+      stream_end => sub {
+         $self->stream_end;
+      },
       received_stanza_xml => sub {
          my ($parser, $node) = @_;
-         $self->recv_stanza ($node);
+         $self->recv_stanza_xml ($node);
       },
       received_stanza => sub {
          my ($parser, $stanza) = @_;
-         $self->recv ($stanza);
+
+         if ($stanza->type eq 'error') {
+            $self->error (
+               $self->{error} = AnyEvent::XMPP::Error::Stream->new (stanza => $stanza)
+            );
+
+         } else {
+            $self->recv ($stanza);
+         }
       },
       parse_error => sub {
          my ($parser, $ex, $data) = @_;
@@ -179,6 +192,7 @@ sub cleanup_flags {
    delete $self->{peer_host};
    delete $self->{peer_port};
    delete $self->{write_done_queue};
+   delete $self->{error};
 }
 
 =item $stream->reinit ()
@@ -234,7 +248,7 @@ sub connect {
 
          $self->set_handle ($fh, $peer_host, $peer_port);
          
-      }, sub { $timeout };
+      }, ($timeout ? sub { $timeout } : ());
 }
 
 =item $stream->set_handle ($fh, $peer_host, $peer_port)
@@ -259,7 +273,9 @@ sub set_handle {
          fh => $fh,
          on_eof => sub {
             $self->disconnect (
-               "EOF on connection to $self->{peer_host}:$self->{peer_port}: $!"
+               "EOF on connection to $self->{peer_host}:$self->{peer_port}"
+               . ($self->{error} ? ": " . $self->{error}->string . "."
+                                 : ".")
             );
          },
          on_error => sub {
@@ -523,6 +539,14 @@ an L<AnyEvent::XMPP::Node> object.
 
 sub stream_start { }
 
+=item stream_end
+
+This event is emitted whenever the stream end tag has been received.
+
+=cut
+
+sub stream_end { }
+
 =item recv_stanza_xml => $node
 
 This is a debugging event, which is invoked for any "XML" elements that have 
@@ -541,7 +565,9 @@ is an object instance which is derived from L<AnyEvent::XMPP::Stanza>.
 
 =cut
 
-sub recv { }
+sub recv {
+   my ($self, $stanza) = @_;
+}
 
 =item send => $stanza
 
@@ -582,7 +608,13 @@ has been received. C<$data> is the received unicode character data chunk.
 
 =cut
 
-sub debug_recv { }
+sub debug_recv {
+   my ($self, $data) = @_;
+
+   if ($DEBUG > 1) {
+      warn "RECV>\n$data\n";
+   }
+}
 
 =item debug_send => $data
 
@@ -591,7 +623,13 @@ C<$data> is sent outward.
 
 =cut
 
-sub debug_send { }
+sub debug_send {
+   my ($self, $data) = @_;
+
+   if ($DEBUG > 1) {
+      warn "SEND>\n$data\n";
+   }
+}
 
 =back
 
