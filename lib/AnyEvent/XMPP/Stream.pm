@@ -59,7 +59,7 @@ AnyEvent::XMPP::Stream - Class for exchanging XMPP "XML" protocol messages.
       return $self
    }
 
-=head2 DESCRIPTION
+=head1 DESCRIPTION
 
 This module provides basic TCP/TLS connectivity and knows how to parse XMPP
 stanzas and partial "XML" tags. And provides the ability to send XMPP stanzas
@@ -77,7 +77,7 @@ the EVENTS section). If you subclass from this class you B<must> call the
 constructor of this class, because it's needed by L<Object::Event::Methods> to
 work properly.
 
-=head2 METHODS
+=head1 METHODS
 
 =over 4
 
