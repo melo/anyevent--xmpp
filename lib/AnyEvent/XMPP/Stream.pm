@@ -11,7 +11,7 @@ use Encode;
 
 our $DEBUG = 0;
 
-use base qw/Object::Event::Methods/;
+use base qw/Object::Event/;
 
 =head1 NAME
 
@@ -77,7 +77,7 @@ server.
 
 You may subclass from this connection or use the event interface (see below, in
 the EVENTS section). If you subclass from this class you B<must> call the
-constructor of this class, because it's needed by L<Object::Event::Methods> to
+constructor of this class, because it's needed by L<Object::Event> to
 work properly.
 
 =head1 METHODS
@@ -128,31 +128,31 @@ sub new {
    $self->{parser}->reg_cb (
       stream_start => sub {
          my ($parser, $node) = @_;
-         $self->stream_start ($node);
+         $self->event (stream_start => $node);
       },
       stream_end => sub {
-         $self->stream_end;
+         $self->event ('stream_end');
       },
       received_stanza_xml => sub {
          my ($parser, $node) = @_;
-         $self->recv_stanza_xml ($node);
+         $self->event (recv_stanza_xml => $node);
       },
       received_stanza => sub {
          my ($parser, $stanza) = @_;
 
          if ($stanza->type eq 'error') {
-            $self->error (
+            $self->event (error =>
                $self->{error} = AnyEvent::XMPP::Error::Stream->new (stanza => $stanza)
             );
 
          } else {
-            $self->recv ($stanza);
+            $self->event (recv => $stanza);
          }
       },
       parse_error => sub {
          my ($parser, $ex, $data) = @_;
 
-         $self->error (
+         $self->event (error =>
             AnyEvent::XMPP::Error::Parser->new (
                exception => $ex, data => $data
             )
@@ -165,7 +165,7 @@ sub new {
    $self->set_exception_cb (sub {
       my ($ev, $ex) = @_;
 
-      $self->error (
+      $self->event (error =>
          AnyEvent::XMPP::Error::Exception->new (
             exception => "(" . $ev->dump . "): $ex",
             context   => 'stream event callback'
@@ -179,8 +179,10 @@ sub new {
 
          push @{$self->{write_done_queue}}, $stanza->sent_cb
             if $stanza->sent_cb;
+
          $self->write_data (my $stanza_data = $stanza->serialize ($self->{writer}));
-         $self->sent_stanza_xml ($stanza_data);
+
+         $self->event (sent_stanza_xml => $stanza_data);
       },
       ext_after_error => sub {
          my ($self, $error) = @_;
@@ -190,6 +192,31 @@ sub new {
               ." warning!\n";
       }
    );
+
+   {
+      my @cbs;
+
+      for (qw/
+         error
+         connected
+         connect_error
+         disconnected
+         stream_start
+         stream_end
+         recv_stanza_xml
+         sent_stanza_xml
+         recv
+         send_buffer_empty
+         debug_recv
+         debug_send
+      /) {
+         no strict 'refs';
+
+         push @cbs, ($_ => \&{$_})
+      }
+
+      $self->reg_cb (@cbs);
+   }
 
    return $self
 }
@@ -310,7 +337,7 @@ sub set_handle {
    $self->{peer_port} = $peer_port;
    
    $self->reinit;
-   $self->connected ($peer_host, $peer_port);
+   $self->event (connected => $peer_host, $peer_port);
 }
 
 =item $stream->write_data ($data)
@@ -440,10 +467,11 @@ sub disconnect {
 
    if ($self->{connected}) {
       delete $self->{handle};
-      $self->disconnected ($self->{peer_host}, $self->{peer_port}, $msg);
+      $self->event (disconnected => $self->{peer_host}, $self->{peer_port}, $msg);
+
    } elsif ($self->{handle}) {
       delete $self->{handle};
-      $self->connect_error ($msg);
+      $self->event (connect_error => $msg);
    }
 
    $self->cleanup_flags;
@@ -492,14 +520,10 @@ sub cleanup {
 
 =head1 EVENTS
 
-These events are provided via the event interface of L<Object::Event::Methods>.
+These events are provided via the event interface of L<Object::Event>.
 You can register event callbacks via the C<reg_cb> method, please consult the 
-L<Object::Event::Methods> documentation for more details or the examples in
+L<Object::Event> documentation for more details or the examples in
 this documentation or the L<AnyEvent::XMPP> distribution.
-
-Please note that if you plan to subclass it's always wise to overwrite all
-event methods and call the parent's methods in them, because
-L<Object::Event::Methods> won't do that for you.
 
 =over 4
 
@@ -518,7 +542,7 @@ Here is an example:
    $stream->reg_cb (error => sub {
       my ($stream, $error) = @_;
       warn "got error: " . $error->string . "\n":
-      $stream->current->stop; # see documentation of Object::Event::Methods.
+      $stream->current->stop; # see documentation of Object::Event.
    });
 
 =cut
@@ -655,7 +679,11 @@ about to be send. If you stop the event the stanza will not be transmitted.
 
 =cut
 
-sub send { }
+sub send {
+   my ($self, $stanza) = @_;
+
+   $self->event (send => $stanza);
+}
 
 =item send_buffer_empty
 

@@ -2,9 +2,9 @@ package AnyEvent::XMPP::IM;
 use strict;
 no warnings;
 use AnyEvent::XMPP::Util qw/stringprep_jid/;
-use AnyEvent::XMPP::Connection;
+use AnyEvent::XMPP::Stream::Client;
 use AnyEvent::XMPP::Stanza;
-use base qw/Object::Event::Methods/;
+use base qw/Object::Event/;
 
 our $DEBUG = 1;
 
@@ -46,11 +46,10 @@ Default: 5 seconds
 sub new {
    my $this  = shift;
    my $class = ref($this) || $this;
-   my $self  = {
+   my $self  = $class->SUPER::new (
       initial_reconnect_interval => 5,
       @_,
-   };
-   bless $self, $class;
+   );
 
    return $self
 }
@@ -65,10 +64,10 @@ sub send_session_iq {
       my ($stanza, $error) = @_;
 
       if ($stanza) {
-         $self->connected ($jid, $con->{peer_host}, $con->{peer_port});
+         $self->event (connected => $jid, $con->{peer_host}, $con->{peer_port});
 
       } else {
-         $self->error ($jid, $error);
+         $self->event (error => $jid, $error);
       }
    }));
 }
@@ -80,7 +79,7 @@ sub init_connection {
       $self->send_session_iq ($con, $jid);
 
    } else {
-      $self->connected ($jid, $con->{peer_host}, $con->{peer_port});
+      $self->event (connected => $jid, $con->{peer_host}, $con->{peer_port});
    }
 }
 
@@ -109,11 +108,21 @@ sub set_accounts {
    }
 }
 
+sub _install_retry {
+   my ($conhdl) = @_;
+
+   $conhdl->{timeout} *= 2;
+   $conhdl->{timer} =
+      AnyEvent->timer (after => $conhdl->{timeout}, cb => sub {
+         $conhdl->{con}->connect;
+      });
+}
+
 sub spawn_connection {
    my ($self, $jid) = @_;
 
    my $conhdl = $self->{conns}->{$jid} = {
-      con => AnyEvent::XMPP::Connection->new (%{$self->{accs}->{$jid}}),
+      con => AnyEvent::XMPP::Stream::Client->new (%{$self->{accs}->{$jid}}),
       timeout => $self->{initial_reconnect_interval},
    };
 
@@ -126,21 +135,24 @@ sub spawn_connection {
 
          $self->init_connection ($con, $jid);
       },
+      connect_error => sub {
+         my ($self, $msg) = @_;
+         
+         _install_retry ($conhdl);
+         
+         $self->event (connect_error => $jid, $msg, $conhdl->{timeout});
+      },
       error => sub {
          my ($con, $error) = @_;
 
-         $self->error ($jid, $error);
+         $self->event (error => $jid, $error);
       },
       disconnected => sub {
          my ($con, $h, $p, $reason) = @_;
 
-         $conhdl->{timeout} *= 2;
-         $conhdl->{timer} =
-            AnyEvent->timer (after => $conhdl->{timeout}, cb => sub {
-               $conhdl->{con}->connect;
-            });
-            
-         $self->disconnected ($jid, $h, $p, $reason, $conhdl->{timeout});
+         _install_retry ($conhdl);
+
+         $self->event (disconnected => $jid, $h, $p, $reason, $conhdl->{timeout});
       },
    );
 
@@ -167,6 +179,7 @@ sub update_connections {
 
    for (keys %{$self->{accs}}) {
       unless ($self->{conns}->{$_}) {
+      warn "SPAN $_\n";
          $self->spawn_connection ($_);
       }
    }
@@ -176,7 +189,7 @@ sub update_connections {
 
 =head1 EVENTS
 
-These events are emitted by this object via the L<Object::Event::Methods> API:
+These events are emitted by this object via the L<Object::Event> API:
 
 =over 4
 
@@ -208,6 +221,13 @@ sub error {
       print "$jid: ERROR: " . $error->string . "\n";
    }
 }
+
+=item connect_error => $jid, $reason, $reconnect_timeout
+
+This error is emitted when a problem occurred while the TCP connection
+was being made. C<$jid> is the account, C<$reason> is the human readable error
+message and C<$reconnect_timeout> contains the seconds to the next
+retry.
 
 =item disconnected => $jid, $peer_host, $peer_port, $reason, $reconnect_timeout
 

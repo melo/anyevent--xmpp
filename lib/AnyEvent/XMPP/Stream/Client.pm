@@ -38,9 +38,8 @@ This module represents a XMPP stream as described in RFC 3920.
 
 It implements the L<AnyEvent::XMPP::Delivery> interface for stanza delivery.
 It's a subclass of L<AnyEvent::XMPP::Stream> and it inherits the event
-interface of L<Object::Event::Methods>. Please see L<Object::Event> and
-L<Object::Event::Methods> for further information about registering event
-callbacks.
+interface of L<Object::Event>. Please see L<Object::Event> for further
+information about registering event callbacks.
 
 This module only handles basic XMPP stream connecting, authentication and
 resource binding and not advanced stuff like roster management, presence
@@ -233,7 +232,7 @@ sub new {
    $self->set_exception_cb (sub {
       my ($ev, $ex) = @_;
 
-      $self->error (
+      $self->event (error => 
          AnyEvent::XMPP::Error::Exception->new (
             exception => "(" . $ev->dump . "): $ex", context => 'event callback'
          )
@@ -259,7 +258,7 @@ sub new {
              && not ($self->{disable_old_jabber_authentication})
              && not ($self->{authenticated})) {
 
-            $self->pre_authentication;
+            $self->event ('pre_authentication;')
          }
       },
       connected => sub {
@@ -272,12 +271,18 @@ sub new {
                   $self->disconnect ("connection timeout reached in authentication.");
                });
          }
+
+         if ($self->{old_style_ssl}) {
+            $self->starttls;
+         }
+
+         $self->send_header;
       },
       ext_before_stream_ready => sub {
          my ($self) = @_;
          delete $self->{timeout};
       },
-      [features => 50] => sub {
+      [recv_features => 50] => sub {
          my ($self, $stanza) = @_;
 
          if (not ($self->{disable_ssl}) && $stanza->tls) {
@@ -302,7 +307,7 @@ sub new {
                         $self->send_header;
 
                      } elsif ($type eq 'tls_failure') {
-                        $self->error (
+                        $self->event (error => 
                            AnyEvent::XMPP::Error->new (text => 'tls negotiation failed')
                         );
                         $self->disconnect ("TLS handshake failure");
@@ -313,12 +318,12 @@ sub new {
             }
          }
       },
-      [features => 40] => sub {
+      [recv_features => 40] => sub {
          my ($self, $stanza) = @_;
 
          if (not $self->{authenticated}) {
             $self->current->stop;
-            $self->pre_authentication ($stanza);
+            $self->event (pre_authentication => $stanza);
          }
       },
       ext_after_pre_authentication => sub {
@@ -326,7 +331,7 @@ sub new {
 
          $self->start_authenticator ($stanza);
       },
-      [features => 30] => sub {
+      [recv_features => 30] => sub {
          my ($self, $stanza) = @_;
 
          if (not defined ($self->{jid}) && $stanza->bind) {
@@ -335,15 +340,31 @@ sub new {
 
                if ($error) {
                   # TODO FIXME: make proper error?!
-                  $self->error ($error);
+                  $self->event (error => $error);
 
                } else {
                   $self->{jid} = $jid;
-                  $self->stream_ready;
+                  $self->event ('stream_ready')
                }
             });
          }
       },
+      send => sub {
+         my ($self, $stanza) = @_;
+
+         $self->{tracker}->register ($stanza);
+
+         if (xmpp_ns ($self->{default_stream_namespace}) eq xmpp_ns ('client')) {
+            if (cmp_jid ($stanza->to, $self->{server_jid})) {
+               $stanza->set_to (undef);
+            }
+
+            if (cmp_jid ($stanza->from, $self->{jid})) {
+               $stanza->set_from (undef);
+            }
+         }
+      },
+      recv => \&recv,
    );
 
    return $self;
@@ -487,7 +508,7 @@ sub start_authenticator {
 
          if (defined $jid) {
             $self->{res_manager}->add ($jid);
-            $self->stream_ready;
+            $self->event ('stream_ready');
 
          } else {
             $self->reinit;
@@ -499,7 +520,7 @@ sub start_authenticator {
       },
       auth_fail => sub {
          my ($auth, $error) = @_;
-         $self->error ($error);
+         $self->event (error => $error);
          $self->disconnect ("authentication failed");
 
          $self->{authenticator}->disconnect;
@@ -517,8 +538,8 @@ sub start_authenticator {
 The L<AnyEvent::XMPP::Stream::Client> class is derived from
 L<AnyEvent::XMPP::Stream>, all events that are emitted there are also emitted
 by objects of this class.  Please consult the documentation for
-L<AnyEvent::XMPP:Stream> and L<Object::Event::Methods> for details about
-registering event callbacks.
+L<AnyEvent::XMPP:Stream> and L<Object::Event> for details about registering
+event callbacks.
 
 NODE: Every callback gets as it's first argument the L<AnyEvent::XMPP::Stream>
 object. 
@@ -548,31 +569,6 @@ sub stream_ready {
       print "stream ready!\n";
    }
 }
-
-sub error { my $self = shift; $self->SUPER::error (@_) }
-
-sub connected {
-   my ($self, @args) = @_;
-   $self->SUPER::connected (@args);
-
-   if ($self->{old_style_ssl}) {
-      $self->starttls;
-   }
-
-   $self->send_header;
-}
-
-sub connect_error { my $self = shift; $self->SUPER::connect_error (@_) }
-
-sub disconnected { my $self = shift; $self->SUPER::disconnected (@_) }
-
-sub stream_start { my $self = shift; $self->SUPER::stream_start (@_) }
-
-sub stream_end { my $self = shift; $self->SUPER::stream_end (@_) }
-
-sub sent_stanza_xml { my $self = shift; $self->SUPER::sent_stanza_xml (@_) }
-
-sub recv_stanza_xml { my $self = shift; $self->SUPER::recv_stanza_xml (@_) }
 
 =item recv => $stanza
 
@@ -617,35 +613,11 @@ sub recv {
 
    if ($type eq 'features') {
       $self->{features} = $stanza;
-      $self->features ($stanza);
+      $self->event (recv_features => $stanza);
    }
 }
 
-sub send {
-   my ($self, $stanza) = @_;
 
-   $self->{tracker}->register ($stanza);
-
-   if (xmpp_ns ($self->{default_stream_namespace}) eq xmpp_ns ('client')) {
-      if (cmp_jid ($stanza->to, $self->{server_jid})) {
-         $stanza->set_to (undef);
-      }
-
-      if (cmp_jid ($stanza->from, $self->{jid})) {
-         $stanza->set_from (undef);
-      }
-   }
-
-   $self->SUPER::send ($stanza);
-
-   # the real sending is done by the super class in ext_after_send
-}
-
-sub send_buffer_empty { my $self = shift; $self->SUPER::send_buffer_empty (@_) }
-
-sub debug_recv { my $self = shift; $self->SUPER::debug_recv (@_) }
-
-sub debug_send { my $self = shift; $self->SUPER::debug_send (@_) }
 
 =back
 

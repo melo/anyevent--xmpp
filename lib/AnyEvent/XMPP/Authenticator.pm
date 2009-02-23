@@ -10,7 +10,7 @@ use AnyEvent::XMPP::Util qw/join_jid/;
 use Encode;
 use Digest::SHA1 qw/sha1_hex/;
 
-use base qw/Object::Event::Methods/;
+use base qw/Object::Event/;
 
 =head1 NAME
 
@@ -52,12 +52,12 @@ sub new {
                $self->construct_sasl_response ($stanza->node->text);
 
             } elsif ($type eq 'sasl_success') {
-               $self->auth;
+               $self->event ('auth');
                $con->current->unreg_me;
 
             } elsif ($type eq 'sasl_failure') {
                my $error = AnyEvent::XMPP::Error::SASL->new (stanza => $stanza);
-               $self->auth_fail ($error);
+               $self->event (auth_fail => $error);
                $con->current->unreg_me;
             }
          }
@@ -280,10 +280,6 @@ C<$jid> is defined if the authentication also bound a resource for
 you. If C<$jid> is undefined no resource was bound yet and the XMPP stream
 needs to be reinitiated (because we are finished with SASL authentication).
 
-=cut
-
-sub auth { }
-
 =item auth_fail => $error
 
 This event is emitted when an authentication failure occurred.
@@ -293,8 +289,6 @@ object or ...
 FIXME TODO
 
 =cut
-
-sub auth_fail { }
 
 sub disconnect {
    my ($self) = @_;

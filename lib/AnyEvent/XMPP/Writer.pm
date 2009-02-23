@@ -4,6 +4,7 @@ use XML::Writer;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Util qw/simxml filter_xml_chars filter_xml_attr_hash_chars/;
 use Encode;
+use Carp qw/cluck/;
 
 =head1 NAME
 

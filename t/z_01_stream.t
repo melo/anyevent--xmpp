@@ -35,7 +35,7 @@ $stream->reg_cb (
          
    },
    connect_error => sub {
-      my ($stream, $h, $p, $msg) = @_;
+      my ($stream, $msg) = @_;
 
       print "ok 1 - connect error ($msg)\n";
 

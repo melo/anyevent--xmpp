@@ -6,7 +6,7 @@ use AnyEvent::XMPP::Stanza;
 # OMFG!!!111 THANK YOU FOR THIS MODULE TO HANDLE THE XMPP INSANITY:
 use XML::Parser::Expat;
 
-use base qw/Object::Event::Methods/;
+use base qw/Object::Event/;
 
 =head1 NAME
 
@@ -57,8 +57,8 @@ sub cb_start_tag {
    $node->append_raw ($p->recognized_string);
 
    if (not @{$self->{nodestack}}) {
-      $self->received_stanza_xml ($node);
-      $self->stream_start ($node);
+      $self->event (received_stanza_xml => $node);
+      $self->event (stream_start => $node);
       $node = AnyEvent::XMPP::Node->new ($p->namespace ($el), $el, {}, $self);
    }
 
@@ -100,16 +100,16 @@ sub cb_end_tag {
    }
 
    if (@{$self->{nodestack}} == 1) {
-      $self->received_stanza_xml ($node);
+      $self->event (received_stanza_xml => $node);
 
-      $self->received_stanza (
+      $self->event (received_stanza => 
          AnyEvent::XMPP::Stanza::analyze ($node, $self->{stream_ns})
       );
 
    } elsif (@{$self->{nodestack}} == 0) {
-      $self->received_stanza_xml ($node);
+      $self->event (received_stanza_xml => $node);
 
-      $self->stream_end ($node);
+      $self->event (stream_end => $node);
    }
 }
 
@@ -197,30 +197,7 @@ sub feed {
       $self->{parser}->parse_more ($data);
    };
 
-   $self->parse_error ($@, $data) if $@;
-}
-
-sub stream_start {
-   my ($self, $node) = @_;
-}
-
-sub stream_end {
-   my ($self, $node) = @_;
-}
-
-sub received_stanza_xml {
-   my ($self, $node) = @_;
-   # subclass/event callback responsibility
-}
-
-sub received_stanza {
-   my ($self, $stanza) = @_;
-   # subclass/event callback responsibility
-}
-
-sub parse_error {
-   my ($self, $error) = @_;
-   # subclass/event callback responsibility
+   $self->event (parse_error => $@, $data) if $@;
 }
 
 =back

@@ -79,6 +79,41 @@ sub new {
       @_
    );
 
+   $self->reg_cb (
+      connected => sub {
+         my $self = shift;
+         $self->send_header (undef, undef, to => $self->{domain});
+      },
+      stream_start => sub {
+         my ($self, $node) = @_;
+         my $id = $node->attr ('id');
+
+         my $secret =
+            encode ('utf-8',
+               $self->{parser}->{parser}->xml_escape ($self->{secret}));
+         my $handshake_secret = lc sha1_hex ($id . $secret);
+
+         my $stanza = AnyEvent::XMPP::Stanza->new (type => 'handshake');
+
+         $stanza->add ({ node => $handshake_secret });
+
+         $self->send ($stanza);
+      },
+      recv => sub {
+         my ($self, $stanza) = @_;
+
+         unless ($self->{authenticated}) {
+            $self->current->stop;
+
+            if ($stanza->node->eq (component => 'handshake')) {
+               $self->{authenticated} = 1;
+               $self->event ('stream_ready');
+            }
+         }
+      },
+      stream_ready => \&stream_ready,
+   );
+
    $self
 }
 
@@ -101,64 +136,6 @@ and can now be used to transmit stanzas.
 =cut
 
 sub stream_ready { }
-
-sub error { my $self = shift; $self->SUPER::error (@_) }
-
-sub connected {
-   my $self = shift;
-   $self->SUPER::connected (@_);
-   $self->send_header (undef, undef, to => $self->{domain});
-}
-
-sub connect_error {
-   my $self = shift; $self->SUPER::connect_error (@_);
-}
-
-sub disconnected { my $self = shift; $self->SUPER::disconnected (@_) }
-
-sub stream_start {
-   my ($self, $node) = @_;
-   $self->SUPER::stream_start ($node);
-
-   my $id = $node->attr ('id');
-
-   my $secret =
-      encode ('utf-8',
-         $self->{parser}->{parser}->xml_escape ($self->{secret}));
-   my $handshake_secret = lc sha1_hex ($id . $secret);
-
-   my $stanza = AnyEvent::XMPP::Stanza->new (type => 'handshake');
-
-   $stanza->add ({ node => $handshake_secret });
-
-   $self->send ($stanza);
-}
-
-sub sent_stanza_xml { my $self = shift; $self->SUPER::sent_stanza_xml (@_) }
-
-sub recv_stanza_xml { my $self = shift; $self->SUPER::recv_stanza_xml (@_) }
-
-sub recv {
-   my ($self, $stanza) = @_;
-   $self->SUPER::recv ($stanza);
-
-   unless ($self->{authenticated}) {
-      $self->current->stop;
-
-      if ($stanza->node->eq (component => 'handshake')) {
-         $self->{authenticated} = 1;
-         $self->stream_ready;
-      }
-   }
-}
-
-sub send { my $self = shift; $self->SUPER::send (@_) }
-
-sub send_buffer_empty { my $self = shift; $self->SUPER::send_buffer_empty (@_) }
-
-sub debug_recv { my $self = shift; $self->SUPER::debug_recv (@_) }
-
-sub debug_send { my $self = shift; $self->SUPER::debug_send (@_) }
 
 =back
 
