@@ -47,12 +47,9 @@ to XMPP communication.
 For a list of L</Supported extensions> see below.
 
 There are also other modules in this distribution, for example:
-L<AnyEvent::XMPP::Util>, L<AnyEvent::XMPP::Writer>, L<AnyEvent::XMPP::Parser> and those I
+L<AnyEvent::XMPP::Util>, L<AnyEvent::XMPP::Parser> and those I
 forgot :-) Those modules might be helpful and/or required if you want to use
 this framework for XMPP.
-
-See also L<AnyEvent::XMPP::Writer> for a discussion about the brokenness of XML in the XMPP
-specification.
 
 If you have any questions or seek for help look below under L</SUPPORT>.
 
@@ -72,10 +69,6 @@ For the I/O events, timers, TCP, TLS, DNS and I/O buffering.
 The former L<AnyEvent::XMPP::Event> module has been outsourced to the L<Object::Event>
 module to provide a more generic way for more other modules to register and call
 event callbacks.
-
-=item L<XML::Writer>
-
-For writing "XML".
 
 =item L<XML::Parser::Expat>
 
