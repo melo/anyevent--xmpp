@@ -4,7 +4,6 @@ no warnings;
 use AnyEvent::Socket;
 use AnyEvent::Handle;
 use AnyEvent::XMPP::Parser;
-use AnyEvent::XMPP::Writer;
 use AnyEvent::XMPP::Error::Exception;
 use AnyEvent::XMPP::Util qw/dump_twig_xml/;
 use Encode;
@@ -117,10 +116,10 @@ sub new {
       @_
    );
 
-   $self->{writer} =
-      AnyEvent::XMPP::Writer->new (
-         stream_ns => $self->{default_stream_namespace}
-      );
+   $self->{namespace_prefixes} = {
+      $self->{default_stream_namespace} => '',
+      'http://etherx.jabber.org/streams' => 'stream',
+   };
 
    $self->{parser} =
       AnyEvent::XMPP::Parser->new ($self->{default_stream_namespace});
@@ -180,7 +179,8 @@ sub new {
          push @{$self->{write_done_queue}}, $stanza->sent_cb
             if $stanza->sent_cb;
 
-         $self->write_data (my $stanza_data = $stanza->serialize ($self->{writer}));
+         $self->write_data (
+            my $stanza_data = $stanza->serialize ($self->{namespace_prefixes}));
 
          $self->event (sent_stanza_xml => $stanza_data);
       },
@@ -245,7 +245,6 @@ sub reinit {
    my ($self) = @_;
 
    $self->{parser}->init;
-   $self->{writer}->init;
 }
 
 =item $stream->connect ($host, $service, $timeout)
@@ -424,7 +423,6 @@ sub send_header {
    return unless $self->{connected};
 
    $self->send (AnyEvent::XMPP::StreamStartStanza->new ($lang, $version, %attrs));
- #  $self->write_data ($self->{writer}->init_stream ($lang, $version, %attrs));
 }
 
 =item $stream->send_end ()
@@ -443,7 +441,7 @@ sub send_end {
    my ($self) = @_;
    return unless $self->{connected};
 
-   $self->write_data ($self->{writer}->end_of_stream);
+   $self->write_data ("</stream:stream>"); # shameless, but XML
    $self->{disconnect_timer} =
       AnyEvent->timer (after => $self->{stream_end_timeout}, cb => sub {
          $self->disconnect ("receival of stream end timeouted.");
@@ -503,10 +501,6 @@ sub cleanup {
 
    if ($self->{handle}) {
       delete $self->{handle};
-   }
-
-   if ($self->{writer}) {
-      delete $self->{writer};
    }
 
    if ($self->{parser}) {

@@ -221,8 +221,10 @@ sub set_timeout  { $_[0]->{timeout} = $_[1] }
 
 sub construct {
    my ($self, @args) = @_;
+
    if (ref $args[0]) {
-      $self->{create_cb} = $args[0];
+      $self->{node} = $args[0];
+
    } else {
       my %args = @args;
       $self->{$_} = $args{$_} for keys %args;
@@ -257,68 +259,58 @@ sub add {
    push @{$self->{cbs}}, $cb;
 }
 
-sub _writer_serialize {
-   my ($w, $arg) = @_;
-
-   if (ref ($arg) eq 'HASH') {
-      simxml ($w, %$arg);
-
-   } elsif (ref ($arg) eq 'ARRAY') {
-      _writer_serialize ($w, $_) for @$arg;
-
-   } else {
-      $arg->($w)
-   }
-}
 
 sub serialize {
-   my ($self, $writer) = @_;
+   my ($self, $nsdecls) = @_;
 
-   my $create_cb;
-
-   if ($self->{create_cb}) {
-      $create_cb = sub { _writer_serialize ($_[1], $self->{create_cb}) };
-
-   } else {
-      my @add;
-
-      if (defined $self->{id}) {
-         push @add, (id => $self->{id})
-      }
-
-      $self->{attrs} ||= {};
-
-      my $name = $self->{type};
-
-      my $attrs = {
-         (map { $_ => $self->{attrs}->{$_} }
-            grep { defined $self->{attrs}->{$_} }
-               keys %{$self->{attrs}}),
-         @add
-      };
-
-      my $internal_cb;
-      if ($self->{cbs}) {
-         $internal_cb = sub { _writer_serialize ($_[0], $self->{cbs}) };
-      }
-
-      $create_cb = sub {
-         my ($writer, $w) = @_;
-
-         $w->addPrefix ($writer->ns, '');
-
-         if ($internal_cb) {
-            $w->startTag ([$writer->ns, $name], %$attrs);
-            $internal_cb->($w);
-            $w->endTag;
-         } else {
-            $w->emptyTag ([$writer->ns, $name], %$attrs);
-         }
-      };
-   }
-
-   $writer->call_writer ($create_cb)
+   $self->{node}->as_string ($nsdecls)
 }
+
+#   my $create_cb;
+#
+#   if ($self->{create_cb}) {
+#      return _writer_serialize ($nsdecls, $self->{create_cb});
+#
+#   } else {
+#      my @add;
+#
+#      if (defined $self->{id}) {
+#         push @add, (id => $self->{id})
+#      }
+#
+#      $self->{attrs} ||= {};
+#
+#      my $name = $self->{type};
+#
+#      my $attrs = {
+#         (map { $_ => $self->{attrs}->{$_} }
+#            grep { defined $self->{attrs}->{$_} }
+#               keys %{$self->{attrs}}),
+#         @add
+#      };
+#
+#      my $internal_cb;
+#      if ($self->{cbs}) {
+#         $internal_cb = sub { _writer_serialize ($nsdecls, $self->{cbs}) };
+#      }
+#
+#      $create_cb = sub {
+#         my ($writer, $w) = @_;
+#
+#         $w->addPrefix ($writer->ns, '');
+#
+#         if ($internal_cb) {
+#            $w->startTag ([$writer->ns, $name], %$attrs);
+#            $internal_cb->($w);
+#            $w->endTag;
+#         } else {
+#            $w->emptyTag ([$writer->ns, $name], %$attrs);
+#         }
+#      };
+#   }
+#
+#   $writer->call_writer ($create_cb)
+#}
 
 =item B<type>
 

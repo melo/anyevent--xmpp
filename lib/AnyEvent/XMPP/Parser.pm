@@ -51,15 +51,22 @@ This methods (re)initializes the parser.
 =cut
 
 sub cb_start_tag {
-   my ($self, $p, $el, %attrs) = @_;
+   my ($self, $p, $el, @attrs) = @_;
 
-   my $node = AnyEvent::XMPP::Node->new ($p->namespace ($el), $el, \%attrs, $self);
-   $node->append_raw ($p->recognized_string);
+   my %attrs;
+   while (@attrs) {
+      my ($k, $v) = (shift @attrs, shift @attrs);
+      my $ns = $p->namespace ($k);
+      $ns = $p->namespace ($el) unless defined $ns;
+      $attrs{"$ns\|$k"} = $v;
+   }
+   my $node = AnyEvent::XMPP::Node->new ($p->namespace ($el), $el, \%attrs);
+   $node->append_parsed ($p->recognized_string);
 
    if (not @{$self->{nodestack}}) {
       $self->event (received_stanza_xml => $node);
       $self->event (stream_start => $node);
-      $node = AnyEvent::XMPP::Node->new ($p->namespace ($el), $el, {}, $self);
+      $node = AnyEvent::XMPP::Node->new ($p->namespace ($el), $el, {});
    }
 
    push @{$self->{nodestack}}, $node;
@@ -74,8 +81,8 @@ sub cb_char_data {
    }
 
    my $node = $self->{nodestack}->[-1];
-   $node->add_text ($str);
-   $node->append_raw ($p->recognized_string);
+   $node->add ($str);
+   $node->append_parsed ($p->recognized_string);
 }
 
 sub cb_end_tag {
@@ -92,11 +99,11 @@ sub cb_end_tag {
    }
 
    my $node = pop @{$self->{nodestack}};
-   $node->append_raw ($p->recognized_string);
+   $node->append_parsed ($p->recognized_string);
 
    # > 1 because we don't want the stream tag to save all our children...
    if (@{$self->{nodestack}} > 1) {
-      $self->{nodestack}->[-1]->add_node ($node);
+      $self->{nodestack}->[-1]->add ($node);
    }
 
    if (@{$self->{nodestack}} == 1) {
@@ -116,7 +123,7 @@ sub cb_end_tag {
 sub cb_default {
    my ($self, $p, $str) = @_;
 
-   $self->{nodestack}->[-1]->append_raw ($str)
+   $self->{nodestack}->[-1]->append_parsed ($str)
       if @{$self->{nodestack}};
 }
 
@@ -161,27 +168,6 @@ sub cleanup {
    }
 
    return;
-}
-
-=item B<nseq ($namespace, $tagname, $cmptag)>
-
-This method checks whether the C<$cmptag> matches the C<$tagname>
-in the C<$namespace>.
-
-C<$cmptag> needs to come from the XML::Parser::Expat as it has
-some magic attached that stores the namespace.
-
-=cut
-
-sub nseq {
-   my ($self, $ns, $name, $tag) = @_;
-
-   unless (exists $self->{nso}->{$ns}->{$name}) {
-      $self->{nso}->{$ns}->{$name} =
-         $self->{parser}->generate_ns_name ($name, $ns);
-   }
-
-   return $self->{parser}->eq_name ($self->{nso}->{$ns}->{$name}, $tag);
 }
 
 =item B<feed ($data)>

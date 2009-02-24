@@ -14,7 +14,7 @@ our @EXPORT_OK = qw/resourceprep nodeprep prep_join_jid join_jid
                     prep_node_jid prep_domain_jid prep_res_jid
                     from_xmpp_datetime to_xmpp_datetime to_xmpp_time
                     xmpp_datetime_as_timestamp
-                    filter_xml_chars filter_xml_attr_hash_chars
+                    filter_xml_chars filter_xml_attr_hash_chars xml_escape
                     /;
 our @ISA = qw/Exporter/;
 
@@ -547,6 +547,22 @@ sub install_default_debug_dump {
          printf "send<< %s:%d\n%s", $con->{host}, $con->{port}, dump_twig_xml ($data)
       },
    )
+}
+
+=item $xml_escaped = xml_escape ($string)
+
+Your regular XML escape procedure. Escaping <, >, & and " characters.  It will
+also run the output through filter_xml_chars, just for convenience.
+
+=cut
+
+sub xml_escape {
+   my $str = shift;
+   $str =~ s/</&lt;/g;
+   $str =~ s/>/&gt;/g;
+   $str =~ s/&/&amp;/g;
+   $str =~ s/"/&quot;/g;
+   filter_xml_chars $str
 }
 
 =back
