@@ -8,7 +8,7 @@ use constant {
    NAME   => 1,
    ATTRS  => 2,
    NODES  => 3,
-   RAW    => 4
+   META   => 4,
 };
 
 use constant {
@@ -103,6 +103,16 @@ Returns the namespace URI of this node.
 
 sub namespace {
    $_[0]->[NS]
+}
+
+=item B<meta ($meta)>
+
+=cut
+
+sub meta {
+   defined $_[1]
+      ? $_[0]->[META] = $_[1]
+      : $_[0]->[META]
 }
 
 =item B<eq ($namespace_or_alias, $name) or eq ($node)>
