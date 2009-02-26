@@ -2,6 +2,8 @@ package AnyEvent::XMPP::Node;
 use strict;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns_maybe/;
 use AnyEvent::XMPP::Util qw/xml_escape/;
+require Exporter;
+our @EXPORT_OK = qw/simxml/;
 
 use constant {
    NS     => 0,
@@ -9,6 +11,7 @@ use constant {
    ATTRS  => 2,
    NODES  => 3,
    META   => 4,
+   NSDECLS => 5,
 };
 
 use constant {
@@ -38,6 +41,137 @@ rather take care of it drop me a mail, feature request or most preferably a patc
 Every L<AnyEvent::XMPP::Node> has a namespace, attributes, text and child nodes.
 
 You can access these with the following methods:
+
+=head1 FUNCTIONS
+
+=over 4
+
+=item B<simxml ($w, %xmlstruct)>
+
+This function takes a L<XML::Writer> as first argument (C<$w>) and the
+rest key value pairs:
+
+   simxml ($w,
+      defns => '<xmlnamespace>',
+      node  => <node>,
+   );
+
+Where node is:
+
+   <node> := {
+                ns     => '<xmlnamespace>',
+                name   => 'tagname',
+                attrs  => [ 'name', 'value', 'name2', 'value2', ... ],
+                childs => [ <node>, ... ]
+             }
+           | {
+                dns    => '<xmlnamespace>', # this will set that namespace to
+                                            # the default namespace before using it.
+                name   => 'tagname',
+                attrs  => [ 'name', 'value', 'name2', 'value2', ... ],
+                childs => [ <node>, ... ]
+             }
+           | [ sub { ... }, ... ]
+           | sub { ... }
+           | \(my $rawxml = "raw XML unicode text")
+           | "textnode"
+
+Please note: C<childs> stands for C<child sequence> :-)
+
+Also note that if you omit the C<ns> key for nodes there is a fall back
+to the namespace of the parent element or the last default namespace.
+This makes it easier to write things like this:
+
+   {
+      defns => 'muc_owner',
+      node => { name => 'query' }
+   }
+
+(Without having to include C<ns> in the node.)
+
+This is a bigger example:
+
+   ...
+
+   $msg->node->add (
+      simxml($w,
+         defns => 'muc_user', # sets the default namepsace for all following elements
+         node  => {
+            name => 'x',      # element 'x' in namespace 'muc_user'
+            childs => [
+               {
+                  'name' => 'invite',           # element 'invite' in namespace 'muc_user'
+                  'attrs' => [ 'to', $to_jid ], # to="$to_jid" attribute for 'invite'
+                  'childs' => [
+                     { # the <reason>$reason</reason> element in the invite element
+                       'name' => 'reason',
+                       childs => [ $reason ]
+                     }
+                  ],
+               }
+            ]
+         }
+      );
+   );
+
+=cut
+
+sub simxml {
+   my (%desc) = @_;
+
+   $desc{fb_ns} = $desc{defns}
+      unless exists $desc{fb_ns};
+
+   my $node = $desc{node};
+
+   if (not defined $node) {
+      return;
+
+   } elsif (ref ($node) eq 'CODE') {
+      return $node->();
+
+   } elsif (ref ($node) eq 'ARRAY') {
+      my @o;
+      push @o, $_->() for @$node;
+      return @o;
+
+   } elsif (ref ($node) eq 'HASH') {
+      my $ns = $node->{dns} ? $node->{dns} : $node->{ns};
+      $ns    = $ns          ? $ns          : $desc{fb_ns};
+      $ns    = xmpp_ns_maybe ($ns);
+
+      my $tag = $ns ? [$ns, $node->{name}] : $node->{name};
+
+      my $nnode = AnyEvent::XMPP::Node->new ($ns, $node->{name}, $node->{attrs} || []);
+
+      my $defns;
+      if ($node->{defns}) { $defns = $node->{defns} }
+
+      for (@{$node->{childs}}) {
+         next unless defined $_;
+
+         my $fb_ns = $desc{fb_ns};
+
+         my (@args);
+
+         if (ref ($_) eq 'HASH') {
+            $defns = $_->{dns} if defined $_->{dns};
+            $fb_ns = $_->{ns}  if defined $_->{ns};
+         }
+
+         push @args, (defns => $defns) if defined $defns;
+
+         my @nodes = simxml (node => $_, fb_ns => $fb_ns, @args);
+         $nnode->add ($_) for @nodes;
+      }
+
+      return $nnode;
+   } else {
+      return $node;
+   }
+}
+
+=back
 
 =head1 METHODS
 
@@ -71,6 +205,7 @@ sub new {
    my $map = $self->[ATTRS] = { };
    while (@a) {
       my ($name, $value) = (shift @a, shift @a);
+
       if (ref $name) {
          $name = join "|", @$name
       } else {
@@ -78,6 +213,7 @@ sub new {
             $name = $self->[NS] . "|" . $name
          }
       }
+
       $map->{$name} = $value;
    }
 
@@ -266,15 +402,15 @@ sub find_all {
    @ret
 }
 
-=item B<write_on ($writer)>
+=item B<add_decl_prefix ($namespace_or_abbrev, $prefix)>
 
-This writes the current node out to the L<AnyEvent::XMPP::Writer> object in C<$writer>.
+This will append a prefix declaration directly to the node.
 
 =cut
 
-sub write_on {
-   my ($self, $w) = @_;
-   $w->raw ($self->as_string);
+sub add_decl_prefix {
+   my ($self, $nsdecl, $prefix) = @_;
+   push @{$self->[NSDECLS]}, [$nsdecl, $prefix];
 }
 
 =item B<raw_string ()>
@@ -337,6 +473,10 @@ sub as_string {
          $subdecls{$ns} = '';
          unshift @attrs, ['', $ns, 'xmlns'];
       }
+   }
+
+   for (@{$self->[NSDECLS] || []}) {
+      push @attrs, [$_->[1], $_->[0], 'xmlns'];
    }
 
    for my $ak (sort keys %{$self->[ATTRS] || {}}) {
