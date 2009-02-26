@@ -4,6 +4,7 @@ use AnyEvent::XMPP::Namespaces qw/xmpp_ns_maybe/;
 use AnyEvent::XMPP::Util qw/xml_escape/;
 require Exporter;
 our @EXPORT_OK = qw/simxml/;
+our @ISA = qw/Exporter/;
 
 use constant {
    NS     => 0,
@@ -46,10 +47,9 @@ You can access these with the following methods:
 
 =over 4
 
-=item B<simxml ($w, %xmlstruct)>
+=item B<simxml (%xmlstruct)>
 
-This function takes a L<XML::Writer> as first argument (C<$w>) and the
-rest key value pairs:
+C<%xmlstruct> key value pairs:
 
    simxml ($w,
       defns => '<xmlnamespace>',
@@ -191,7 +191,6 @@ sub new {
    $self->[NS]    = shift;
    $self->[NAME]  = shift;
    $self->[NODES] = [];
-   $self->[RAW] = '';
 
    my @a;
    if (ref $_[0] eq 'ARRAY') {
@@ -343,7 +342,7 @@ sub add {
    my $n;
    if (ref ($node) eq 'AnyEvent::XMPP::Node') {
       push @{$self->[NODES]}, [NNODE, $n = $node];
-   } elsif (ref ($node) eq 'REF') {
+   } elsif (ref ($node) eq 'SCALAR') {
       push @{$self->[NODES]}, [NRAW,  $n = $node];
    } elsif (@args > 0) {
       push @{$self->[NODES]}, [NNODE, $n = AnyEvent::XMPP::Node->new ($node, @args)];
@@ -451,7 +450,7 @@ sub as_string {
    my ($self, $nsdecls, $indent, $idcnt) = @_;
 
    my $name = $self->[NAME];
-   my $ns = $self->[NS];
+   my $ns   = $self->[NS];
 
    my %subdecls = %{$nsdecls || {}};
    my @attrs;
@@ -493,26 +492,24 @@ sub as_string {
       push @attrs, [$name, $self->[ATTRS]->{$ak}, $pref]
    }
 
-   my $pad = "  " x $indent;
-   
    my $child_data =
       join '', map {
          my $str;
          if ($_->[0] == NNODE) {
-            $str = $_->[1]->as_string (\%subdecls, ($indent ? ($indent + 1) : 0), $idcnt)
+            $str = $_->[1]->as_string (\%subdecls, $indent, $idcnt)
          } elsif ($_->[0] == NTEXT) {
-            $str = xml_escape ($indent ? map { $pad . $_ } split /\n/, $_->[1] : $_->[1])
+            $str = xml_escape ($_->[1])
          } elsif ($_->[0] == NRAW) {
             $str = ${$_->[1]};
          }
-         $str
+         $str . ($indent ? "\n" : "")
       } @{$self->[NODES]};
 
    my $elem_name = $subdecls{$ns} eq '' ? $name : "$subdecls{$ns}:$name";
 
    my $start = 
-      $pad . "<$elem_name "
-      . (join ' ', map {
+      "<$elem_name"
+      . (join '', map { ' ' . $_ } map {
            my ($name, $value, $pref) = @$_;
            (substr ($name, 0, 4) eq 'xml:')
                ? "$name=\"" . xml_escape ($value) ."\""
@@ -524,16 +521,17 @@ sub as_string {
            )
         } @attrs);
 
-   return $start . '>' if $only_start;
+   return $start . ">" . ($indent ? "\n" : '') if $only_start;
 
-   $start
-   . ($child_data ne ''
-        ? '>'
-          . ($indent ? "\n" : '')
-          . $child_data
-          . ($indent ? "\n$pad" : '')
-          . "</$elem_name>"
-        : '/>')
+   if ($indent) {
+      return $start 
+         . ($child_data ne ''
+              ?  ">\n" . (join "\n", map { "  " . $_ } split /\n/, $child_data)
+                 . "\n</$elem_name>"
+              : "/>")
+   } else {
+      return $start . ($child_data ne '' ? ">" . $child_data . "</$elem_name>" : "/>")
+   }
 }
 
 =item B<append_parsed ($string)>
