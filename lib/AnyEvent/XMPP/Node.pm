@@ -140,8 +140,6 @@ sub simxml {
       $ns    = $ns          ? $ns          : $desc{fb_ns};
       $ns    = xmpp_ns_maybe ($ns);
 
-      my $tag = $ns ? [$ns, $node->{name}] : $node->{name};
-
       my $nnode = AnyEvent::XMPP::Node->new ($ns, $node->{name}, $node->{attrs} || []);
 
       if (defined $desc{defns}) {
@@ -153,7 +151,6 @@ sub simxml {
 
       for (@{$node->{childs}}) {
          next unless defined $_;
-
          my $fb_ns = $desc{fb_ns};
 
          my (@args);
@@ -162,7 +159,7 @@ sub simxml {
             if (defined $_->{dns}) {
                push @args, (defns => $_->{dns});
             }
-            $fb_ns = $_->{ns}  if defined $_->{ns};
+            $fb_ns = $_->{ns} if defined $_->{ns};
          }
 
          my @nodes = simxml (node => $_, fb_ns => $fb_ns, @args);
@@ -451,48 +448,40 @@ C<$default_namespace> is the default namespace this element is in.
 
 # Welcome to XML nightmare!!!!!!
 sub as_string {
-   my ($self, $indent, $idcnt, @ext) = @_;
+   my ($self, $indent, $idcnt, $subdecls, $only_start) = @_;
 
    my $name      = $self->[NAME];
    my $ns        = $self->[NS];
    my $elem_name = $name;
-   my $only_start;
 
-   my %subdecls = ();
+   $subdecls ||= {};
    my @attrs;
 
    for (@{$self->[NSDECLS] || []}) {
-      if (not (defined $subdecls{$_->[1]})
-          || $subdecls{$_->[1]} ne $_->[0]) {
+      if (not (defined $subdecls->{$_->[1]})
+          || $subdecls->{$_->[1]} ne $_->[0]) {
 
          push @attrs, [$_->[1], $_->[0], 'xmlns'];
-         $subdecls{$_->[0]} = $_->[1];
+         $subdecls->{$_->[0]} = $_->[1];
       }
-   }
-
-   for (@ext) {
-      if (ref ($_) eq 'HASH') {
-         (%subdecls) = %$_;
-      }
-      $only_start = 1 if $_ eq 'start';
    }
 
    if (defined ($ns)) {
-      unless (defined $subdecls{$ns}) {
-         my $pref = $subdecls{$ns} = 'ns' . ++$idcnt;
+      unless (defined $subdecls->{$ns}) {
+         my $pref = $subdecls->{$ns} = 'ns' . ++$idcnt;
          unshift @attrs, [$pref, $ns, 'xmlns']
       }
-      $elem_name = $subdecls{$ns} eq '' ? $name : "$subdecls{$ns}:$name";
+      $elem_name = $subdecls->{$ns} eq '' ? $name : "$subdecls->{$ns}:$name";
    }
 
    for my $ak (sort keys %{$self->[ATTRS] || {}}) {
       my ($ns, $name) = split /\|/, $ak;
       my $pref;
 
-      if (defined ($subdecls{$ns})) {
-         $pref = $subdecls{$ns};
+      if (defined ($subdecls->{$ns})) {
+         $pref = $subdecls->{$ns};
       } else {
-         $pref = $subdecls{$ns} = 'ns' . ++$idcnt;
+         $pref = $subdecls->{$ns} = 'ns' . ++$idcnt;
          unshift @attrs, [$pref, $ns, 'xmlns']
       }
 
@@ -503,7 +492,7 @@ sub as_string {
       join '', map {
          my $str;
          if ($_->[0] == NNODE) {
-            $str = $_->[1]->as_string ($indent, $idcnt, \%subdecls)
+            $str = $_->[1]->as_string ($indent, $idcnt, { %$subdecls })
          } elsif ($_->[0] == NTEXT) {
             $str = xml_escape ($_->[1])
          } elsif ($_->[0] == NRAW) {
