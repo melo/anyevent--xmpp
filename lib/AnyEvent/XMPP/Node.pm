@@ -141,28 +141,17 @@ sub simxml {
       $ns    = xmpp_ns_maybe ($ns);
 
       my $nnode = AnyEvent::XMPP::Node->new ($ns, $node->{name}, $node->{attrs} || []);
+      
+      my $fb_ns = $desc{fb_ns};
 
-      if (defined $desc{defns}) {
-         $nnode->add_decl_prefix (xmpp_ns_maybe ($desc{defns}) => '');
-
-      } elsif (defined ($node->{dns}) && $node->{dns} eq $ns) {
+      if (defined ($node->{dns}) && xmpp_ns_maybe ($node->{dns}) eq $ns) {
          $nnode->add_decl_prefix ($ns => '');
+         $fb_ns = $ns;
       }
 
       for (@{$node->{childs}}) {
          next unless defined $_;
-         my $fb_ns = $desc{fb_ns};
-
-         my (@args);
-
-         if (ref ($_) eq 'HASH') {
-            if (defined $_->{dns}) {
-               push @args, (defns => $_->{dns});
-            }
-            $fb_ns = $_->{ns} if defined $_->{ns};
-         }
-
-         my @nodes = simxml (node => $_, fb_ns => $fb_ns, @args);
+         my @nodes = simxml (node => $_, fb_ns => $fb_ns);
          $nnode->add ($_) for @nodes;
       }
 
@@ -410,7 +399,7 @@ This will append a prefix declaration directly to the node.
 
 sub add_decl_prefix {
    my ($self, $nsdecl, $prefix) = @_;
-   push @{$self->[NSDECLS]}, [$nsdecl, $prefix];
+   push @{$self->[NSDECLS]}, [xmpp_ns_maybe ($nsdecl), $prefix];
 }
 
 =item B<raw_string ()>
@@ -454,11 +443,11 @@ sub as_string {
    my $ns        = $self->[NS];
    my $elem_name = $name;
 
-   $subdecls ||= {};
+   $subdecls = { %{$subdecls || {}} };
    my @attrs;
 
    for (@{$self->[NSDECLS] || []}) {
-      if (not (defined $subdecls->{$_->[1]})
+      if (not (exists $subdecls->{$_->[1]})
           || $subdecls->{$_->[1]} ne $_->[0]) {
 
          push @attrs, [$_->[1], $_->[0], 'xmlns'];
@@ -467,7 +456,7 @@ sub as_string {
    }
 
    if (defined ($ns)) {
-      unless (defined $subdecls->{$ns}) {
+      unless (exists $subdecls->{$ns}) {
          my $pref = $subdecls->{$ns} = 'ns' . ++$idcnt;
          unshift @attrs, [$pref, $ns, 'xmlns']
       }
@@ -475,14 +464,18 @@ sub as_string {
    }
 
    for my $ak (sort keys %{$self->[ATTRS] || {}}) {
-      my ($ns, $name) = split /\|/, $ak;
+      my ($ans, $name) = split /\|/, $ak;
       my $pref;
 
-      if (defined ($subdecls->{$ns})) {
-         $pref = $subdecls->{$ns};
-      } else {
-         $pref = $subdecls->{$ns} = 'ns' . ++$idcnt;
-         unshift @attrs, [$pref, $ns, 'xmlns']
+      if ($ans ne $ns) { # optimisation: attributes without prefix have
+                         # the namespace of the lement they are in
+         if (exists $subdecls->{$ans}) {
+            $pref = $subdecls->{$ans};
+
+         } else { 
+            $pref = $subdecls->{$ans} = 'ns' . ++$idcnt;
+            unshift @attrs, [$pref, $ans, 'xmlns']
+         }
       }
 
       push @attrs, [$name, $self->[ATTRS]->{$ak}, $pref]
@@ -492,7 +485,7 @@ sub as_string {
       join '', map {
          my $str;
          if ($_->[0] == NNODE) {
-            $str = $_->[1]->as_string ($indent, $idcnt, { %$subdecls })
+            $str = $_->[1]->as_string ($indent, $idcnt, $subdecls)
          } elsif ($_->[0] == NTEXT) {
             $str = xml_escape ($_->[1])
          } elsif ($_->[0] == NRAW) {

@@ -11,22 +11,36 @@ my %def = (
 );
 
 my $stream_el = AnyEvent::XMPP::Node->new ('http://etherx.jabber.org/streams' => 'stream');
-$stream_el->add_decl_prefix ('jabber:client' => '');
-$stream_el->add_decl_prefix ('http://etherx.jabber.org/streams' => 'stream');
+$stream_el->add_decl_prefix ($_ => $def{$_}) for keys %def;
 
-my @input = (
-   $stream_el->as_string,
-   "<message>FOOAREE&amp;lt;&amp;lt;&amp;gt;&amp;gt;&amp;gt;</message>",
+my $iq_el = 
    simxml (defns => 'jabber:client', node => {
       name => 'iq', attrs => [ type => 'set' ], childs => [
-         { name => 'query', dns => 'roster' }
+         { name => 'query', dns => 'roster',
+            childs => [
+               { name => 'immed', ns => 'component', childs => [
+                  { name => 'test' },
+               ]},
+               { name => 'test2' }
+            ]
+         }
       ]
-   })->as_string,
+   });
+
+my @input = (
+   $stream_el->as_string (0, 0, {}, 1),
+   simxml (defns => 'component', node => {
+      name => 'message', attrs => [ to => "elmex\@jabber.org" ], childs => [
+         { name => 'body', childs => [ "Hi!" ] }
+      ]
+   })->as_string (0, 0, \%def),
+   $iq_el->as_string (0, 0, \%def),
 );
 
 my @expected_output = (
-   "<stream xmlns=\"http://etherx.jabber.org/streams\"/>",
-   "<message xmlns=\"jabber:client\">FOOAREE&amp;lt;&amp;lt;&amp;gt;&amp;gt;&amp;gt;</message>",
+   "<stream:stream/>",
+   '<ns1:message xmlns:ns1="jabber:component:accept" to="elmex@jabber.org"><ns1:body>Hi!</ns1:body></ns1:message>',
+   '<iq type="set"><ns1:query xmlns:ns1="jabber:iq:roster"><ns2:immed xmlns:ns2="jabber:component:accept"><ns1:test/></ns2:immed><ns1:test2/></ns1:query></iq>',
 );
 
 plan tests => scalar @input;
@@ -35,13 +49,14 @@ my $p = AnyEvent::XMPP::Parser->new;
 
 $p->reg_cb (received_stanza_xml => sub {
    my ($p, $node) = @_;
+   my $str;
    is (
-      $node->as_string,
+      $str = $node->as_string (0, 0, \%def),
       (shift @expected_output),
-      "stanza was parsed correctly and serialized correctly"
+      "[" . substr ($str, 0, 16) . "...] stanza was parsed correctly and serialized correctly"
    );
 });
 
 $p->init;
 
-for (@input) { warn "FEED[$_]\n"; $p->feed ($_) }
+for (@input) { $p->feed ($_) }
