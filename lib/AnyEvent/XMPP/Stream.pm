@@ -6,6 +6,8 @@ use AnyEvent::Handle;
 use AnyEvent::XMPP::Parser;
 use AnyEvent::XMPP::Error::Exception;
 use AnyEvent::XMPP::Util qw/dump_twig_xml/;
+use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
+use AnyEvent::XMPP::Node qw/simxml/;
 use Encode;
 
 our $DEBUG = 0;
@@ -40,9 +42,9 @@ AnyEvent::XMPP::Stream - Class for exchanging XMPP "XML" protocol messages.
          $self->current->stop; # important, see documentation!
       },
       recv => sub {
-         my ($stream, $stanza) = @_;
+         my ($stream, $node) = @_;
 
-         warn "recevied stanza type: " . $stanza->type . "\n";
+         warn "recevied stanza type: " . $node->meta->type . "\n";
       }
    );
 
@@ -113,12 +115,14 @@ sub new {
    my $self  = $class->SUPER::new (
       default_stream_namespace => 'client',
       stream_end_timeout       => 30,
+      enable_methods           => 1,
       @_
    );
 
    $self->{namespace_prefixes} = {
       $self->{default_stream_namespace} => '',
-      'http://etherx.jabber.org/streams' => 'stream',
+      xmpp_ns ('stream') => 'stream',
+      xmpp_ns ('xml')    => 'xml',
    };
 
    $self->{parser} =
@@ -127,31 +131,34 @@ sub new {
    $self->{parser}->reg_cb (
       stream_start => sub {
          my ($parser, $node) = @_;
-         $self->event (stream_start => $node);
+         $self->stream_start ($node);
+         $self->recv_stanza_xml ($node);
       },
       stream_end => sub {
-         $self->event ('stream_end');
-      },
-      received_stanza_xml => sub {
          my ($parser, $node) = @_;
-         $self->event (recv_stanza_xml => $node);
+         $self->recv_stanza_xml ($node);
+         $self->stream_end ($node);
       },
-      received_stanza => sub {
-         my ($parser, $stanza) = @_;
+      recv => sub {
+         my ($parser, $node) = @_;
 
-         if ($stanza->type eq 'error') {
-            $self->event (error =>
-               $self->{error} = AnyEvent::XMPP::Error::Stream->new (stanza => $stanza)
-            );
+         $node->meta (AnyEvent::XMPP::Meta->new ($node));
+          
+         my $type = $node->meta->type;
+
+         if ($type ne 'error') {
+            $self->recv ($node);
 
          } else {
-            $self->event (recv => $stanza);
+            $self->error (
+               $self->{error} = AnyEvent::XMPP::Error::Stream->new (node => $node)
+            );
          }
       },
       parse_error => sub {
          my ($parser, $ex, $data) = @_;
 
-         $self->event (error =>
+         $self->error (
             AnyEvent::XMPP::Error::Parser->new (
                exception => $ex, data => $data
             )
@@ -162,11 +169,11 @@ sub new {
    );
 
    $self->set_exception_cb (sub {
-      my ($ev, $ex) = @_;
+      my ($ex) = @_;
 
-      $self->event (error =>
+      $self->error (
          AnyEvent::XMPP::Error::Exception->new (
-            exception => "(" . $ev->dump . "): $ex",
+            exception => $ex,
             context   => 'stream event callback'
          )
       );
@@ -174,13 +181,19 @@ sub new {
 
    $self->reg_cb (
       ext_after_send => sub {
-         my ($self, $stanza) = @_;
+         my ($self, $node) = @_;
 
-         push @{$self->{write_done_queue}}, $stanza->sent_cb
-            if $stanza->sent_cb;
+         if ($node->meta && $node->meta->sent_cb) {
+            push @{$self->{write_done_queue}}, $node->meta->sent_cb
+         }
 
          $self->write_data (
-            my $stanza_data = $stanza->serialize ($self->{namespace_prefixes}));
+            my $stanza_data =
+               $node->as_string (0, {
+                  %{$self->{namespace_prefixes}},
+                  $node->namespace => ''
+               })
+         );
 
          $self->event (sent_stanza_xml => $stanza_data);
       },
@@ -192,31 +205,6 @@ sub new {
               ." warning!\n";
       }
    );
-
-   {
-      my @cbs;
-
-      for (qw/
-         error
-         connected
-         connect_error
-         disconnected
-         stream_start
-         stream_end
-         recv_stanza_xml
-         sent_stanza_xml
-         recv
-         send_buffer_empty
-         debug_recv
-         debug_send
-      /) {
-         no strict 'refs';
-
-         push @cbs, ($_ => \&{$_})
-      }
-
-      $self->reg_cb (@cbs);
-   }
 
    return $self
 }
@@ -342,7 +330,7 @@ sub set_handle {
 =item $stream->write_data ($data)
 
 Please only use this method if you know what you are doing, for usual stanza
-sending you should use the C<send> method (see below) and L<AnyEvent::XMPP::Stanza>
+sending you should use the C<send> method (see below) and L<AnyEvent::XMPP::Node>
 objects.
 
 This method will write out unicode character data to the TCP/TLS connection.
@@ -363,12 +351,19 @@ sub write_data {
    }) if $self->is_connected;
 }
 
-=item $stream->send ($stanza)
+=item $stream->send ($node)
 
-B<NOTE>: The default namespace the C<$stanza> is in, is decided by the
-C<default_stream_namespace> argument to the constructor of this class.  That
-means that the stanza itself doesn't store it's namespace and that it depends
-on what kind of connection the stanza is sent out.
+This method will serialize and send the L<AnyEvent::XMPP::Node> object
+C<$node>, which may have L<AnyEvent::XMPP::Meta> information attached to it
+(see C<meta> method of C<$node>).
+
+Sending may be intercepted by stopping the generated C<send> event.
+
+B<NOTE:> The C<$node> will be serialized as if it's own namespace is the
+default namespace. This is done so that it is ensured that no prefixes are
+generated for your stanza's namespace, as it is required by XMPP.  Of course
+that means that stanzas of different namespaces can't be distinguished from the
+default namespace of the stream anymore.
 
 =item $stream->starttls ($state, $ctx)
 
@@ -412,9 +407,12 @@ sub starttls {
 
 =item $stream->send_header ($lang, $version, %attrs)
 
-This method sends the XMPP stream header. For more details about the
-meaning of the arguments C<$lang>, C<$version> and C<%attrs>
-consult the documentation of the C<init_stream> method of C<AnyEvent::XMPP::Writer>.
+This method sends the XMPP stream header. C<$lang> is the language
+of the messages of this stream, the default is 'en'.
+C<$version> is the version for this stream, the default is '1.0'.
+And if C<$version> is the empty string no version attribute will be generated.
+
+You may pass other attributes for the stream start tag in C<%attrs>.
 
 =cut
 
@@ -422,7 +420,23 @@ sub send_header {
    my ($self, $lang, $version, %attrs) = @_;
    return unless $self->{connected};
 
-   $self->send (AnyEvent::XMPP::StreamStartStanza->new ($lang, $version, %attrs));
+   $version = '1.0' unless defined $version;
+   $lang    = 'en'  unless defined $lang;
+
+   my $node = simxml (
+      defns => 'stream',
+      node => {
+         name => 'stream',
+         attrs => [
+            [xmpp_ns ('xml'), 'lang'] => $lang,
+            ($version ne '' ? (version => $version) : ()),
+            %attrs
+         ]
+      }
+   );
+   $node->add_decl_prefix (xmpp_ns ('stream') => 'stream');
+   $node->add_decl_prefix ($self->{default_stream_namespace} => '');
+   $self->send ($node);
 }
 
 =item $stream->send_end ()
@@ -600,9 +614,11 @@ an L<AnyEvent::XMPP::Node> object.
 
 sub stream_start { }
 
-=item stream_end
+=item stream_end => $node
 
-This event is emitted whenever the stream end tag has been received.
+This event is emitted whenever the stream end tag has been received.  C<$node>
+is the L<AnyEvent::XMPP::Node> object containing information about the stream
+element.
 
 =cut
 
@@ -639,7 +655,7 @@ sub recv_stanza_xml {
 
 =item sent_stanza_xml => $data
 
-This debugging event is generated when a L<AnyEvent::XMPP::Stanza> has been
+This debugging event is generated when a L<AnyEvent::XMPP::Node> has been
 serialized and sent out. You will catch 99% of the outside traffic with this,
 maybe except exotic things like whitespace pings.
 For a 100% coverage always use the C<debug_send> event!
@@ -655,28 +671,31 @@ sub sent_stanza_xml {
    }
 }
 
-=item recv => $stanza
+=item recv => $node
 
-This event is emitted when an XMPP stanza has been received. C<$stanza>
-is an object instance which is derived from L<AnyEvent::XMPP::Stanza>.
+This event is emitted when an XMPP stanza has been received. C<$node>
+is an L<AnyEvent::XMPP::Node> object, with meta information attached
+(see C<meta> method of L<AnyEvent::XMPP::Node>).
+
+The attached meta information is an object of type L<AnyEvent::XMPP::Meta>.
 
 =cut
 
 sub recv {
-   my ($self, $stanza) = @_;
+   my ($self, $node) = @_;
 }
 
-=item send => $stanza
+=item send => $node
 
-This event is emitted when a C<$stanza> (see C<recv> event about the type) is
+This event is emitted when a C<$node> (see C<recv> event about the type) is
 about to be send. If you stop the event the stanza will not be transmitted.
+
+You may attach a meta information object of L<AnyEvent::XMPP::Meta> to the C<$node>.
 
 =cut
 
 sub send {
-   my ($self, $stanza) = @_;
-
-   $self->event (send => $stanza);
+   my ($self, $node) = @_;
 }
 
 =item send_buffer_empty
@@ -695,8 +714,9 @@ afterwards you can do this:
 
    $stream->send_end;
 
-B<NOTE>: The L<AnyEvent::XMPP::Stanza> class provides means to set
-callbacks for execution when the data for a stanza has been sent out.
+B<NOTE>: The L<AnyEvent::XMPP::Meta> meta information, which can be attached to
+L<AnyEvent::XMPP::Node> objects, provides means to set callbacks for execution
+when the data for a stanza has been sent out.
 
 =cut
 

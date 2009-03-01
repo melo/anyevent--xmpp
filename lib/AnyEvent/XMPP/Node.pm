@@ -13,6 +13,7 @@ use constant {
    NODES  => 3,
    META   => 4,
    NSDECLS => 5,
+   FLAGS   => 6
 };
 
 use constant {
@@ -20,6 +21,11 @@ use constant {
    NTEXT   => 1,
    NPARS   => 2,
    NRAW    => 3,
+};
+
+use constant {
+   ONLY_START => 1,
+   ONLY_END   => 2,
 };
 
 =head1 NAME
@@ -220,17 +226,37 @@ sub name {
    $_[0]->[NAME]
 }
 
-=item B<namespace>
+=item B<namespace ($ns)>
 
-Returns the namespace URI of this node.
+Returns or sets (if C<$ns> is defined) the namespace URI of this node.
 
 =cut
 
 sub namespace {
-   $_[0]->[NS]
+   my ($self, $ns) = @_;
+
+   $ns = xmpp_ns_maybe ($ns);
+
+   if (defined $ns) {
+      for my $k (keys %{$self->[ATTRS]}) {
+         if ($k =~ /^\Q$self->[NS]\E\|(.*)$/) {
+            $self->[ATTRS]->{$ns . '|' . $1} =
+               delete $self->[ATTRS]->{$k};
+         }
+      }
+
+      return $self->[NS] = $ns;
+   } else {
+      return $self->[NS]
+   }
 }
 
 =item B<meta ($meta)>
+
+This method will return or set (if C<$meta> is defined) the meta information of
+this node. This is mainly used by the C<analyze> function of the
+L<AnyEvent::XMPP::Stanza> package, to assign special meta objects, which store
+the results of the analyze process.
 
 =cut
 
@@ -437,7 +463,7 @@ C<$default_namespace> is the default namespace this element is in.
 
 # Welcome to XML nightmare!!!!!!
 sub as_string {
-   my ($self, $indent, $idcnt, $subdecls, $only_start) = @_;
+   my ($self, $indent, $subdecls, $idcnt) = @_;
 
    my $name      = $self->[NAME];
    my $ns        = $self->[NS];
@@ -481,18 +507,9 @@ sub as_string {
       push @attrs, [$name, $self->[ATTRS]->{$ak}, $pref]
    }
 
-   my $child_data =
-      join '', map {
-         my $str;
-         if ($_->[0] == NNODE) {
-            $str = $_->[1]->as_string ($indent, $idcnt, $subdecls)
-         } elsif ($_->[0] == NTEXT) {
-            $str = xml_escape ($_->[1])
-         } elsif ($_->[0] == NRAW) {
-            $str = ${$_->[1]};
-         }
-         $str . ($indent ? "\n" : "")
-      } @{$self->[NODES]};
+   if ($self->[FLAGS] & ONLY_END) {
+      return "</$elem_name>";
+   }
 
    my $start = 
       "<$elem_name"
@@ -508,13 +525,31 @@ sub as_string {
            )
         } @attrs);
 
-   return $start . ">" . ($indent ? "\n" : '') if $only_start;
+   if ($self->[FLAGS] & ONLY_START) {
+      return $start . ">";
+   }
+
+   my $child_data =
+      join '', map {
+         my $str;
+
+         if ($_->[0] == NNODE) {
+            $str = $_->[1]->as_string ($indent, $subdecls, $idcnt)
+
+         } elsif ($_->[0] == NTEXT) {
+            $str = xml_escape ($_->[1])
+
+         } elsif ($_->[0] == NRAW) {
+            $str = ${$_->[1]};
+         }
+
+         $str . ($indent ? "\n" : "")
+      } @{$self->[NODES]};
 
    if ($indent) {
-      warn "$elem_name [$child_data]\n";
       return $start 
          . ($child_data ne ''
-              ?  ">\n" . (join "\n", map { "  " . $_ } split /\n/, $child_data)
+              ? ">\n" . (join "\n", map { "  " . $_ } split /\n/, $child_data)
                  . "\n</$elem_name>"
               : "/>")
    } else {
@@ -579,6 +614,22 @@ sub _to_sax_events {
       Name         => $self->name,
    });
 }
+
+
+=item $node->set_only_start ()
+
+This will set a flag that will prevent the element from having
+an end tag.
+
+=item $node->set_only_end ()
+
+This will set a flag that will prevent the element from having
+a start tag and contents.
+
+=cut
+
+sub set_only_start { $_[0]->[FLAGS] |= ONLY_START }
+sub set_only_end   { $_[0]->[FLAGS] |= ONLY_END   }
 
 =back
 

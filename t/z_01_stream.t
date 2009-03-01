@@ -22,16 +22,16 @@ $stream->reg_cb (
       print "ok 2 - connected\n";
 
       $stream->send_header;
-      $stream->reg_cb (send_buffer_empty => sub {
-         my ($stream) = @_;
-         $stream->current->unreg_me;
-         print "ok 4 - called send_buffer_empty\n";
-      });
-      my $stanza = new_iq (set =>
-         create => { defns => 'test', node => { name => 'test123' } }
-      );
-      $stanza->set_sent_cb (sub { $stream->disconnect ('done') });
-      $stream->send ($stanza);
+#      $stream->reg_cb (send_buffer_empty => sub {
+#         my ($stream) = @_;
+#         $stream->current->unreg_me;
+#         print "ok 4 - called send_buffer_empty\n";
+#      });
+#      my $stanza = new_iq (set =>
+#         create => { defns => 'test', node => { name => 'test123' } }
+#      );
+#      $stanza->set_sent_cb (sub { $stream->disconnect ('done') });
+#      $stream->send ($stanza);
          
    },
    connect_error => sub {
@@ -55,6 +55,7 @@ tcp_server undef, undef, sub {
       on_eof => sub { $cv->send },
       on_read => sub {
          $buf .= $hdl->rbuf;
+         warn "READ[$buf]\n";
          $hdl->rbuf = '';
       }
    );
