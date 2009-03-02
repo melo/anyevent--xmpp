@@ -1,7 +1,7 @@
 package AnyEvent::XMPP::Ext::Registration;
 use strict;
-use AnyEvent::XMPP::Util;
-use AnyEvent::XMPP::Namespaces qw/xmpp_ns new_iq/;
+use AnyEvent::XMPP::Util qw/new_iq/;
+use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Ext::RegisterForm;
 
 =head1 NAME

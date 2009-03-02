@@ -2,13 +2,11 @@
 use strict;
 no warnings;
 
-use Test::More tests => 2;
 use AnyEvent;
 use AnyEvent::XMPP::Test;
 use AnyEvent::XMPP::Stream::Client;
 use AnyEvent::XMPP::Ext::Registration;
 use AnyEvent::XMPP::Util qw/split_jid/;
-use AnyEvent::XMPP::Stanza;
 
 AnyEvent::XMPP::Test::check ('client');
 

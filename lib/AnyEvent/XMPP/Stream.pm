@@ -182,7 +182,7 @@ sub new {
       ext_after_send => sub {
          my ($self, $node) = @_;
 
-         if ($node->meta && $node->meta->sent_cbs) {
+         if ($node->meta->sent_cbs) {
             push @{$self->{write_done_queue}}, $node->meta->sent_cbs
          }
 

@@ -480,7 +480,7 @@ sub new_iq {
    $node->attr ('type', $type);
 
    if (my $int = delete $args{create}) {
-      $node->add ($args{create});
+      $node->add ($int);
    }
 
    my @reply_info;

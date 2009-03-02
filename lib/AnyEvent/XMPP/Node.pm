@@ -1,5 +1,6 @@
 package AnyEvent::XMPP::Node;
 use strict;
+no warnings;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns_maybe/;
 use AnyEvent::XMPP::Util qw/xml_escape/;
 use AnyEvent::XMPP::Meta;
@@ -270,7 +271,7 @@ sub meta {
       : (
          $_[0]->[META]
            ? $_[0]->[META]
-           : $_[0]->[META] = AnyEvent::XMPP::Meta->new ($_[0], $_[0]->[NS])
+           : ($_[0]->[META] = AnyEvent::XMPP::Meta->new ($_[0], $_[0]->[NS]))
       )
 }
 
@@ -377,7 +378,7 @@ sub add {
    } elsif (@args > 0) {
       push @{$self->[NODES]}, [NNODE, $n = AnyEvent::XMPP::Node->new ($node, @args)];
    } elsif (ref ($node) eq 'HASH') {
-      push @{$self->[NODES]}, [NNODE, $n = simxml (%{$_[0]})];
+      push @{$self->[NODES]}, [NNODE, $n = simxml (%$node)];
    } else {
       push @{$self->[NODES]}, [NTEXT, $n = $node]
    }
