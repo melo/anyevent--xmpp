@@ -1,8 +1,7 @@
 package AnyEvent::XMPP::ResourceManager;
 use strict;
 no warnings;
-use AnyEvent::XMPP::Util qw/stringprep_jid/;
-use AnyEvent::XMPP::Stanza;
+use AnyEvent::XMPP::Util qw/stringprep_jid new_iq/;
 
 =head1 NAME
 
@@ -61,7 +60,7 @@ sub bind {
    $con->send (new_iq (set => create => {
       defns => 'bind', node => { name => 'bind', @req_res }
    }, cb => sub {
-      my ($stanza, $error) = @_;
+      my ($node, $error) = @_;
 
       if ($error) {
          $cb->(undef, $error);
@@ -75,7 +74,7 @@ sub bind {
          #}
 
       } else {
-         my @jid = $stanza->node->find_all ([qw/bind bind/], [qw/bind jid/]);
+         my @jid = $node->find_all ([qw/bind bind/], [qw/bind jid/]);
          my $jid = $jid[0]->text;
 
          # TODO: unless ($jid) { die "Got empty JID tag from server!\n" }

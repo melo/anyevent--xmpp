@@ -6,7 +6,6 @@ use AnyEvent::XMPP::Authenticator;
 use AnyEvent::XMPP::Util qw/split_jid join_jid simxml dump_twig_xml stringprep_jid cmp_jid/;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Error;
-use AnyEvent::XMPP::Stanza;
 use AnyEvent::XMPP::ResourceManager;
 use Carp qw/croak/;
 
@@ -283,23 +282,19 @@ sub new {
          delete $self->{timeout};
       },
       [recv_features => 50] => sub {
-         my ($self, $stanza) = @_;
+         my ($self, $node) = @_;
 
-         if (not ($self->{disable_ssl}) && $stanza->tls) {
+         if (not ($self->{disable_ssl}) && $node->meta->{tls}) {
             if (not $self->{ssl_enabled}) {
                $self->current->stop;
 
-               $self->send (
-                  AnyEvent::XMPP::Stanza->new ({
-                     defns => 'tls', node => { name => 'starttls' }
-                  })
-               );
+               $self->send (simxml (defns => 'tls', node => { name => 'starttls' }));
 
                $self->reg_cb (
                   ext_before_recv => sub {
-                     my ($self, $stanza) = @_;
+                     my ($self, $node) = @_;
 
-                     my $type = $stanza->type;
+                     my $type = $node->meta->{type};
 
                      if ($type eq 'tls_proceed') {
                         $self->starttls;
@@ -319,22 +314,22 @@ sub new {
          }
       },
       [recv_features => 40] => sub {
-         my ($self, $stanza) = @_;
+         my ($self, $node) = @_;
 
          if (not $self->{authenticated}) {
             $self->current->stop;
-            $self->event (pre_authentication => $stanza);
+            $self->event (pre_authentication => $node);
          }
       },
       ext_after_pre_authentication => sub {
-         my ($self, $stanza) = @_;
+         my ($self, $node) = @_;
 
-         $self->start_authenticator ($stanza);
+         $self->start_authenticator ($node);
       },
       [recv_features => 30] => sub {
-         my ($self, $stanza) = @_;
+         my ($self, $node) = @_;
 
-         if (not defined ($self->{jid}) && $stanza->bind) {
+         if (not defined ($self->{jid}) && $node->meta->{bind}) {
             $self->{res_manager}->bind ($self->{resource}, sub {
                my ($jid, $error) = @_;
 
@@ -350,17 +345,17 @@ sub new {
          }
       },
       send => sub {
-         my ($self, $stanza) = @_;
+         my ($self, $node) = @_;
 
-         $self->{tracker}->register ($stanza);
+         $self->{tracker}->register ($node);
 
          if (xmpp_ns ($self->{default_stream_namespace}) eq xmpp_ns ('client')) {
-            if (cmp_jid ($stanza->to, $self->{server_jid})) {
-               $stanza->set_to (undef);
+            if (cmp_jid ($node->attr ('to'), $self->{server_jid})) {
+               $node->attr (to => undef);
             }
 
-            if (cmp_jid ($stanza->from, $self->{jid})) {
-               $stanza->set_from (undef);
+            if (cmp_jid ($node->attr ('from'), $self->{jid})) {
+               $node->attr (from => undef);
             }
          }
       },
@@ -462,8 +457,8 @@ sub credentials {
 
 =item $con->features ()
 
-Returns the last received C<features> stanza in form of a
-L<AnyEvent::XMPP::FeatureStanza> object.
+Returns the last received C<features> stanza in form of an
+L<AnyEvent::XMPP::Node> object.
 
 =cut
 
@@ -488,15 +483,15 @@ sub is_ready {
    $_[0]->is_connected && $_[0]->{authenticated} && defined $_[0]->{jid}
 }
 
-=item $con->send ($stanza)
+=item $con->send ($node)
 
 This method is used to send an XMPP stanza directly over
-the connection. 
+the connection. The type of C<$node> is L<AnyEvent::XMPP::Node>.
 
 =cut
 
 sub start_authenticator {
-   my ($self, $stanza) = @_;
+   my ($self, $node) = @_;
 
    $self->{authenticator}
       = AnyEvent::XMPP::Authenticator->new (connection => $self);
@@ -528,7 +523,7 @@ sub start_authenticator {
       }
    );
 
-   $self->{authenticator}->start ($stanza);
+   $self->{authenticator}->start ($node);
 }
 
 =back
@@ -570,7 +565,7 @@ sub stream_ready {
    }
 }
 
-=item recv => $stanza
+=item recv => $node
 
 See also L<AnyEvent::XMPP::Stream> about the semantics of this event.
 
@@ -591,29 +586,31 @@ it are defaulted to the server JID (C<from>) and your full JID (C<to>).
 =cut
 
 sub recv {
-   my ($self, $stanza) = @_;
+   my ($self, $node) = @_;
 
-   $self->SUPER::recv ($stanza);
+   $self->SUPER::recv ($node);
 
    unless ($self->is_ready) {
       $self->current->stop;
    }
 
    if (defined (my $resjid = $self->{res_manager}->any_jid)) {
-      $stanza->set_default_to ($resjid);
+      $node->attr (to => $resjid)
+         unless defined $node->attr ('to');
    }
 
    if (defined $self->{server_jid}) {
-      $stanza->set_default_from ($self->{server_jid});
+      $node->attr (from => $self->{server_jid})
+         unless defined $node->attr ('from');
    }
 
-   $self->{tracker}->handle_stanza ($stanza);
+   $self->{tracker}->handle_stanza ($node);
 
-   my $type = $stanza->type;
+   my $type = $node->meta->{type};
 
    if ($type eq 'features') {
-      $self->{features} = $stanza;
-      $self->event (recv_features => $stanza);
+      $self->{features} = $node;
+      $self->event (recv_features => $node);
    }
 }
 

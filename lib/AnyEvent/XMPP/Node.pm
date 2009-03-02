@@ -2,16 +2,17 @@ package AnyEvent::XMPP::Node;
 use strict;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns_maybe/;
 use AnyEvent::XMPP::Util qw/xml_escape/;
+use AnyEvent::XMPP::Meta;
 require Exporter;
 our @EXPORT_OK = qw/simxml/;
 our @ISA = qw/Exporter/;
 
 use constant {
-   NS     => 0,
-   NAME   => 1,
-   ATTRS  => 2,
-   NODES  => 3,
-   META   => 4,
+   NS      => 0,
+   NAME    => 1,
+   ATTRS   => 2,
+   NODES   => 3,
+   META    => 4,
    NSDECLS => 5,
    FLAGS   => 6
 };
@@ -251,19 +252,26 @@ sub namespace {
    }
 }
 
-=item B<meta ($meta)>
+=item B<meta>
 
 This method will return or set (if C<$meta> is defined) the meta information of
-this node. This is mainly used by the C<analyze> function of the
-L<AnyEvent::XMPP::Stanza> package, to assign special meta objects, which store
-the results of the analyze process.
+this node. The meta information should be an L<AnyEvent::XMPP::Meta> object,
+containing annotations about the content of the node.
+
+B<NOTE>: The meta information object will be auto-generated when this method
+is called for the first time. So make sure you built up the essential
+parts of your stanza before you request the meta information.
 
 =cut
 
 sub meta {
    defined $_[1]
       ? $_[0]->[META] = $_[1]
-      : $_[0]->[META]
+      : (
+         $_[0]->[META]
+           ? $_[0]->[META]
+           : $_[0]->[META] = AnyEvent::XMPP::Meta->new ($_[0], $_[0]->[NS])
+      )
 }
 
 =item B<eq ($namespace_or_alias, $name) or eq ($node)>
@@ -321,7 +329,11 @@ C<$value> is optional, and if not undef it will replace the attribute value.
 
 sub attr {
    defined $_[2]
-      ? $_[0]->[ATTRS]->{$_[0]->[NS] . "|" . $_[1]} = $_[2]
+      ? (
+           defined $_[2]
+              ? $_[0]->[ATTRS]->{$_[0]->[NS] . "|" . $_[1]} = $_[2]
+              : delete $_[0]->[ATTRS]->{$_[0]->[NS] . "|" . $_[1]}
+        )
       : $_[0]->[ATTRS]->{$_[0]->[NS] . "|" . $_[1]}
 }
 
@@ -346,6 +358,8 @@ sub attrs { $_[0]->[ATTRS] }
 
 =item B<add ($text)>
 
+=item B<add ($simxml_args = { ... })>
+
 =item B<add (\$unescaped)>
 
 Adds a sub-node to the current node.
@@ -362,6 +376,8 @@ sub add {
       push @{$self->[NODES]}, [NRAW,  $n = $node];
    } elsif (@args > 0) {
       push @{$self->[NODES]}, [NNODE, $n = AnyEvent::XMPP::Node->new ($node, @args)];
+   } elsif (ref ($node) eq 'HASH') {
+      push @{$self->[NODES]}, [NNODE, $n = simxml (%{$_[0]})];
    } else {
       push @{$self->[NODES]}, [NTEXT, $n = $node]
    }
@@ -523,7 +539,7 @@ sub as_string {
               : "$pref" . ($name ne '' ? "\:$name" : '')
                  . '="' . xml_escape ($value) . "\""
            )
-        } @attrs);
+        } grep { defined $_->[1] } @attrs);
 
    if ($self->[FLAGS] & ONLY_START) {
       return $start . ">";

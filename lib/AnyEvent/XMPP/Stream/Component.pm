@@ -93,19 +93,20 @@ sub new {
                $self->{parser}->{parser}->xml_escape ($self->{secret}));
          my $handshake_secret = lc sha1_hex ($id . $secret);
 
-         my $stanza = AnyEvent::XMPP::Stanza->new (type => 'handshake');
-
-         $stanza->add ({ node => $handshake_secret });
-
-         $self->send ($stanza);
+         $self->send (simxml (
+            defns => 'component', node => {
+               name => 'handshake',
+               childs => [ $handshake_secret ]
+            }
+         ));
       },
       recv => sub {
-         my ($self, $stanza) = @_;
+         my ($self, $node) = @_;
 
          unless ($self->{authenticated}) {
             $self->current->stop;
 
-            if ($stanza->node->eq (component => 'handshake')) {
+            if ($node->eq (component => 'handshake')) {
                $self->{authenticated} = 1;
                $self->event ('stream_ready');
             }

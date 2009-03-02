@@ -12,6 +12,8 @@ This is just the definition of an interface for sending and receiving stanzas.
 Following modules implement it:
 
    AnyEvent::XMPP::Stream
+   AnyEvent::XMPP::Stream::Client
+   AnyEvent::XMPP::Stream::Component
 
 This module merely defines a convention which methods and
 events are provided.
@@ -22,13 +24,13 @@ Every 'delivery' object must implement following methods:
 
 =over 4
 
-=item B<send ($stanza)>
+=item B<send ($node)>
 
-C<$stanza> must be an object of the class L<AnyEvent::XMPP::Stanza>
+C<$node> must be an object of the class L<AnyEvent::XMPP::Node>
 or a subclass of it.
 
-This method should deliver the C<$stanza> as if it was 'sent'.  For
-L<AnyEvent::XMPP::Stream> this means that the C<$stanza> will be sent to
+This method should deliver the C<$node> as if it was 'sent'.  For
+L<AnyEvent::XMPP::Stream> this means that the C<$node> will be sent to
 the server.
 
 Other delivery objects might have other semantics w.r.t. sending a stanza.
@@ -41,13 +43,13 @@ Every 'delivery' object must provide these events:
 
 =over 4
 
-=item send => $stanza
+=item send => $node
 
-This event is emitted when the C<$stanza> is on it's way to the
+This event is emitted when the C<$node> is on it's way to the
 destination. Stopping this event usually results in the stanza not
 being sent.
 
-=item recv => $stanza
+=item recv => $node
 
 This event should be generated whenever a stanza for
 further processing was received. Interested parties should

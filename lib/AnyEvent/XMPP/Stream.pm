@@ -142,9 +142,8 @@ sub new {
       recv => sub {
          my ($parser, $node) = @_;
 
-         $node->meta (AnyEvent::XMPP::Meta->new ($node));
-          
-         my $type = $node->meta->type;
+         my $meta = $node->meta;
+         my $type = $meta->{type};
 
          if ($type ne 'error') {
             $self->recv ($node);
@@ -183,8 +182,8 @@ sub new {
       ext_after_send => sub {
          my ($self, $node) = @_;
 
-         if ($node->meta && $node->meta->sent_cb) {
-            push @{$self->{write_done_queue}}, $node->meta->sent_cb
+         if ($node->meta && $node->meta->sent_cbs) {
+            push @{$self->{write_done_queue}}, $node->meta->sent_cbs
          }
 
          $self->write_data (

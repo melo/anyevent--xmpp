@@ -177,11 +177,11 @@ sub init_new_form {
 }
 
 sub _get_legacy_form {
-   my ($self, $stanza) = @_;
+   my ($self, $node) = @_;
 
    my $form = {};
 
-   my ($qnode) = $stanza->node->find_all ([qw/register query/]);
+   my ($qnode) = $node->find_all ([qw/register query/]);
 
    return $form unless $qnode;
 
@@ -194,18 +194,18 @@ sub _get_legacy_form {
    $form
 }
 
-sub init_from_stanza {
-   my ($self, $stanza) = @_;
+sub init_from_node {
+   my ($self, $node) = @_;
 
-   if (my (@form) = $stanza->node->find_all ([qw/register query/], [qw/data_form x/])) {
+   if (my (@form) = $node->find_all ([qw/register query/], [qw/data_form x/])) {
       $self->init_new_form (@form);
    }
 
-   if (my ($xoob) = $stanza->node->find_all ([qw/register query/], [qw/x_oob x/])) {
+   if (my ($xoob) = $node->find_all ([qw/register query/], [qw/x_oob x/])) {
       $self->{oob} = AnyEvent::XMPP::Ext::OOB::url_from_node ($xoob);
    }
 
-   $self->{legacy_form} = $self->_get_legacy_form ($stanza);
+   $self->{legacy_form} = $self->_get_legacy_form ($node);
 }
 
 =item B<answer_form_to_simxml>

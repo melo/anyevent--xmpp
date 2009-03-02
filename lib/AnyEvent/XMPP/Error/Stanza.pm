@@ -1,5 +1,4 @@
 package AnyEvent::XMPP::Error::Stanza;
-use AnyEvent::XMPP::Stanza;
 use AnyEvent::XMPP::Error;
 use strict;
 our @ISA = qw/AnyEvent::XMPP::Error/;
@@ -12,9 +11,34 @@ Subclass of L<AnyEvent::XMPP::Error>
 
 =cut
 
+our %STANZA_ERRORS = (
+   'bad-request'             => ['modify', 400],
+   'conflict'                => ['cancel', 409],
+   'feature-not-implemented' => ['cancel', 501],
+   'forbidden'               => ['auth',   403],
+   'gone'                    => ['modify', 302],
+   'internal-server-error'   => ['wait',   500],
+   'item-not-found'          => ['cancel', 404],
+   'jid-malformed'           => ['modify', 400],
+   'not-acceptable'          => ['modify', 406],
+   'not-allowed'             => ['cancel', 405],
+   'not-authorized'          => ['auth',   401],
+   'payment-required'        => ['auth',   402],
+   'recipient-unavailable'   => ['wait',   404],
+   'redirect'                => ['modify', 302],
+   'registration-required'   => ['auth',   407],
+   'remote-server-not-found' => ['cancel', 404],
+   'remote-server-timeout'   => ['wait',   504],
+   'resource-constraint'     => ['wait',   500],
+   'service-unavailable'     => ['cancel', 503],
+   'subscription-required'   => ['auth',   407],
+   'undefined-condition'     => ['cancel', 500],
+   'unexpected-request'      => ['wait',   400],
+);
+
 sub init {
    my ($self) = @_;
-   my $sta = $self->stanza;
+   my $sta = $self->node;
 
    unless (defined $sta) {
       $self->{error_cond} = 'client-timeout';
@@ -55,8 +79,8 @@ sub init {
    }
 
    if (not ($self->{error_cond}) && defined $self->{error_code}) {
-      for my $er (keys %AnyEvent::XMPP::Stanza::STANZA_ERRORS) {
-         my $ern = $AnyEvent::XMPP::Stanza::STANZA_ERRORS{$er};
+      for my $er (keys %STANZA_ERRORS) {
+         my $ern = $STANZA_ERRORS{$er};
          if ($ern->[1] == $self->{error_code} && $ern->[0] eq $self->{error_type}) {
             $self->{error_cond} = $er;
             last;
@@ -65,7 +89,7 @@ sub init {
    }
 
    if (!(defined $self->{error_code}) && $self->{error_cond}) {
-      my $ern = $AnyEvent::XMPP::Stanza::STANZA_ERRORS{$self->{error_cond}};
+      my $ern = $STANZA_ERRORS{$self->{error_cond}};
       $self->{error_type} = $ern->[0];
       $self->{error_code} = $ern->[1];
    }
@@ -75,9 +99,9 @@ sub init {
 
 =over 4
 
-=item B<stanza ()>
+=item B<node ()>
 
-Returns the L<AnyEvent::XMPP::Stanza> object for this Stanza error.
+Returns the L<AnyEvent::XMPP::Node> object for this Stanza error.
 This method returns undef if the stanza timeouted.
 
 In the case of a timeout the C<condition> method returns C<client-timeout>,

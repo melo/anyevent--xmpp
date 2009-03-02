@@ -4,9 +4,9 @@ no warnings;
 use MIME::Base64;
 use Digest::SHA1 qw/sha1_hex/;
 use Authen::SASL qw/Perl/;
-use AnyEvent::XMPP::Stanza;
 use AnyEvent::XMPP::IQTracker;
-use AnyEvent::XMPP::Util qw/join_jid/;
+use AnyEvent::XMPP::Util qw/join_jid new_iq/;
+use AnyEvent::XMPP::Node;
 use Encode;
 use Digest::SHA1 qw/sha1_hex/;
 
@@ -44,19 +44,19 @@ sub new {
    $self->{regid} =
       $self->{connection}->reg_cb (
          ext_before_recv => sub {
-            my ($con, $stanza) = @_;
+            my ($con, $node) = @_;
 
-            my $type = $stanza->type;
+            my $type = $node->meta->{type};
 
             if ($type eq 'sasl_challenge') {
-               $self->construct_sasl_response ($stanza->node->text);
+               $self->construct_sasl_response ($node->text);
 
             } elsif ($type eq 'sasl_success') {
                $self->event ('auth');
                $con->current->unreg_me;
 
             } elsif ($type eq 'sasl_failure') {
-               my $error = AnyEvent::XMPP::Error::SASL->new (stanza => $stanza);
+               my $error = AnyEvent::XMPP::Error::SASL->new (node => $node);
                $self->event (auth_fail => $error);
                $con->current->unreg_me;
             }
@@ -100,14 +100,14 @@ sub construct_sasl_auth {
       $self->{sasl} = $mech;
    }
 
-   $self->{connection}->send (AnyEvent::XMPP::Stanza->new ({
+   $self->{connection}->send (simxml (
       defns => 'sasl', node => {
          name => 'auth', attrs => [ mechanism => $self->{sasl}->mechanism ],
          childs => [
             MIME::Base64::encode_base64 ($data, '')
          ]
       }
-   }));
+   ));
 }
 
 sub construct_sasl_response {
@@ -124,11 +124,11 @@ sub construct_sasl_response {
       }
    }
 
-   $self->{connection}->send (AnyEvent::XMPP::Stanza->new ({
+   $self->{connection}->send (simxml (
       defns => 'sasl', node => {
          name => 'response', childs => [ MIME::Base64::encode_base64 ($ret, '') ]
       }
-   }));
+   ));
 }
 
 sub send_sasl_auth {
@@ -155,13 +155,13 @@ sub request_iq_fields {
          # childs => [ { name => 'username', childs => [ $self->{username} ] } ] 
       }
    }, cb => sub {
-      my ($stanza, $err) = @_;
+      my ($node, $err) = @_;
 
       if ($err) {
          $cb->();
          
       } else {
-         my (@query) = $stanza->node->find_all ([qw/auth query/]);
+         my (@query) = $node->find_all ([qw/auth query/]);
 
          if (@query) {
             my $fields = {};
@@ -234,11 +234,11 @@ sub send_iq_auth {
 }
 
 sub start {
-   my ($self, $stanza) = @_;
+   my ($self, $node) = @_;
 
    my $default_iq_fields = { username => 1, password => 1, resource => 1 };
 
-   unless ($stanza) {
+   unless ($node) {
       # This is a hack for jabberd 1.4.2, VERY OLD Jabber stuff.
       $self->send_iq_auth ($default_iq_fields);
       return;
@@ -248,8 +248,8 @@ sub start {
    # stream features! We all love the depreacted XEP-0078, eh?
    # => this means we don't check it ...
 
-   if (not ($self->{connection}->{disable_sasl}) && $stanza->sasl_mechs) {
-      $self->send_sasl_auth ($stanza->sasl_mechs);
+   if (not ($self->{connection}->{disable_sasl}) && $node->meta->{sasl_mechs}) {
+      $self->send_sasl_auth ($node->meta->{sasl_mechs});
 
    } elsif (not $self->{connection}->{disable_iq_auth}) {
       $self->request_iq_fields (sub {
@@ -317,7 +317,7 @@ sub init {
    my ($self) = @_;
 
    my $error;
-   for ($self->stanza->node->nodes) {
+   for ($self->node->nodes) {
       $error = $_->name;
       last
    }

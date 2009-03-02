@@ -1,9 +1,8 @@
 package AnyEvent::XMPP::Ext::Registration;
 use strict;
 use AnyEvent::XMPP::Util;
-use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
+use AnyEvent::XMPP::Namespaces qw/xmpp_ns new_iq/;
 use AnyEvent::XMPP::Ext::RegisterForm;
-use AnyEvent::XMPP::Stanza;
 
 =head1 NAME
 
@@ -141,17 +140,17 @@ sub send_registration_request {
    $self->{delivery}->send (new_iq (get => create => {
       defns => 'register', node => { name => 'query' }
    }, cb => sub {
-      my ($stanza, $error) = @_;
+      my ($node, $error) = @_;
 
       my $form;
-      if ($stanza) {
+      if ($node) {
          $form = AnyEvent::XMPP::Ext::RegisterForm->new;
-         $form->init_from_stanza ($stanza);
+         $form->init_from_node ($node);
 
       } else {
          $error =
             AnyEvent::XMPP::Error::Register->new (
-               stanza => $error->stanza, register_state => 'register'
+               node => $error->node, register_state => 'register'
             );
       }
 
@@ -162,16 +161,16 @@ sub send_registration_request {
 sub _error_or_form_cb {
    my ($self, $e, $cb) = @_;
 
-   $e = $e->stanza;
+   $e = $e->node;
 
    my $error =
       AnyEvent::XMPP::Error::Register->new (
-         stanza => $e, register_state => 'submit'
+         node => $e, register_state => 'submit'
       );
 
    if ($e->node->find_all ([qw/register query/], [qw/data_form x/])) {
       my $form = AnyEvent::XMPP::Ext::RegisterForm->new;
-      $form->init_from_stanza ($e);
+      $form->init_from_node ($e);
 
       $cb->($self, 0, $error, $form)
    } else {
@@ -197,9 +196,9 @@ sub send_unregistration_request {
       defns => 'register',
       node => { name => 'query', childs => [ { name => 'remove' } ] }
    }, cb => sub {
-      my ($stanza, $error) = @_;
+      my ($node, $error) = @_;
 
-      if ($stanza) {
+      if ($node) {
          $cb->($self, 1)
       } else {
          $self->_error_or_form_cb ($error, $cb);
@@ -229,9 +228,9 @@ sub send_password_change_request {
          { ns => 'register', name => 'password', childs => [ $password ] },
       ]}
    }, sub {
-      my ($stanza, $error) = @_;
+      my ($node, $error) = @_;
 
-      if ($stanza) {
+      if ($node) {
          $cb->($self, 1, undef, undef)
 
       } else {
@@ -271,9 +270,9 @@ sub submit_form {
          $form->answer_form_to_simxml
       ]}
    }, cb => sub {
-      my ($stanza, $error) = @_;
+      my ($node, $error) = @_;
 
-      if ($stanza) {
+      if ($node) {
          $cb->($self, 1, undef, undef)
 
       } else {

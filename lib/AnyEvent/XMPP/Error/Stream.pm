@@ -14,7 +14,7 @@ Subclass of L<AnyEvent::XMPP::Error>
 
 sub init {
    my ($self) = @_;
-   my $node = $self->stanza->node;
+   my $node = $self->node;
 
    my @txt = $node->find_all ([qw/streams text/]);
    my $error;
@@ -49,14 +49,14 @@ sub init {
 
 =over 4
 
-=item B<stanza ()>
+=item B<node ()>
 
-Returns the L<AnyEvent::XMPP::Stanza> object for this stream error.
+Returns the L<AnyEvent::XMPP::Node> object for this stream error.
 
 =cut
 
-sub stanza {
-   $_[0]->{stanza}
+sub node {
+   $_[0]->{node}
 }
 
 =item B<name ()>

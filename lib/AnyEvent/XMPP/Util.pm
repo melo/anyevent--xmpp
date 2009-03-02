@@ -4,7 +4,7 @@ no warnings;
 use Encode;
 use Net::LibIDN qw/idn_prep_name idn_prep_resource idn_prep_node/;
 use AnyEvent::Socket;
-use AnyEvent::XMPP::Namespaces qw/xmpp_ns_maybe/;
+use AnyEvent::XMPP::Namespaces qw/xmpp_ns_maybe xmpp_ns/;
 require Exporter;
 our @EXPORT_OK = qw/resourceprep nodeprep prep_join_jid join_jid
                     split_jid stringprep_jid prep_bare_jid bare_jid
@@ -15,6 +15,7 @@ our @EXPORT_OK = qw/resourceprep nodeprep prep_join_jid join_jid
                     from_xmpp_datetime to_xmpp_datetime to_xmpp_time
                     xmpp_datetime_as_timestamp
                     filter_xml_chars filter_xml_attr_hash_chars xml_escape
+                    new_iq
                     /;
 our @ISA = qw/Exporter/;
 
@@ -421,6 +422,78 @@ sub xml_escape {
    $str =~ s/&/&amp;/g;
    $str =~ s/"/&quot;/g;
    filter_xml_chars $str
+}
+
+=item $node = new_iq ($type, %attrs)
+
+This function generates a new L<AnyEvent::XMPP::IQ> object for you.
+
+C<$type> may be one of these 4 values:
+
+   set
+   get
+   result
+   error
+
+The destination and source of the stanza should be given by the C<to> and
+C<from> attributes in C<%args>. C<%args> may also contain additional XML attributes
+or these keys:
+
+=over 4
+
+=item create => C<$creation>
+
+This is the most important parameter for any XMPP stanza, it
+allows you to create the content of the stanza.
+
+TODO: Document it!
+
+=item cb => $callback
+
+If you expect a reply to this IQ stanza you have to set a C<$callback>.
+That callback will be called when either a response stanza was received
+or the timeout triggered.
+
+If the result was successful then the first argument of the callback
+will be the result stanza.
+
+If the result was an error or a timeout the first argument will be undef
+and the second will contain an L<AnyEvent::XMPP::Error::IQ> object,
+describing the error.
+
+=item timeout => $seconds
+
+This sets the timeout for this IQ stanza. It's entirely optional and
+will be set to a default IQ timeout (see also L<AnyEvent::XMPP::Connection>
+and L<AnyEvent::XMPP::IQTracker> for more details).
+
+If you set the timeout to 0 no timeout will be generated.
+
+=back
+
+=cut
+
+sub new_iq {
+   my ($type, %args) = @_;
+
+   my $node = AnyEvent::XMPP::Node->new (xmpp_ns ('client') => 'iq');
+   $node->attr ('type', $type);
+
+   if (my $int = delete $args{create}) {
+      $node->add ($args{create});
+   }
+
+   my @reply_info;
+   if (my $cb = delete $args{cb}) {
+      (@reply_info) = ($cb, $args{timeout});
+   }
+
+   $node->attr ($_ => $args{$_}) for keys %args;
+
+   my $meta = $node->meta;
+   $meta->set_reply_cb (@reply_info);
+
+   $node
 }
 
 =back

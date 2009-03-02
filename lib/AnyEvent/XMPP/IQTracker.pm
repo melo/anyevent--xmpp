@@ -46,19 +46,22 @@ sub new {
    return $self
 }
 
-=item B<register ($stanza)>
+=item B<register ($node)>
 
-This method will inspect the C<$stanza> and if required it will store tracking
+This method will inspect the C<$node> and if required it will store tracking
 information about the stanza.
 
 =cut
 
 sub register {
-   my ($self, $stanza) = @_;
+   my ($self, $node) = @_;
 
-   return unless $stanza->type eq 'iq' && $stanza->want_id;
+   my $meta = $node->meta;
 
-   my ($cb, $timeout) = ($stanza->reply_cb, $stanza->timeout);
+   return unless $meta->{type} eq 'iq';
+   return if not ($meta->{reply_cb}) || defined $node->attr ('id');
+
+   my ($cb, $timeout) = ($meta->{reply_cb}, $meta->{reply_timeout});
 
    return unless $cb;
 
@@ -66,43 +69,44 @@ sub register {
       $timeout = $self->{default_iq_timeout};
    }
 
-   $stanza->set_id (++$self->{id});
-   my $track = $self->{tracked}->{$stanza->id} = [ $cb ];
+   my $id = ++$self->{id};
+   $node->attr (id => $id);
+   my $track = $self->{tracked}->{$id} = [ $cb ];
 
    if ($timeout) {
       $track->[1] =
          AnyEvent->timer (
             after => $timeout,
             cb => sub {
-               delete $self->{tracked}->{$stanza->id};
+               delete $self->{tracked}->{$id};
                $cb->(undef, AnyEvent::XMPP::Error::IQ->new);
             }
          );
    }
 }
 
-=item B<handle_stanza ($stanza)>
+=item B<handle_stanza ($node)>
 
-This method inspects the incoming C<$stanza> if it is a reply
+This method inspects the incoming C<$node> if it is a reply
 to some request which was C<register>ed before.
 
 =cut
 
 sub handle_stanza {
-   my ($self, $stanza) = @_;
+   my ($self, $node) = @_;
 
-   return if $stanza->type ne 'iq';
+   return if $node->meta->{type} ne 'iq';
 
-   my $track = delete $self->{tracked}->{$stanza->id}
+   my $track = delete $self->{tracked}->{$node->attr ('id')}
       or return;
 
    delete $track->[1];
 
-   if ($stanza->iq_type eq 'result') {
-      $track->[0]->($stanza);
+   if ($node->attr ('type') eq 'result') {
+      $track->[0]->($node);
 
-   } elsif ($stanza->iq_type eq 'error') {
-      my $error = AnyEvent::XMPP::Error::IQ->new (stanza => $stanza);
+   } elsif ($node->attr ('type') eq 'error') {
+      my $error = AnyEvent::XMPP::Error::IQ->new (node => $node);
       $track->[0]->(undef, $error);
    }
 }

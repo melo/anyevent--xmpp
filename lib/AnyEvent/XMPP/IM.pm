@@ -3,7 +3,7 @@ use strict;
 no warnings;
 use AnyEvent::XMPP::Util qw/stringprep_jid/;
 use AnyEvent::XMPP::Stream::Client;
-use AnyEvent::XMPP::Stanza;
+use AnyEvent::XMPP::Util qw/new_iq/;
 use base qw/Object::Event/;
 
 our $DEBUG = 1;
@@ -61,9 +61,9 @@ sub send_session_iq {
       defns => 'session',
       node => { name => 'session' }
    }, cb => sub {
-      my ($stanza, $error) = @_;
+      my ($node, $error) = @_;
 
-      if ($stanza) {
+      if ($node) {
          $self->event (connected => $jid, $con->{peer_host}, $con->{peer_port});
 
       } else {
@@ -84,7 +84,7 @@ sub init_connection {
 }
 
 sub send {
-   my ($self, $stanza) = @_;
+   my ($self, $node) = @_;
 }
 
 sub add_account {
