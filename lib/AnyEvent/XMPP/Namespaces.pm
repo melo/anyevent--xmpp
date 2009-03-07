@@ -6,27 +6,32 @@ our @EXPORT_OK = qw/xmpp_ns set_xmpp_ns_alias xmpp_ns_maybe/;
 our @ISA = qw/Exporter/;
 
 our %NAMESPACES = (
-   client      => 'jabber:client',
-   component   => 'jabber:component:accept',
    stream      => 'http://etherx.jabber.org/streams',
+   xml         => 'http://www.w3.org/XML/1998/namespace',
+
    streams     => 'urn:ietf:params:xml:ns:xmpp-streams',
+   session     => 'urn:ietf:params:xml:ns:xmpp-session',
    stanzas     => 'urn:ietf:params:xml:ns:xmpp-stanzas',
    sasl        => 'urn:ietf:params:xml:ns:xmpp-sasl',
    bind        => 'urn:ietf:params:xml:ns:xmpp-bind',
    tls         => 'urn:ietf:params:xml:ns:xmpp-tls',
+
+   client      => 'jabber:client',
+   component   => 'jabber:component:accept',
    roster      => 'jabber:iq:roster',
    register    => 'jabber:iq:register',
    version     => 'jabber:iq:version',
    auth        => 'jabber:iq:auth',
-   session     => 'urn:ietf:params:xml:ns:xmpp-session',
-   xml         => 'http://www.w3.org/XML/1998/namespace',
+
+   iq_oob      => 'jabber:iq:oob',
+   x_oob       => 'jabber:x:oob',
+
    disco_info  => 'http://jabber.org/protocol/disco#info',
    disco_items => 'http://jabber.org/protocol/disco#items',
+
    register_f  => 'http://jabber.org/features/iq-register',
    iqauth      => 'http://jabber.org/features/iq-auth',
    data_form   => 'jabber:x:data',
-   iq_oob      => 'jabber:iq:oob',
-   x_oob       => 'jabber:x:oob',
    muc         => 'http://jabber.org/protocol/muc',
    muc_user    => 'http://jabber.org/protocol/muc#user',
    muc_owner   => 'http://jabber.org/protocol/muc#owner',
@@ -74,13 +79,14 @@ which make handling of namepsaces a bit easier:
    bind    => urn:ietf:params:xml:ns:xmpp-bind
    tls     => urn:ietf:params:xml:ns:xmpp-tls
 
-   client  => jabber:client
-   roster  => jabber:iq:roster
-   version => jabber:iq:version
-   auth    => jabber:iq:auth
+   client    => jabber:client
+   component => jabber:component:accept
+   roster    => jabber:iq:roster
+   version   => jabber:iq:version
+   auth      => jabber:iq:auth
 
-   iq_oob  => jabber:iq:oob
-   x_oob   => jabber:x:oob
+   iq_oob    => jabber:iq:oob
+   x_oob     => jabber:x:oob
 
    disco_info  => http://jabber.org/protocol/disco#info
    disco_items => http://jabber.org/protocol/disco#items
@@ -92,6 +98,7 @@ which make handling of namepsaces a bit easier:
    ping        => urn:xmpp:ping
 
    vcard       => vcard-temp
+   vcard_upd   => vcard-temp:x:update
 
    pubsub      => http://jabber.org/protocol/pubsub
    pubsub_own  => http://jabber.org/protocol/pubsub#owner

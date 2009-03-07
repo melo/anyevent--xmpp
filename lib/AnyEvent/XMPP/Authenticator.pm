@@ -52,12 +52,12 @@ sub new {
                $self->construct_sasl_response ($node->text);
 
             } elsif ($type eq 'sasl_success') {
-               $self->event ('auth');
+               $self->auth;
                $con->current->unreg_me;
 
             } elsif ($type eq 'sasl_failure') {
                my $error = AnyEvent::XMPP::Error::SASL->new (node => $node);
-               $self->event (auth_fail => $error);
+               $self->auth_fail ($error);
                $con->current->unreg_me;
             }
          }
@@ -280,6 +280,10 @@ C<$jid> is defined if the authentication also bound a resource for
 you. If C<$jid> is undefined no resource was bound yet and the XMPP stream
 needs to be reinitiated (because we are finished with SASL authentication).
 
+=cut
+
+sub auth { }
+
 =item auth_fail => $error
 
 This event is emitted when an authentication failure occurred.
@@ -289,6 +293,8 @@ object or ...
 FIXME TODO
 
 =cut
+
+sub auth_fail { }
 
 sub disconnect {
    my ($self) = @_;

@@ -394,20 +394,6 @@ sub dump_twig_xml {
    }
 }
 
-sub install_default_debug_dump {
-   my ($con) = @_;
-   $con->reg_cb (
-      debug_recv => sub {
-         my ($con, $data) = @_;
-         printf "recv>> %s:%d\n%s", $con->{host}, $con->{port}, dump_twig_xml ($data)
-      },
-      debug_send => sub {
-         my ($con, $data) = @_;
-         printf "send<< %s:%d\n%s", $con->{host}, $con->{port}, dump_twig_xml ($data)
-      },
-   )
-}
-
 =item $xml_escaped = xml_escape ($string)
 
 Your regular XML escape procedure. Escaping <, >, & and " characters.  It will

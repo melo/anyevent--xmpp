@@ -65,6 +65,7 @@ sub analyze {
 
    } elsif ($node->eq (stream => 'features')) {
       $type = 'features';
+      $self->analyze_features ($node);
 
    } elsif ($node->eq (tls => 'proceed')) {
       $type = 'tls_proceed';

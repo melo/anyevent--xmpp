@@ -1,7 +1,7 @@
 package AnyEvent::XMPP::Stream::Component;
 use strict;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
-use AnyEvent::XMPP::Util qw/simxml/;
+use AnyEvent::XMPP::Util qw/simxml xml_escape/;
 use Digest::SHA1 qw/sha1_hex/;
 use Encode;
 
@@ -88,10 +88,8 @@ sub new {
          my ($self, $node) = @_;
          my $id = $node->attr ('id');
 
-         my $secret =
-            encode ('utf-8',
-               $self->{parser}->{parser}->xml_escape ($self->{secret}));
-         my $handshake_secret = lc sha1_hex ($id . $secret);
+         my $handshake_secret =
+            lc sha1_hex ($id . encode ('utf-8', xml_escape ($self->{secret})));
 
          $self->send (simxml (
             defns => 'component', node => {
@@ -108,11 +106,10 @@ sub new {
 
             if ($node->eq (component => 'handshake')) {
                $self->{authenticated} = 1;
-               $self->event ('stream_ready');
+               $self->stream_ready;
             }
          }
-      },
-      stream_ready => \&stream_ready,
+      }
    );
 
    $self
@@ -124,6 +121,24 @@ sub new {
 
 All events that are emitted by L<AnyEvent::XMPP::Stream> are also
 emitted by this class.
+
+=cut
+
+sub error             { my $self = shift; $self->SUPER::error (@_) }
+sub connected         { my $self = shift; $self->SUPER::connnected (@_) }
+sub connect_error     { my $self = shift; $self->SUPER::connect_error (@_) }
+sub disconnected      { my $self = shift; $self->SUPER::disconnected (@_) }
+sub stream_start      { my $self = shift; $self->SUPER::stream_start (@_) }
+sub stream_end        { my $self = shift; $self->SUPER::stream_end (@_) }
+sub recv_stanza_xml   { my $self = shift; $self->SUPER::recv_stanza_xml (@_) }
+sub sent_stanza_xml   { my $self = shift; $self->SUPER::sent_stanza_xml (@_) }
+sub recv              { my $self = shift; $self->SUPER::recv (@_) }
+sub send              { my $self = shift; $self->SUPER::send (@_) }
+sub send_buffer_empty { my $self = shift; $self->SUPER::send_buffer_empty (@_) }
+sub debug_recv        { my $self = shift; $self->SUPER::debug_recv (@_) }
+sub debug_send        { my $self = shift; $self->SUPER::debug_send (@_) }
+
+=pod 
 
 These addition events can be registered on with C<reg_cb>:
 

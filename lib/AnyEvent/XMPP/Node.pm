@@ -41,8 +41,8 @@ AnyEvent::XMPP::Node - XML node tree helper for the parser.
 
 =head1 DESCRIPTION
 
-This class represens a XML node. L<AnyEvent::XMPP> should usually not
-require messing with the parse tree, but sometimes it is neccessary.
+This class represents a XML node. L<AnyEvent::XMPP> should usually not
+require messing with the parse tree, but sometimes it is necessary.
 
 If you experience any need for messing with these and feel L<AnyEvent::XMPP> should
 rather take care of it drop me a mail, feature request or most preferably a patch!

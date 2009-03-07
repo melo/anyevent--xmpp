@@ -18,26 +18,24 @@ AnyEvent::XMPP::Parser - Parser for XML streams (helper for AnyEvent::XMPP)
 
 =head1 DESCRIPTION
 
-This is a XMPP XML parser helper class, which helps me to cope with the XMPP XML.
+This is a XMPP "XML" parser helper class, which helps me to cope with the XMPP "XML".
 
-See also L<AnyEvent::XMPP::Writer> for a discussion of the issues with XML in XMPP.
+TODO: Insert old rant about XML from AnyEvent::XMPP::Writer here.
 
 =head1 METHODS
 
 =over 4
 
-=item B<new ($stream_ns)>
+=item B<new>
 
 This creates a new AnyEvent::XMPP::Parser and calls C<init>.
-
-C<$stream_ns> is the namespace of the stream.
 
 =cut
 
 sub new {
    my $this = shift;
    my $class = ref($this) || $this;
-   my $self = $class->SUPER::new (stream_ns => (shift), enable_methods => 1);
+   my $self = $class->SUPER::new (enable_methods => 1);
    bless $self, $class;
 
    $self->{parser} = XML::Parser->new (

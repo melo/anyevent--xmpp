@@ -3,7 +3,6 @@ use strict;
 use utf8;
 use AnyEvent;
 use AnyEvent::XMPP::Component;
-use AnyEvent::XMPP::Util qw/install_default_debug_dump/;
 
 my $j = AnyEvent->condvar;
 my $c = AnyEvent::XMPP::Component-> new (
@@ -12,8 +11,6 @@ my $c = AnyEvent::XMPP::Component-> new (
            port   => 5347,
            secret => 'lolfe',
         );
-
-install_default_debug_dump ($c);
 
 $c->reg_cb (
    connect => sub {
