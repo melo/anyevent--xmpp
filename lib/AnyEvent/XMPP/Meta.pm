@@ -14,7 +14,15 @@ AnyEvent::XMPP::Meta - Meta information for AnyEvent::XMPP::Node
 
 =over 4
 
-=item B<new (%args)>
+=item AnyEvent::XMPP::Meta->new ($node)
+
+Creates a new meta information of the L<AnyEvent::XMPP::Node> object
+in C<$node>. The result will be a meta information object, which
+will be a hash reference which you have to access directly to get the
+meta information (like the type of the stanza, or whether the features
+stanza came with the bind feature, ...).
+
+Defined keys are given in the B<META TYPE> and B<TYPES> section below.
 
 =cut
 
@@ -27,24 +35,6 @@ sub new {
    $self->analyze (@_);
 
    return $self
-}
-
-sub analyze_features {
-   my ($self, $node) = @_;
-
-   my @mechs = $node->find_all ([qw/sasl mechanisms/], [qw/sasl mechanism/]);
-   $self->{sasl_mechs} = [ map { $_->text } @mechs ]
-      if @mechs;
-
-   $self->{tls}     = 1 if $node->find_all ([qw/tls starttls/]);
-   $self->{bind}    = 1 if $node->find_all ([qw/bind bind/]);
-   $self->{session} = 1 if $node->find_all ([qw/session session/]);
-
-   # and yet another weird thingie: in XEP-0077 it's said that
-   # the register feature MAY be advertised by the server. That means:
-   # it MAY not be advertised even if it is available... so we don't
-   # care about it...
-   # my @reg   = $node->find_all ([qw/register register/]);
 }
 
 sub analyze {
@@ -110,16 +100,11 @@ sub set_reply_cb {
 
 =back
 
-=head1 PUBLIC KEYS
+=head1 META TYPE
 
-The meta information is basically a hash, containing some
-defined keys:
-
-=over 4
-
-=item B<type>
-
-This key contains the type of the stanza, which is one of these:
+The meta information is basically a hash. The key that all meta informations
+for XMPP stanzas have in common is the C<type> key, which defines which type
+the stanza is of, possible values are:
 
    presence
    iq
@@ -136,6 +121,56 @@ This key contains the type of the stanza, which is one of these:
    sasl_failure
 
    unknown
+
+=head1 TYPES
+
+Here are the possible per type keys defined:
+
+=over 4
+
+=item B<features>
+
+This is the type of the features stanza which is received after an XMPP Stream
+was connected. It has these further keys:
+
+=over 4
+
+=item tls => $bool
+
+=item bind => $bool
+
+=item session => $bool
+
+These are flags which are true if the features stanza came with the
+corresponding feature enabled.
+
+=item sasl_mechs => $mech_arrayref
+
+C<$mech_arrayref> is an array reference which contains the SASL mechanisms
+which were advertised by the server.
+
+=back
+
+=cut
+
+sub analyze_features {
+   my ($self, $node) = @_;
+
+   my @mechs = $node->find_all ([qw/sasl mechanisms/], [qw/sasl mechanism/]);
+
+   $self->{sasl_mechs} = [ map { $_->text } @mechs ]
+      if @mechs;
+
+   $self->{tls}     = 1 if $node->find_all ([qw/tls starttls/]);
+   $self->{bind}    = 1 if $node->find_all ([qw/bind bind/]);
+   $self->{session} = 1 if $node->find_all ([qw/session session/]);
+
+   # and yet another weird thingie: in XEP-0077 it's said that
+   # the register feature MAY be advertised by the server. That means:
+   # it MAY not be advertised even if it is available... so we don't
+   # care about it...
+   # my @reg = $node->find_all ([qw/register register/]);
+}
 
 =back
 
