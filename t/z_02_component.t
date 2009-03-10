@@ -7,8 +7,6 @@ use AnyEvent::XMPP::Test;
 use AnyEvent::Socket;
 use AnyEvent::XMPP::Stream::Component;
 
-$AnyEvent::XMPP::Stream::DEBUG = 2;
-
 AnyEvent::XMPP::Test::check ('component');
 
 my $cv = AnyEvent->condvar;

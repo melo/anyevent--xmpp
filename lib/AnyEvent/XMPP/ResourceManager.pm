@@ -58,7 +58,7 @@ sub bind {
    }
 
    $con->send (new_iq (set => create => {
-      defns => 'bind', node => { name => 'bind', @req_res }
+      node => { dns => 'bind', name => 'bind', @req_res }
    }, cb => sub {
       my ($node, $error) = @_;
 

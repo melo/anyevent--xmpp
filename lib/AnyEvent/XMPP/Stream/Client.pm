@@ -282,7 +282,7 @@ sub new {
             if (not $self->{ssl_enabled}) {
                $self->stop_event;
 
-               $self->send (simxml (defns => 'tls', node => { name => 'starttls' }));
+               $self->send (simxml (node => { dns => 'tls', name => 'starttls' }));
 
                $self->reg_cb (
                   ext_before_recv => sub {
@@ -312,7 +312,7 @@ sub new {
 
          if (not $self->{authenticated}) {
             $self->stop_event;
-            $self->event (pre_authentication => $node);
+            $self->pre_authentication ($node);
          }
       },
       ext_after_pre_authentication => sub {
@@ -333,7 +333,7 @@ sub new {
 
                } else {
                   $self->{jid} = $jid;
-                  $self->event ('stream_ready')
+                  $self->stream_ready ($jid);
                }
             });
          }
@@ -481,7 +481,8 @@ sub start_authenticator {
 
          if (defined $jid) {
             $self->{res_manager}->add ($jid);
-            $self->event ('stream_ready');
+            $self->{jid} = $jid;
+            $self->stream_ready ($jid);
 
          } else {
             $self->reinit;
@@ -530,6 +531,11 @@ is about to begin.
 This is a good place to start in band registration, see also
 L<AnyEvent::XMPP::Ext::Registration>.
 
+=cut
+
+__PACKAGE__->hand_event_methods_down (qw/stream_ready/);
+sub pre_authentication { }
+
 =item stream_ready
 
 This event is emitted when authentication was performed and a resource
@@ -537,6 +543,7 @@ was bound.
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/stream_ready/);
 sub stream_ready { 
    if ($DEBUG) {
       print "stream ready!\n";
@@ -586,9 +593,7 @@ sub recv {
 
    if ($type eq 'features') {
       $self->{features} = $node;
-      warn "REFE $type\n";
       $self->recv_features ($node);
-      warn "REFEA $type\n";
    }
 }
 

@@ -6,7 +6,7 @@ use Digest::SHA1 qw/sha1_hex/;
 use Authen::SASL qw/Perl/;
 use AnyEvent::XMPP::IQTracker;
 use AnyEvent::XMPP::Util qw/join_jid new_iq/;
-use AnyEvent::XMPP::Node;
+use AnyEvent::XMPP::Node qw/simxml/;
 use Encode;
 use Digest::SHA1 qw/sha1_hex/;
 
@@ -39,7 +39,7 @@ C<$con>.
 sub new {
    my $this  = shift;
    my $class = ref($this) || $this;
-   my $self  = $class->SUPER::new (@_);
+   my $self  = $class->SUPER::new (@_, enable_methods => 1);
 
    $self->{regid} =
       $self->{connection}->reg_cb (
@@ -101,7 +101,8 @@ sub construct_sasl_auth {
    }
 
    $self->{connection}->send (simxml (
-      defns => 'sasl', node => {
+      node => {
+         dns => 'sasl',
          name => 'auth', attrs => [ mechanism => $self->{sasl}->mechanism ],
          childs => [
             MIME::Base64::encode_base64 ($data, '')
@@ -125,7 +126,8 @@ sub construct_sasl_response {
    }
 
    $self->{connection}->send (simxml (
-      defns => 'sasl', node => {
+      node => {
+         dns => 'sasl',
          name => 'response', childs => [ MIME::Base64::encode_base64 ($ret, '') ]
       }
    ));
@@ -150,7 +152,7 @@ sub request_iq_fields {
    my ($self, $cb) = @_;
 
    $self->{connection}->send (new_iq (get => create => {
-      defns => 'auth', node => { ns => 'auth', name => 'query',
+      node => { dns => 'auth', name => 'query',
          # heh, something i've seen on some ejabberd site:
          # childs => [ { name => 'username', childs => [ $self->{username} ] } ] 
       }
@@ -211,8 +213,8 @@ sub send_iq_auth {
 
    $self->{connection}->send (new_iq (
       set => create => {
-         defns => 'auth',
          node => {
+            dns => 'auth',
             name => 'query',
             childs => [
                map { {
@@ -323,7 +325,7 @@ sub init {
    my ($self) = @_;
 
    my $error;
-   for ($self->node->nodes) {
+   for ($self->{node}->nodes) {
       $error = $_->name;
       last
    }

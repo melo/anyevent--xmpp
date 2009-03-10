@@ -365,6 +365,10 @@ generated for your stanza's namespace, as it is required by XMPP.  Of course
 that means that stanzas of different namespaces can't be distinguished from the
 default namespace of the stream anymore.
 
+If you want to enforce a namespace declaration use the C<add_decl_prefix> method
+of L<AnyEvent::XMPP::Node> to enforce it. (Or use the C<dns> parameter if you
+use C<simxml>).
+
 =item $stream->starttls ($state, $ctx)
 
 This method will enable TLS on the connection by using L<AnyEvent::Handle>'s
@@ -434,6 +438,7 @@ sub send_header {
          ]
       }
    );
+   $node->set_only_start;
    $node->add_decl_prefix (xmpp_ns ('stream') => 'stream');
    $node->add_decl_prefix ($self->{default_stream_namespace} => '');
    $self->send ($node);
@@ -656,8 +661,8 @@ sub recv_stanza_xml {
    my ($self, $node) = @_;
 
    if ($DEBUG) {
-      warn ">>> $self->{peer_host}:$self->{peer_port} >>>\n"
-           . dump_twig_xml ($node->as_string);
+      warn ">>> $self->{jid}:$self->{peer_host}:$self->{peer_port} >>>\n"
+           . dump_twig_xml ($node->raw_string)
    }
 }
 
@@ -675,7 +680,7 @@ sub sent_stanza_xml {
    my ($self, $data) = @_;
 
    if ($DEBUG) {
-      warn "<<< $self->{peer_host}:$self->{peer_port} <<<\n"
+      warn "<<< $self->{jid}:$self->{peer_host}:$self->{peer_port} <<<\n"
            . dump_twig_xml ($data);
    }
 }
@@ -693,7 +698,6 @@ The attached meta information is an object of type L<AnyEvent::XMPP::Meta>.
 __PACKAGE__->hand_event_methods_down (qw/recv/);
 sub recv {
    my ($self, $node) = @_;
-   warn "RECVCVVVVVVVVVVVVVVVVVVVV\n";
 }
 
 =item send => $node

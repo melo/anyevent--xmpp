@@ -29,6 +29,10 @@ our ($JID1, $JID2, $PASS);
 sub check {
    my ($what) = @_;
 
+   if ($ENV{ANYEVENT_XMPP_TEST_DEBUG}) {
+      $AnyEvent::XMPP::Stream::DEBUG = $ENV{ANYEVENT_XMPP_TEST_DEBUG};
+   }
+
    if ($what eq 'component') {
       unless ($ENV{ANYEVENT_XMPP_TEST_COMPONENT}) {
          plan skip_all => "ANYEVENT_XMPP_TEST_COMPONENT environment variable not set.";

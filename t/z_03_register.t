@@ -19,13 +19,12 @@ my $stream = AnyEvent::XMPP::Stream::Client->new (
    port     => $PORT,
 );
 
-$AnyEvent::XMPP::Stream::DEBUG = 2;
-
 my $reg = AnyEvent::XMPP::Ext::Registration->new (delivery => $stream);
 
 my $registered = 0;
 my $logged_in  = 0;
 my $unregistered = 1;
+my $recon_cnt = 1;
 
 $stream->reg_cb (
    connected => sub {
@@ -35,7 +34,6 @@ $stream->reg_cb (
    },
    pre_authentication => sub {
       my ($stream) = @_;
-      warn "PRE\n";
 
       my $ev = $stream->stop_event;
 
@@ -46,9 +44,10 @@ $stream->reg_cb (
 
          if ($error) {
             print "# Couldn't register: " . $error->string . "\n";
+            print "not ok 2 - registered first JID\n";
 
          } else {
-            $registered++;
+            print "ok 2 - registered first JID\n";
          }
 
          my ($username2) = split_jid ($JID2);
@@ -57,9 +56,10 @@ $stream->reg_cb (
 
             if ($error) {
                print "# Couldn't register second: " . $error->string . "\n";
+               print "not ok 3 - registered second JID\n";
 
             } else {
-               $registered++;
+               print "ok 3 - registered second JID\n";
             }
 
             $ev->();
@@ -69,19 +69,18 @@ $stream->reg_cb (
    stream_ready => sub {
       my ($stream) = @_;
       $logged_in = 1;
-
       $cv->send;
    },
    disconnected => sub {
       my ($stream, $h, $p) = @_;
-
-      $stream->connect;
+      $cv->send;
    }
 );
 
 $stream->connect;
 
+print "1..4\n";
+
 $cv->recv;
 
-is ($registered, 2, "registered successfully");
-ok ($logged_in,  "logged in successfully");
+print (($logged_in ? '' : 'not ') . "ok 4 - logged in successfully\n");

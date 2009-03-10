@@ -38,16 +38,16 @@ our %STANZA_ERRORS = (
 
 sub init {
    my ($self) = @_;
-   my $sta = $self->node;
+   my $node = $self->node;
 
-   unless (defined $sta) {
+   unless (defined $node) {
       $self->{error_cond} = 'client-timeout';
       $self->{error_type} = 'cancel';
       return;
    }
 
    my @error;
-   my ($err) = $sta->node->find_all ([$sta->{stream_ns}, 'error']);
+   my ($err) = $node->find_all ([$node->meta->{stream_ns}, 'error']);
 
    unless ($err) {
       warn "No error element found in error stanza!";
@@ -109,8 +109,8 @@ C<type> returns 'cancel' and C<code> undef.
 
 =cut
 
-sub stanza {
-   $_[0]->{stanza}
+sub node {
+   $_[0]->{node}
 }
 
 =item B<type ()>

@@ -465,7 +465,7 @@ Now you can roll stunts like this:
 sub raw_string {
    my ($self) = @_;
    join '',
-      map { $_->[0] == NPARS ? $_->[1] : $_->[1]->as_string }
+      map { $_->[0] == NPARS ? $_->[1] : $_->[1]->raw_string }
          grep { $_->[0] != NTEXT }
             @{$self->[NODES]};
 }

@@ -4,8 +4,11 @@ no warnings;
 
 use AnyEvent;
 use AnyEvent::Socket;
+use AnyEvent::XMPP::Test;
 use AnyEvent::XMPP::Stream;
 use AnyEvent::XMPP::Util qw/new_iq/;
+
+AnyEvent::XMPP::Test::check ('none');
 
 my $cv = AnyEvent->condvar;
 

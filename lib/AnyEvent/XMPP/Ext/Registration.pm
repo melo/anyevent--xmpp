@@ -137,7 +137,7 @@ sub send_registration_request {
    my ($self, $cb) = @_;
 
    $self->{delivery}->send (new_iq (get => create => {
-      defns => 'register', node => { name => 'query' }
+      node => { dns => 'register', name => 'query' }
    }, cb => sub {
       my ($node, $error) = @_;
 
@@ -167,7 +167,7 @@ sub _error_or_form_cb {
          node => $e, register_state => 'submit'
       );
 
-   if ($e->node->find_all ([qw/register query/], [qw/data_form x/])) {
+   if ($e->find_all ([qw/register query/], [qw/data_form x/])) {
       my $form = AnyEvent::XMPP::Ext::RegisterForm->new;
       $form->init_from_node ($e);
 
@@ -189,11 +189,8 @@ please look in the description of the C<submit_form> method below.
 sub send_unregistration_request {
    my ($self, $cb) = @_;
 
-   my $con = $self->{connection};
-
    $self->{delivery}->send (new_iq (set => create => {
-      defns => 'register',
-      node => { name => 'query', childs => [ { name => 'remove' } ] }
+      node => { dns => 'register', name => 'query', childs => [ { name => 'remove' } ] }
    }, cb => sub {
       my ($node, $error) = @_;
 
@@ -218,11 +215,8 @@ please look in the description of the C<submit_form> method below.
 sub send_password_change_request {
    my ($self, $username, $password, $cb) = @_;
 
-   my $con = $self->{connection};
-
-   $con->send_iq (set => {
-      defns => 'register',
-      node => { ns => 'register', name => 'query', childs => [
+   $self->{delivery}->send (new_iq (set => create => {
+      node => { dns => 'register', name => 'query', childs => [
          { ns => 'register', name => 'username', childs => [ $username ] },
          { ns => 'register', name => 'password', childs => [ $password ] },
       ]}
@@ -235,7 +229,7 @@ sub send_password_change_request {
       } else {
          $self->_error_or_form_cb ($error, $cb);
       }
-   });
+   }));
 }
 
 =item submit_form ($form, $cb->($reg, $ok, $error, $form))
@@ -264,8 +258,7 @@ sub submit_form {
    my ($self, $form, $cb) = @_;
 
    $self->{delivery}->send (new_iq (set => create => {
-      defns => 'register',
-      node => { ns => 'register', name => 'query', childs => [
+      node => { dns => 'register', name => 'query', childs => [
          $form->answer_form_to_simxml
       ]}
    }, cb => sub {

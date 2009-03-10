@@ -1,7 +1,7 @@
 package AnyEvent::XMPP::IM;
 use strict;
 no warnings;
-use AnyEvent::XMPP::Util qw/stringprep_jid/;
+use AnyEvent::XMPP::Util qw/prep_bare_jid/;
 use AnyEvent::XMPP::Stream::Client;
 use AnyEvent::XMPP::Util qw/new_iq/;
 use base qw/Object::Event/;
@@ -49,6 +49,17 @@ sub new {
    my $self  = $class->SUPER::new (
       initial_reconnect_interval => 5,
       @_,
+      enable_methods => 1,
+   );
+
+   $self->reg_cb (
+      ext_after_error => sub {
+         my ($con, $error) = @_;
+
+         warn "unhandled error in AnyEvent::XMPP::IM: " . $error->string . "."
+              ." Please read the documentation of the 'error' event, to inhibit this"
+              ." warning!\n";
+      }
    );
 
    return $self
@@ -58,16 +69,16 @@ sub send_session_iq {
    my ($self, $con, $jid) = @_;
 
    $con->send (new_iq (set => create => {
-      defns => 'session',
-      node => { name => 'session' }
+      node => { dns => 'session', name => 'session' }
    }, cb => sub {
       my ($node, $error) = @_;
 
       if ($node) {
-         $self->event (connected => $jid, $con->{peer_host}, $con->{peer_port});
+         $con->{_im_session_ready} = 1;
+         $self->connected ($jid, $con->{peer_host}, $con->{peer_port});
 
       } else {
-         $self->event (error => $jid, $error);
+         $self->error ($jid, $error);
       }
    }));
 }
@@ -75,11 +86,12 @@ sub send_session_iq {
 sub init_connection {
    my ($self, $con, $jid) = @_;
 
-   if ($con->features->session) {
+   if ($con->features->meta->{session}) {
       $self->send_session_iq ($con, $jid);
 
    } else {
-      $self->event (connected => $jid, $con->{peer_host}, $con->{peer_port});
+      $con->{_im_session_ready} = 1;
+      $self->connected ($jid, $con->{peer_host}, $con->{peer_port});
    }
 }
 
@@ -90,7 +102,7 @@ sub send {
 sub add_account {
    my ($self, $jid, $password, %args) = @_;
 
-   $self->{accs}->{stringprep_jid $jid} = {
+   $self->{accs}->{prep_bare_jid $jid} = {
       jid      => $jid,
       password => $password,
       %args
@@ -121,6 +133,8 @@ sub _install_retry {
 sub spawn_connection {
    my ($self, $jid) = @_;
 
+   $jid = prep_bare_jid $jid;
+
    my $conhdl = $self->{conns}->{$jid} = {
       con => AnyEvent::XMPP::Stream::Client->new (%{$self->{accs}->{$jid}}),
       timeout => $self->{initial_reconnect_interval},
@@ -128,31 +142,31 @@ sub spawn_connection {
 
    $conhdl->{regid} = $conhdl->{con}->reg_cb (
       stream_ready => sub {
-         my ($con) = @_;
+         my ($con, $njid) = @_;
 
          $conhdl->{timeout} = $self->{initial_reconnect_interval};
          delete $conhdl->{timer};
 
-         $self->init_connection ($con, $jid);
+         $self->init_connection ($con, $njid);
       },
       connect_error => sub {
          my ($self, $msg) = @_;
          
          _install_retry ($conhdl);
          
-         $self->event (connect_error => $jid, $msg, $conhdl->{timeout});
+         $self->connect_error ($jid, $msg, $conhdl->{timeout});
       },
       error => sub {
          my ($con, $error) = @_;
-
-         $self->event (error => $jid, $error);
+         $self->error ($jid, $error);
+         $con->stop_event;
       },
       disconnected => sub {
          my ($con, $h, $p, $reason) = @_;
 
          _install_retry ($conhdl);
 
-         $self->event (disconnected => $jid, $h, $p, $reason, $conhdl->{timeout});
+         $self->disconnected ($jid, $h, $p, $reason, $conhdl->{timeout});
       },
    );
 
@@ -162,6 +176,7 @@ sub spawn_connection {
 sub remove_connection {
    my ($self, $jid) = @_;
 
+   $jid = prep_bare_jid $jid;
    my $c = delete $self->{conns}->{$jid};
    $c->{con}->disconnect ('removed account');
    $c->{con}->unreg_cb ($c->{regid});
@@ -179,10 +194,21 @@ sub update_connections {
 
    for (keys %{$self->{accs}}) {
       unless ($self->{conns}->{$_}) {
-      warn "SPAN $_\n";
          $self->spawn_connection ($_);
       }
    }
+}
+
+sub get_connection {
+   my ($self, $jid) = @_;
+   my $c = $self->{conns}->{prep_bare_jid $jid}
+      or return;
+   $c = $c->{con};
+   $c->is_ready 
+      or return;
+   $c->{_im_session_ready}
+      or return;
+   $c
 }
 
 =back
@@ -211,6 +237,8 @@ sub connected {
 =item error => $jid, $error
 
 This event is emitted when an error occured on the connection to the account C<$jid>.
+
+FIXME: Put error event doc from ::Stream here.
 
 =cut
 

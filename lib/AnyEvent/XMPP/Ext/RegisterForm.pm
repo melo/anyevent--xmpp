@@ -229,7 +229,6 @@ sub answer_form_to_simxml {
       for (keys %$lf) {
          push @childs, {
             ns     => 'register',
-            dns    => 'register',
             name   => $_,
             childs => [ $lf->{$_} ]
          }

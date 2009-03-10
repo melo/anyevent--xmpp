@@ -72,8 +72,6 @@ sub cb_start_tag {
    }
 
    my $node = AnyEvent::XMPP::Node->new ($p->namespace ($el), $el, \%attrs);
-   $node->add_decl_prefix ($p->expand_ns_prefix ($_), $_ eq '#default' ? '' : $_)
-      for $p->new_ns_prefixes;
    $node->append_parsed ($p->recognized_string);
 
    if (not @{$self->{nodestack}}) {
