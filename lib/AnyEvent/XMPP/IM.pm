@@ -150,7 +150,7 @@ sub spawn_connection {
          $self->init_connection ($con, $njid);
       },
       connect_error => sub {
-         my ($self, $msg) = @_;
+         my ($con, $msg) = @_;
          
          _install_retry ($conhdl);
          
