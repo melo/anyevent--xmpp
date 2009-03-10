@@ -1,11 +1,14 @@
 package AnyEvent::XMPP::Stream::Component;
 use strict;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
-use AnyEvent::XMPP::Util qw/simxml xml_escape/;
+use AnyEvent::XMPP::Util qw/xml_escape/;
+use AnyEvent::XMPP::Node qw/simxml/;
 use Digest::SHA1 qw/sha1_hex/;
 use Encode;
 
 use base qw/AnyEvent::XMPP::Stream/;
+__PACKAGE__->inherit_event_methods_from (qw/AnyEvent::XMPP::Stream/);
+__PACKAGE__->hand_event_methods_down_from (qw/AnyEvent::XMPP::Stream/);
 
 =head1 NAME
 
@@ -23,7 +26,7 @@ AnyEvent::XMPP::Stream::Component - "XML" stream that implements the XEP-0114
    $comp->reg_cb (
       stream_ready => sub { ... },
       disconnected => sub { ... },
-      error        => sub { ... $comp->current->stop ... },
+      error        => sub { ... $comp->stop_event ... },
    );
 
    $comp->connect ('jabber.org', 5554);
@@ -73,46 +76,45 @@ C<$secret> is the secret that will be used for authentication with the server.
 sub new {
    my $this = shift;
    my $class = ref($this) || $this;
-
    my $self = $class->SUPER::new (
       default_stream_namespace => 'component',
       @_
    );
 
-   $self->reg_cb (
-      connected => sub {
-         my $self = shift;
-         $self->send_header (undef, undef, to => $self->{domain});
-      },
-      stream_start => sub {
-         my ($self, $node) = @_;
-         my $id = $node->attr ('id');
-
-         my $handshake_secret =
-            lc sha1_hex ($id . encode ('utf-8', xml_escape ($self->{secret})));
-
-         $self->send (simxml (
-            defns => 'component', node => {
-               name => 'handshake',
-               childs => [ $handshake_secret ]
-            }
-         ));
-      },
-      recv => sub {
-         my ($self, $node) = @_;
-
-         unless ($self->{authenticated}) {
-            $self->current->stop;
-
-            if ($node->eq (component => 'handshake')) {
-               $self->{authenticated} = 1;
-               $self->stream_ready;
-            }
-         }
-      }
-   );
-
    $self
+}
+
+sub connected {
+   my $self = shift;
+   $self->send_header (undef, undef, to => $self->{domain});
+};
+
+sub stream_start {
+   my ($self, $node) = @_;
+   my $id = $node->attr ('id');
+
+   my $handshake_secret =
+      lc sha1_hex ($id . encode ('utf-8', xml_escape ($self->{secret})));
+
+   $self->send (simxml (
+      defns => 'component', node => {
+         name => 'handshake',
+         childs => [ $handshake_secret ]
+      }
+   ));
+}
+
+sub recv {
+   my ($self, $node) = @_;
+
+   unless ($self->{authenticated}) {
+      $self->stop_event;
+
+      if ($node->eq (component => 'handshake')) {
+         $self->{authenticated} = 1;
+         $self->stream_ready;
+      }
+   }
 }
 
 =back
@@ -121,24 +123,6 @@ sub new {
 
 All events that are emitted by L<AnyEvent::XMPP::Stream> are also
 emitted by this class.
-
-=cut
-
-sub error             { my $self = shift; $self->SUPER::error (@_) }
-sub connected         { my $self = shift; $self->SUPER::connnected (@_) }
-sub connect_error     { my $self = shift; $self->SUPER::connect_error (@_) }
-sub disconnected      { my $self = shift; $self->SUPER::disconnected (@_) }
-sub stream_start      { my $self = shift; $self->SUPER::stream_start (@_) }
-sub stream_end        { my $self = shift; $self->SUPER::stream_end (@_) }
-sub recv_stanza_xml   { my $self = shift; $self->SUPER::recv_stanza_xml (@_) }
-sub sent_stanza_xml   { my $self = shift; $self->SUPER::sent_stanza_xml (@_) }
-sub recv              { my $self = shift; $self->SUPER::recv (@_) }
-sub send              { my $self = shift; $self->SUPER::send (@_) }
-sub send_buffer_empty { my $self = shift; $self->SUPER::send_buffer_empty (@_) }
-sub debug_recv        { my $self = shift; $self->SUPER::debug_recv (@_) }
-sub debug_send        { my $self = shift; $self->SUPER::debug_send (@_) }
-
-=pod 
 
 These addition events can be registered on with C<reg_cb>:
 
@@ -151,6 +135,7 @@ and can now be used to transmit stanzas.
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/stream_ready/);
 sub stream_ready { }
 
 =back

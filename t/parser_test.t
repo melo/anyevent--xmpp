@@ -39,9 +39,9 @@ my @input = (
 );
 
 my @expected_output = (
-   '<stream:stream>',
+   '<stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams">',
    '<ns1:message xmlns:ns1="jabber:component:accept" to="elmex@jabber.org"><ns1:body>Hi!</ns1:body></ns1:message>',
-   '<iq type="set"><ns1:query xmlns:ns1="jabber:iq:roster"><ns2:immed xmlns:ns2="jabber:component:accept"><ns1:test/></ns2:immed><ns1:test2/></ns1:query></iq>',
+   '<iq type="set"><query xmlns="jabber:iq:roster"><ns1:immed xmlns:ns1="jabber:component:accept"><test/></ns1:immed><test2/></query></iq>',
 );
 
 plan tests => scalar @input;

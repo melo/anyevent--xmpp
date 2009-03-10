@@ -15,7 +15,7 @@ AnyEvent::XMPP::Ext::Registration - Handles all tasks of in band registration
 
    $con->reg_cb (pre_authentication => sub {
       my ($con) = @_;
-      my $event = $con->current;
+      my $event = $con->stop_event;
 
       $reg->send_registration_request (sub {
          my ($reg, $form, $error) = @_;
@@ -29,8 +29,7 @@ AnyEvent::XMPP::Ext::Registration - Handles all tasks of in band registration
                my ($reg, $ok, $error, $form) = @_;
 
                if ($ok) { # registered successfully!
-                  # continue authentication
-                  $event->continue;
+                  $event->(); # continue authentication
 
                } else {   # error
                   if ($form) { # we got an alternative form!

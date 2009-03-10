@@ -70,7 +70,10 @@ sub cb_start_tag {
       $ns = $p->namespace ($el) unless defined $ns;
       $attrs{"$ns\|$k"} = $v;
    }
+
    my $node = AnyEvent::XMPP::Node->new ($p->namespace ($el), $el, \%attrs);
+   $node->add_decl_prefix ($p->expand_ns_prefix ($_), $_ eq '#default' ? '' : $_)
+      for $p->new_ns_prefixes;
    $node->append_parsed ($p->recognized_string);
 
    if (not @{$self->{nodestack}}) {
@@ -136,7 +139,7 @@ sub init {
    my ($self) = @_;
 
    if ($self->{nbparser}) {
-      eval { $self->{nbparser}->parse_done };
+      eval { $self->{nbparser}->finish; $self->{nbparser}->parse_done };
    }
 
    $self->{nbparser} = $self->{parser}->parse_start;

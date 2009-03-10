@@ -32,15 +32,20 @@ $stream->reg_cb (
 
       } else {
          print "not ok 1 - disconnected from $h:$p ($reas)\n";
+         $cv->send;
       }
    },
    error => sub {
-      my ($stream) = @_;
-      $stream->current->stop;
+      my ($stream, $error) = @_;
+      if ($error->isa ('AnyEvent::XMPP::Error::Exception')) {
+         warn "exception: " . $error->string . "\n";
+      }
+      $stream->stop_event;
    },
    connect_error => sub {
       my ($stream, $reas) = @_;
       print "not ok 1 - connect error ($reas)\n";
+      $cv->send;
    },
 );
 

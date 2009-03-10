@@ -8,7 +8,7 @@ use AnyEvent::XMPP::Namespaces qw/xmpp_ns_maybe xmpp_ns/;
 require Exporter;
 our @EXPORT_OK = qw/resourceprep nodeprep prep_join_jid join_jid
                     split_jid stringprep_jid prep_bare_jid bare_jid
-                    is_bare_jid simxml dump_twig_xml install_default_debug_dump
+                    is_bare_jid dump_twig_xml install_default_debug_dump
                     cmp_jid cmp_bare_jid
                     node_jid domain_jid res_jid
                     prep_node_jid prep_domain_jid prep_res_jid

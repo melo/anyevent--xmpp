@@ -3,13 +3,17 @@ use strict;
 use AnyEvent;
 use AnyEvent::XMPP::IQTracker;
 use AnyEvent::XMPP::Authenticator;
-use AnyEvent::XMPP::Util qw/split_jid join_jid simxml dump_twig_xml stringprep_jid cmp_jid/;
+use AnyEvent::XMPP::Util qw/split_jid join_jid dump_twig_xml stringprep_jid cmp_jid/;
+use AnyEvent::XMPP::Node qw/simxml/;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Error;
 use AnyEvent::XMPP::ResourceManager;
 use Carp qw/croak/;
 
 use base qw/AnyEvent::XMPP::Stream/;
+
+__PACKAGE__->inherit_event_methods_from (qw/AnyEvent::XMPP::Stream/);
+__PACKAGE__->hand_event_methods_down_from (qw/AnyEvent::XMPP::Stream/);
 
 our $DEBUG = 1;
 
@@ -228,16 +232,6 @@ sub new {
    $self->{host} = $self->{domain}    unless defined $self->{host};
    $self->{port} = 'xmpp-client=5222' unless defined $self->{port};
 
-   $self->set_exception_cb (sub {
-      my ($ev, $ex) = @_;
-
-      $self->event (error => 
-         AnyEvent::XMPP::Error::Exception->new (
-            exception => "(" . $ev->dump . "): $ex", context => 'event callback'
-         )
-      );
-   });
-
    $self->reg_cb (
       ext_before_stream_start => sub {
          my ($self, $node) = @_;
@@ -281,12 +275,12 @@ sub new {
          my ($self) = @_;
          delete $self->{timeout};
       },
-      [recv_features => 50] => sub {
+      recv_features => 50 => sub {
          my ($self, $node) = @_;
 
          if (not ($self->{disable_ssl}) && $node->meta->{tls}) {
             if (not $self->{ssl_enabled}) {
-               $self->current->stop;
+               $self->stop_event;
 
                $self->send (simxml (defns => 'tls', node => { name => 'starttls' }));
 
@@ -298,7 +292,7 @@ sub new {
 
                      if ($type eq 'tls_proceed') {
                         $self->starttls;
-                        $self->current->unreg_me;
+                        $self->unreg_me;
                         $self->send_header;
 
                      } elsif ($type eq 'tls_failure') {
@@ -306,18 +300,18 @@ sub new {
                            AnyEvent::XMPP::Error->new (text => 'tls negotiation failed')
                         );
                         $self->disconnect ("TLS handshake failure");
-                        $self->current->unreg_me;
+                        $self->unreg_me;
                      }
                   }
                );
             }
          }
       },
-      [recv_features => 40] => sub {
+      recv_features => 40 => sub {
          my ($self, $node) = @_;
 
          if (not $self->{authenticated}) {
-            $self->current->stop;
+            $self->stop_event;
             $self->event (pre_authentication => $node);
          }
       },
@@ -326,7 +320,7 @@ sub new {
 
          $self->start_authenticator ($node);
       },
-      [recv_features => 30] => sub {
+      recv_features => 30 => sub {
          my ($self, $node) = @_;
 
          if (not defined ($self->{jid}) && $node->meta->{bind}) {
@@ -343,23 +337,7 @@ sub new {
                }
             });
          }
-      },
-      send => sub {
-         my ($self, $node) = @_;
-
-         $self->{tracker}->register ($node);
-
-         if (xmpp_ns ($self->{default_stream_namespace}) eq xmpp_ns ('client')) {
-            if (cmp_jid ($node->attr ('to'), $self->{server_jid})) {
-               $node->attr (to => undef);
-            }
-
-            if (cmp_jid ($node->attr ('from'), $self->{jid})) {
-               $node->attr (from => undef);
-            }
-         }
-      },
-      recv => \&recv,
+      }
    );
 
    return $self;
@@ -588,10 +566,8 @@ it are defaulted to the server JID (C<from>) and your full JID (C<to>).
 sub recv {
    my ($self, $node) = @_;
 
-   $self->SUPER::recv ($node);
-
    unless ($self->is_ready) {
-      $self->current->stop;
+      $self->stop_event;
    }
 
    if (defined (my $resjid = $self->{res_manager}->any_jid)) {
@@ -610,11 +586,37 @@ sub recv {
 
    if ($type eq 'features') {
       $self->{features} = $node;
-      $self->event (recv_features => $node);
+      warn "REFE $type\n";
+      $self->recv_features ($node);
+      warn "REFEA $type\n";
    }
 }
 
+sub send {
+   my ($self, $node) = @_;
 
+   $self->{tracker}->register ($node);
+
+   if (xmpp_ns ($self->{default_stream_namespace}) eq xmpp_ns ('client')) {
+      if (cmp_jid ($node->attr ('to'), $self->{server_jid})) {
+         $node->attr (to => undef);
+      }
+
+      if (cmp_jid ($node->attr ('from'), $self->{jid})) {
+         $node->attr (from => undef);
+      }
+   }
+}
+
+=item recv_features => $node
+
+Emitted whenever the stream features have been received.
+This event is used to drive the handshake process.
+
+=cut
+
+__PACKAGE__->hand_event_methods_down (qw/recv_features/);
+sub recv_features { }
 
 =back
 

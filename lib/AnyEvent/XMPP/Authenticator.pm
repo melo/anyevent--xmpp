@@ -53,12 +53,12 @@ sub new {
 
             } elsif ($type eq 'sasl_success') {
                $self->auth;
-               $con->current->unreg_me;
+               $con->unreg_me;
 
             } elsif ($type eq 'sasl_failure') {
                my $error = AnyEvent::XMPP::Error::SASL->new (node => $node);
                $self->auth_fail ($error);
-               $con->current->unreg_me;
+               $con->unreg_me;
             }
          }
       );

@@ -489,7 +489,7 @@ sub as_string {
    $subdecls = { %{$subdecls || {}} };
    my @attrs;
 
-   for (@{$self->[NSDECLS] || []}) {
+   for (sort { $a->[1] cmp $b->[1] } @{$self->[NSDECLS] || []}) {
       if (not (exists $subdecls->{$_->[1]})
           || $subdecls->{$_->[1]} ne $_->[0]) {
 

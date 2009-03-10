@@ -27,7 +27,6 @@ my $registered = 0;
 my $logged_in  = 0;
 my $unregistered = 1;
 
-
 $stream->reg_cb (
    connected => sub {
       my ($stream, $h, $p) = @_;
@@ -36,9 +35,9 @@ $stream->reg_cb (
    },
    pre_authentication => sub {
       my ($stream) = @_;
+      warn "PRE\n";
 
-      my $ev = $stream->current;
-      $ev->stop;
+      my $ev = $stream->stop_event;
 
       my ($username, $domain, $pass) = $stream->credentials;
 
@@ -63,7 +62,7 @@ $stream->reg_cb (
                $registered++;
             }
 
-            $ev->continue;
+            $ev->();
          });
       });
    },

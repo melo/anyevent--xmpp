@@ -39,7 +39,7 @@ AnyEvent::XMPP::Stream - Class for exchanging XMPP "XML" protocol messages.
 
          warn "error: " . $error->string . "\n";
 
-         $self->current->stop; # important, see documentation!
+         $self->stop_event; # important, see documentation!
       },
       recv => sub {
          my ($stream, $node) = @_;
@@ -131,8 +131,8 @@ sub new {
    $self->{parser}->reg_cb (
       stream_start => sub {
          my ($parser, $node) = @_;
-         $self->stream_start ($node);
          $self->recv_stanza_xml ($node);
+         $self->stream_start ($node);
       },
       stream_end => sub {
          my ($parser, $node) = @_;
@@ -141,6 +141,7 @@ sub new {
       },
       recv => sub {
          my ($parser, $node) = @_;
+         $self->recv_stanza_xml ($node);
 
          my $meta = $node->meta;
          my $type = $meta->{type};
@@ -549,11 +550,13 @@ Here is an example:
    $stream->reg_cb (error => sub {
       my ($stream, $error) = @_;
       warn "got error: " . $error->string . "\n":
-      $stream->current->stop; # see documentation of Object::Event.
+      $stream->stop_event; # see documentation of Object::Event.
+      ()
    });
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/error/);
 sub error { }
 
 =item connected => $peer_host, $peer_port
@@ -564,6 +567,7 @@ are the hostname and port number of the other TCP endpoint.
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/connected/);
 sub connected { 
    my ($self, $ph, $pp) = @_;
 
@@ -581,6 +585,7 @@ couldn't be made.
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/connect_error/);
 sub connect_error {
    my ($self, $str) = @_;
 
@@ -595,6 +600,7 @@ This event is emitted when the connection disconnected for some C<$reason>.
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/disconnected/);
 sub disconnected {
    my ($self, $ph, $pp, $reas) = @_;
 
@@ -611,6 +617,7 @@ an L<AnyEvent::XMPP::Node> object.
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/stream_start/);
 sub stream_start { }
 
 =item stream_end => $node
@@ -621,6 +628,7 @@ element.
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/stream_end/);
 sub stream_end {
    my ($self) = @_;
 
@@ -643,6 +651,7 @@ C<$node> is an L<AnyEvent::XMPP::Node> object.
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/recv_stanza_xml/);
 sub recv_stanza_xml {
    my ($self, $node) = @_;
 
@@ -661,6 +670,7 @@ For a 100% coverage always use the C<debug_send> event!
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/sent_stanza_xml/);
 sub sent_stanza_xml {
    my ($self, $data) = @_;
 
@@ -680,8 +690,10 @@ The attached meta information is an object of type L<AnyEvent::XMPP::Meta>.
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/recv/);
 sub recv {
    my ($self, $node) = @_;
+   warn "RECVCVVVVVVVVVVVVVVVVVVVV\n";
 }
 
 =item send => $node
@@ -693,6 +705,7 @@ You may attach a meta information object of L<AnyEvent::XMPP::Meta> to the C<$no
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/send/);
 sub send {
    my ($self, $node) = @_;
 }
@@ -707,7 +720,7 @@ afterwards you can do this:
    $stream->reg_cb (send_buffer_empty => sub {
       my ($stream) = @_;
 
-      $stream->current->unreg_me;
+      $stream->unreg_me;
       $stream->disconnect ('done');
    });
 
@@ -719,6 +732,7 @@ when the data for a stanza has been sent out.
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/send_buffer_empty/);
 sub send_buffer_empty { }
 
 =item debug_recv => $data
@@ -728,6 +742,7 @@ has been received. C<$data> is the received unicode character data chunk.
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/debug_recv/);
 sub debug_recv {
    my ($self, $data) = @_;
 
@@ -743,6 +758,7 @@ C<$data> is sent outward.
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/debug_send/);
 sub debug_send {
    my ($self, $data) = @_;
 
