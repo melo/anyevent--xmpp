@@ -4,7 +4,13 @@ no warnings;
 use AnyEvent::XMPP::Util qw/prep_bare_jid new_iq/;
 use AnyEvent::XMPP::Stream::Client;
 use AnyEvent::XMPP::Node qw/simxml/;
-use base qw/Object::Event/;
+use base qw/Object::Event AnyEvent::XMPP::StanzaHandler AnyEvent::XMPP::Extendable/;
+
+__PACKAGE__->inherit_event_methods_from (qw/
+   AnyEvent::XMPP::Stream
+   AnyEvent::XMPP::StanzaHandler
+   AnyEvent::XMPP::Extendable
+/);
 
 our $DEBUG = 1;
 
@@ -51,6 +57,9 @@ sub new {
       @_,
       enable_methods => 1,
    );
+
+   AnyEvent::XMPP::StanzaHandler::init ($self);
+   AnyEvent::XMPP::Extendable::init ($self);
 
    $self->reg_cb (
       ext_after_error => sub {
@@ -263,7 +272,7 @@ sub connected {
 
 =item error => $jid, $error
 
-This event is emitted when an error occured on the connection to the account C<$jid>.
+This event is emitted when an error occurred on the connection to the account C<$jid>.
 
 FIXME: Put error event doc from ::Stream here.
 

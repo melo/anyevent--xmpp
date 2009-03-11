@@ -16,7 +16,6 @@ print "1..10\n";
 my $hdl;
 AnyEvent::XMPP::Test::start (sub {
    my ($im, $cv) = @_;
-   $hdl = AnyEvent::XMPP::StanzaHandler->new (delivery => $im);
    send_first ($im, $cv);
 });
 

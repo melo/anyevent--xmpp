@@ -3,30 +3,48 @@ use strict;
 no warnings;
 use AnyEvent::XMPP::Util qw/new_error new_reply/;
 use AnyEvent::XMPP::Node qw/simxml/;
+use base qw/Object::Event/;
 
 =head1 NAME
 
-AnyEvent::XMPP::StanzaHandler - A stanza handler for clients
+AnyEvent::XMPP::StanzaHandler - A stanza handler super class for clients
 
 =head1 SYNOPSIS
 
-   use AnyEvent::XMPP::StanzaHandler;
+   package MyCon;
+   use base qw/AnyEvent::XMPP::Stream AnyEvent::XMPP::StanzaHandler/;
 
-   my $delivery = AnyEvent::XMPP::IM->new;
-   my $hdlr = AnyEvent::XMPP:StanzaHandler->new (delivery => $delivery);
+   __PACKAGE__->inherit_event_methods_from (qw/
+      AnyEvent::XMPP::Stream
+      AnyEvent::XMPP::StanzaHandler
+   /);
 
-   $delivery->reg_cb (
+   sub new {
+      my $this  = shift;
+      my $class = ref($this) || $this;
+      my $self = $class->AnyEvent::XMPP::Stream::new (@_);
+
+      AnyEvent::XMPP::StanzaHandler::init ($self);
+
+      $self
+   }
+
+   package main;
+   my $con = MyCon->new (...);
+
+   $con->reg_cb (
       recv_message    => sub { ... },
       recv_presence   => sub { ... },
       recv_iq         => sub {
-         my ($delivery, $iq_type, $node) = @_;
+         my ($con, $iq_type, $node) = @_;
 
          if ($node ... is handled by me ...) {
             $$rhandled = 1;
-            $delivery->stop_event;
+            $con->stop_event;
          }
       },
    );
+   ...
 
 =head1 DESCRIPTION
 
@@ -45,13 +63,10 @@ and in some cases it will provide default behavior if a stanza was not handled.
 
 =cut
 
-sub new {
-   my $this  = shift;
-   my $class = ref($this) || $this;
-   my $self  = { @_ };
-   bless $self, $class;
+sub init {
+   my ($self) = @_;
 
-   $self->{guard} = $self->{delivery}->reg_cb (
+   $self->reg_cb (
       recv => sub {
          my ($delivery, $node) = @_;
          my $t = $node->meta->{type};
@@ -85,11 +100,15 @@ sub new {
          ));
       }
    );
-
-   return $self
 }
 
 =back
+
+=cut
+
+__PACKAGE__->hand_event_methods_down (qw/
+   recv_presence recv_message recv_iq recv_iq_reply
+/);
 
 =head1 EVENTS
 
