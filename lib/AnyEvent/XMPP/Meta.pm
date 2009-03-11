@@ -100,6 +100,10 @@ sub set_reply_cb {
 
 =back
 
+=head1 SOURCE & DESTINATION
+
+TODO: Document C<src> and C<dest>.
+
 =head1 META TYPE
 
 The meta information is basically a hash. The key that all meta informations

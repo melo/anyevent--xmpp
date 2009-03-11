@@ -76,7 +76,10 @@ sub init {
 
 sub add_extension {
    my ($self, $pkg) = @_;
-   require $pkg;
+   eval "require $pkg";
+   if ($@) {
+      croak "Failed to load extension '$pkg': $@\n";
+   }
 
    my @required = $pkg->required_extensions;
 
@@ -86,9 +89,8 @@ sub add_extension {
       }
    }
 
-   my $ext
-      = $self->{_ext_ids}->{$pkg->extension_id}
-      = $pkg->new (extendable => $self);
+   $self->{_ext_ids}->{$pkg}
+      = $pkg->new (extendable => $self)
 }
 
 sub get_extension {

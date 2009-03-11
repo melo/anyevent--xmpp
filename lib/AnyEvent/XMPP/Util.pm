@@ -475,9 +475,14 @@ sub new_iq {
       (@reply_info) = ($cb, delete $args{timeout});
    }
 
+   my $src  = delete $args{src};
+   my $dest = delete $args{dest};
+
    $node->attr ($_ => $args{$_}) for keys %args;
 
    my $meta = $node->meta;
+   $meta->{src}  = $src if defined $src;
+   $meta->{dest} = $dest if defined $dest;
    $meta->set_reply_cb (@reply_info);
 
    $node
@@ -486,9 +491,19 @@ sub new_iq {
 sub new_reply {
    my ($node, $child, %attrs) = @_;
    my $nnode = AnyEvent::XMPP::Node->new ($node->namespace, $node->name, \%attrs);
+
+   $nnode->meta->{src} = $node->meta->{dest} if defined $node->meta->{dest};
+   $nnode->meta->{dest} = $node->meta->{src} if defined $node->meta->{src};
+
    $nnode->attr (id => $node->attr ('id')) if defined $node->attr ('id');
    $nnode->attr (to => $node->attr ('from')) if defined $node->attr ('from');
    $nnode->attr (from => $node->attr ('to')) if defined $node->attr ('to');
+
+   if ($node->name eq 'iq') {
+      $nnode->attr (type => 'result')
+         unless defined $nnode->attr ('type');
+   }
+
    $nnode->add ($child);
    $nnode
 }

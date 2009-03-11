@@ -77,6 +77,7 @@ sub start {
       connect_error => sub {
          my ($im, $jid, $reason, $recon_tout) = @_;
          print "# connect error $jid: $reason\n";
+         $cv->send;
       },
       error => sub {
          my ($im, $jid, $error) = @_;
@@ -86,6 +87,7 @@ sub start {
       disconnected => sub {
          my ($self, $jid, $ph, $pp, $reaso) = @_;
          print "# disconnected $jid,$ph:$pp: $reaso\n";
+         $cv->send;
       },
    );
 

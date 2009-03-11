@@ -578,13 +578,11 @@ sub recv {
    }
 
    if (defined (my $resjid = $self->{res_manager}->any_jid)) {
-      $node->attr (to => $resjid)
-         unless defined $node->attr ('to');
+      $node->meta->{dest} = $resjid;
    }
 
    if (defined $self->{server_jid}) {
-      $node->attr (from => $self->{server_jid})
-         unless defined $node->attr ('from');
+      $node->meta->{src} = $self->{server_jid};
    }
 
    $self->{tracker}->handle_stanza ($node);
@@ -602,18 +600,20 @@ sub send {
 
    $self->{tracker}->register ($node);
 
-   if ($node->name eq 'iq'
-       || $node->name eq 'message' 
-       || $node->name eq 'presence') {
+   # XXX: This was code before we found out that from/to are not
+   #      good for storing the source/dest for internal routing...
+   #if ($node->name eq 'iq'
+   #    || $node->name eq 'message' 
+   #    || $node->name eq 'presence') {
 
-      if (cmp_jid ($node->attr ('to'), $self->{server_jid})) {
-         $node->attr (to => undef);
-      }
+   #   #if (cmp_jid ($node->attr ('to'), $self->{server_jid})) {
+   #   #  # $node->attr (to => undef);
+   #   #}
 
-      if (cmp_jid ($node->attr ('from'), $self->{jid})) {
-         $node->attr (from => undef);
-      }
-   }
+   #   if (cmp_jid ($node->attr ('from'), $self->{jid})) {
+   #      $node->attr (from => undef);
+   #   }
+   #}
 }
 
 =item recv_features => $node

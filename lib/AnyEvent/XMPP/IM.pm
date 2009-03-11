@@ -112,15 +112,17 @@ sub init_connection {
 sub send {
    my ($self, $node) = @_;
 
-   my $from = $node->attr ('from');
-   unless (defined $from) {
+   my $src_jid = $node->meta->{src};
+   $src_jid = $node->attr ('from') unless defined $src_jid;
+   unless (defined $src_jid) {
       my ($any) = (values %{$self->{conns}});
-      $from = $any->{con}->jid if $any
+      $src_jid = $any->{con}->jid if $any
    }
 
-   my $con = $self->get_connection ($from);
+   my $con = $self->get_connection ($src_jid);
    unless ($con) {
-      warn "No connection to send message:\n" . $node->as_string (1) . "\n";
+      warn "No connection to send message from '$src_jid':\n"
+           . $node->as_string (1) . "\n";
       return;
    }
 

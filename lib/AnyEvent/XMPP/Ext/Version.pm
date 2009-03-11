@@ -1,25 +1,24 @@
 package AnyEvent::XMPP::Ext::Version;
+use AnyEvent::XMPP;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
-use AnyEvent::XMPP::Util qw/simxml/;
-use AnyEvent::XMPP::Ext;
+use AnyEvent::XMPP::Util qw/new_iq new_reply/;
+use AnyEvent::XMPP::Node qw/simxml/;
+use Scalar::Util qw/weaken/;
 use strict;
 
-our @ISA = qw/AnyEvent::XMPP::Ext/;
+#use base qw/AnyEvent::XMPP::Ext/;
+#our @ISA = qw/AnyEvent::XMPP::Ext/;
 
 =head1 NAME
 
-AnyEvent::XMPP::Ext::Version - Software version
+AnyEvent::XMPP::Ext::Version - XEP-0092: Software version
 
 =head1 SYNOPSIS
 
-   use AnyEvent::XMPP::Ext::Version;
-
-   my $version = AnyEvent::XMPP::Ext::Version->new;
+   my $version = $extendable->add_extension ('AnyEvent::XMPP::Ext::Version');
    $version->set_name    ("My client");
    $version->set_version ("0.3");
    $version->set_os      (`uname -a`);
-
-   $disco->enable_feature ($version->disco_feature);
 
 =head1 DESCRIPTION
 
@@ -27,7 +26,7 @@ This module defines an extension to provide the abilities
 to answer to software version requests and to request software
 version from other entities.
 
-See also XEP-0092
+See also XEP-0092.
 
 This class is derived from L<AnyEvent::XMPP::Ext> and can be added as extension to
 objects that implement the L<AnyEvent::XMPP::Extendable> interface or derive from
@@ -51,6 +50,8 @@ sub new {
    $self
 }
 
+sub required_extensions { }
+
 sub disco_feature { xmpp_ns ('version') }
 
 sub init {
@@ -59,16 +60,19 @@ sub init {
    $self->set_name    ("AnyEvent::XMPP");
    $self->set_version ("$AnyEvent::XMPP::VERSION");
 
+   weaken $self;
+   weaken $self->{extendable};
 
-   $self->{cb_id} = $self->reg_cb (
-      iq_get_request_xml => sub {
-         my ($self, $con, $node) = @_;
+   $self->{_guard1} = $self->{extendable}->reg_cb (
+      recv_iq => sub {
+         my ($extdbl, $node) = @_;
 
-         if ($self->handle_query ($con, $node)) {
-            return 1;
+         if ($node->attr ('type') eq 'get'
+             && $node->find_all ([qw/version query/])) {
+
+            $self->handle_query ($node);
+            $extdbl->stop_event;
          }
-
-         ()
       }
    );
 }
@@ -129,24 +133,18 @@ sub version_result {
 }
 
 sub handle_query {
-   my ($self, $con, $node) = @_;
+   my ($self, $node) = @_;
 
-   if (my ($q) = $node->find_all ([qw/version query/])) {
-      my @result = $self->version_result;
-      $con->reply_iq_result (
-         $node, {
-            defns => 'version',
-            node => {
-               ns => 'version', name => 'query', childs => [
-                  @result
-               ]
-            }
-         }
-      );
-      return 1
-   }
+   my ($q) = $node->find_all ([qw/version query/]);
+   my @result = $self->version_result;
 
-   ()
+   $self->{extendable}->send (new_reply ($node, {
+      node => {
+         dns    => 'version',
+         name   => 'query',
+         childs => \@result
+      }
+   }));
 }
 
 sub _version_from_node {
@@ -165,16 +163,17 @@ sub _version_from_node {
    $v
 }
 
-=item B<request_version ($con, $dest, $cb)>
+=item $ext->request_version ($from, $dest, $cb->($version, $error), $timeout)
 
-This method sends a version request to C<$dest> on the connection C<$con>.
+This method sends a version request to C<$dest> from the (full) JID C<$from>.
 
-C<$cb> is the callback that will be called if either an error occured or
-the result was received. The callback will also be called after the default IQ
-timeout for the connection C<$con>.
-The second argument for the callback will be either undef if no error occured
-or a L<AnyEvent::XMPP::Error::IQ> error.
-The first argument will be a hash reference with the following fields:
+C<$cb> is the callback that will be called if either an error occurred or the
+result was received.  C<$timeout> is an optional argument, which lets you
+disable (= 0) or specify a custom timeout.
+
+The second argument for the callback will be either undef if no error occurred
+or an L<AnyEvent::XMPP::Error::IQ> error.  The first argument will be a hash
+reference with the following fields:
 
 =over 4
 
@@ -209,26 +208,20 @@ Here an example of the structure of the hash reference:
 =cut
 
 sub request_version {
-   my ($self, $con, $dest, $cb) = @_;
+   my ($self, $from, $dest, $cb, $tout) = @_;
 
-   $con->send_iq (get => {
-      defns => 'version',
-      node  => { ns => 'version', name => 'query' }
-   }, sub {
-      my ($n, $e) = @_;
-      if ($e) {
-         $cb->(undef, $e);
-      } else {
-         $cb->(_version_from_node ($n), undef);
-      }
-   }, to => $dest);
+   $self->{extendable}->send (new_iq (
+      get =>
+         src => $from,
+         to  => $dest,
+      create => { node  => { dns => 'version', name => 'query' } },
+      cb => sub {
+         my ($n, $e) = @_;
+         $cb->($n ? _version_from_node ($n) : undef, $e);
+      },
+      timeout => $tout
+   ));
 }
-
-sub DESTROY {
-   my ($self) = @_;
-   $self->unreg_cb ($self->{cb_id})
-}
-
 
 =back
 
