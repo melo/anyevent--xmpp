@@ -1,0 +1,27 @@
+192.168.2.110
+
+ejabberd:
+   client:  5222, old ssl: 5223
+   server:  5269
+   http:    5280, admin@xmpptest, lolfe
+   service: 5554, test.xmpptest, secret123
+
+jabberd 1.4.5a:
+   client: 5232
+   server: 5289
+   service: 5233, test.192.168.2.110, abc123
+
+openfire:
+   client: 5122, old ssl: 5123
+   server: 5169
+   service: 5125, ?, abc123
+   http: 9090, 9091, admin, lolfe
+
+prosody:
+   client: 5822
+   server: 5833
+
+jabberd2:
+   client: 5992
+   server: 5969
+   service: 5347, ?, abc321

@@ -1,0 +1,24 @@
+#!/opt/perl/bin/perl
+
+my %r;
+
+for (<test_envs/setup_*>) {
+   print "###################################################################\n";
+   print "### $_\n";
+   print "###################################################################\n";
+   system (". $_; make test 2>&1 | tee /tmp/ae_xmpp.tests.out");
+   print "\n\n";
+
+   open my $of, "<", "/tmp/ae_xmpp.tests.out" or die "$!";
+   my $output = do { local $/; <$of> };
+
+   if ($output =~ /Result: (\S+)/) {
+      $r{$_} = $1;
+   }
+}
+
+print "\n\n### SUMMARY:\n";
+
+for (keys %r) {
+   printf "%-50s: %s\n", $_, $r{$_}
+}

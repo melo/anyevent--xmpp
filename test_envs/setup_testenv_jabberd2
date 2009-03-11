@@ -1,0 +1,8 @@
+#!/bin/bash
+
+#export NET_XMPP2_TEST="testit@openfire.ta-sa.org/x:lolfe123"
+#export NET_XMPP2_TEST_MUC="conference.openfire.ta-sa.org"
+#export NET_XMPP2_TEST_DEBUG=1
+
+export ANYEVENT_XMPP_TEST_COMPONENT="192.168.2.110:5347:test@192.168.2.110:abc321"
+export ANYEVENT_XMPP_TEST_CLIENT="192.168.2.110:5992:test_1@xmpptest:test_2@xmpptest:lolfe123"
