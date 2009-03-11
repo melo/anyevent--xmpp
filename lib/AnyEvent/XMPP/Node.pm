@@ -329,7 +329,7 @@ C<$value> is optional, and if not undef it will replace the attribute value.
 =cut
 
 sub attr {
-   defined $_[2]
+   @_ > 2
       ? (
            defined $_[2]
               ? $_[0]->[ATTRS]->{$_[0]->[NS] . "|" . $_[1]} = $_[2]
@@ -363,6 +363,8 @@ sub attrs { $_[0]->[ATTRS] }
 
 =item B<add (\$unescaped)>
 
+=item B<add ($nodes = [$node1, $node2, ...])>
+
 Adds a sub-node to the current node.
 
 =cut
@@ -375,10 +377,12 @@ sub add {
       push @{$self->[NODES]}, [NNODE, $n = $node];
    } elsif (ref ($node) eq 'SCALAR') {
       push @{$self->[NODES]}, [NRAW,  $n = $node];
-   } elsif (@args > 0) {
-      push @{$self->[NODES]}, [NNODE, $n = AnyEvent::XMPP::Node->new ($node, @args)];
    } elsif (ref ($node) eq 'HASH') {
       push @{$self->[NODES]}, [NNODE, $n = simxml (%$node)];
+   } elsif (ref ($node) eq 'ARRAY') {
+      push @{$self->[NODES]}, [NNODE, $n = $_] for @$node;
+   } elsif (@args > 0) {
+      push @{$self->[NODES]}, [NNODE, $n = AnyEvent::XMPP::Node->new ($node, @args)];
    } else {
       push @{$self->[NODES]}, [NTEXT, $n = $node]
    }

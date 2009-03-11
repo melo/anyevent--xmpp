@@ -3,11 +3,13 @@ use strict;
 no warnings;
 
 use Test::More;
+use AnyEvent::XMPP::IM;
+use AnyEvent::XMPP::Util qw/cmp_bare_jid/;
 
 require Exporter;
 our @ISA = qw/Exporter/;
 
-our @EXPORT = qw/$HOST $PORT $SECRET $SERVICE $JID1 $JID2 $PASS/;
+our @EXPORT = qw/$HOST $PORT $SECRET $SERVICE $JID1 $JID2 $FJID1 $FJID2 $PASS/;
 
 =head1 NAME
 
@@ -25,6 +27,7 @@ AnyEvent::XMPP::Test - desc
 
 our ($HOST, $PORT, $SECRET, $SERVICE);
 our ($JID1, $JID2, $PASS);
+our ($FJID1, $FJID2);
 
 sub check {
    my ($what) = @_;
@@ -51,6 +54,47 @@ sub check {
       ($HOST, $PORT, $JID1, $JID2, $PASS) =
          split /:/, $ENV{ANYEVENT_XMPP_TEST_CLIENT};
    }
+}
+
+sub start {
+   my ($cb) = @_;
+
+   my $cv = AnyEvent->condvar;
+
+   my $im = AnyEvent::XMPP::IM->new;
+   my $cnt = 0;
+
+   $im->reg_cb (
+      connected => sub {
+         my ($im, $jid) = @_;
+         if (cmp_bare_jid ($jid, $JID1)) {
+            $FJID1 = $jid;
+         } else {
+            $FJID2 = $jid;
+         }
+         $cb->($im, $cv) if ++$cnt >= 2;
+      },
+      connect_error => sub {
+         my ($im, $jid, $reason, $recon_tout) = @_;
+         print "# connect error $jid: $reason\n";
+      },
+      error => sub {
+         my ($im, $jid, $error) = @_;
+         print "# error $jid: " . $error->string . "\n";
+         $im->stop_event;
+      },
+      disconnected => sub {
+         my ($self, $jid, $ph, $pp, $reaso) = @_;
+         print "# disconnected $jid,$ph:$pp: $reaso\n";
+      },
+   );
+
+   $im->add_account ($JID1, $PASS, host => $HOST, port => $PORT);
+   $im->add_account ($JID2, $PASS, host => $HOST, port => $PORT);
+
+   $im->update_connections;
+
+   $cv->recv;
 }
 
 =back

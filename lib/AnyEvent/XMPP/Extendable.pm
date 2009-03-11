@@ -8,11 +8,10 @@ AnyEvent::XMPP::Extendable - Extendable baseclass
 
 =head1 DESCRIPTION
 
-This class provides a mechanism to add extensions.
-Please note that the class that derives from this must also
-derive from L<AnyEvent::XMPP::Event>!
+This class provides a mechanism to add extensions to a
+L<AnyEvent::XMPP::Delivery> object.
 
-Please see L<AnyEvent::XMPP::Ext> for more information about this mechanism.
+The L<AnyEvent::XMPP::Extendable> class defines some events that
 
 =over 4
 

@@ -1,9 +1,9 @@
 package AnyEvent::XMPP::IM;
 use strict;
 no warnings;
-use AnyEvent::XMPP::Util qw/prep_bare_jid/;
+use AnyEvent::XMPP::Util qw/prep_bare_jid new_iq/;
 use AnyEvent::XMPP::Stream::Client;
-use AnyEvent::XMPP::Util qw/new_iq/;
+use AnyEvent::XMPP::Node qw/simxml/;
 use base qw/Object::Event/;
 
 our $DEBUG = 1;
@@ -54,48 +54,71 @@ sub new {
 
    $self->reg_cb (
       ext_after_error => sub {
-         my ($con, $error) = @_;
+         my ($self, $jid, $error) = @_;
 
          warn "unhandled error in AnyEvent::XMPP::IM: " . $error->string . "."
               ." Please read the documentation of the 'error' event, to inhibit this"
               ." warning!\n";
+      },
+      ext_after_initial_presence => sub {
+         my ($self, $jid) = @_;
+         $self->send (simxml (node =>
+            { name => 'presence', attrs => [ from => $jid ] }
+         ));
       }
    );
 
    return $self
 }
 
-sub send_session_iq {
-   my ($self, $con, $jid) = @_;
-
-   $con->send (new_iq (set => create => {
-      node => { dns => 'session', name => 'session' }
-   }, cb => sub {
-      my ($node, $error) = @_;
-
-      if ($node) {
-         $con->{_im_session_ready} = 1;
-         $self->connected ($jid, $con->{peer_host}, $con->{peer_port});
-
-      } else {
-         $self->error ($jid, $error);
-      }
-   }));
+sub finish_session {
+   my ($self, $con) = @_;
+   $con->{_im_session_ready} = 1;
+   $self->initial_presence ($con->jid);
+   $self->connected ($con->jid, $con->{peer_host}, $con->{peer_port});
 }
 
 sub init_connection {
-   my ($self, $con, $jid) = @_;
+   my ($self, $con) = @_;
 
    if ($con->features->meta->{session}) {
-      $self->send_session_iq ($con, $jid);
+      $con->send (new_iq (set => create => {
+         node => { dns => 'session', name => 'session' }
+      }, cb => sub {
+         my ($node, $error) = @_;
+
+         if ($node) {
+            $self->finish_session ($con);
+
+         } else {
+            $self->error ($con->jid, $error);
+         }
+      }));
 
    } else {
-      $con->{_im_session_ready} = 1;
-      $self->connected ($jid, $con->{peer_host}, $con->{peer_port});
+      $self->finish_session ($con);
    }
 }
 
 sub send {
+   my ($self, $node) = @_;
+
+   my $from = $node->attr ('from');
+   unless (defined $from) {
+      my ($any) = (values %{$self->{conns}});
+      $from = $any->{con}->jid if $any
+   }
+
+   my $con = $self->get_connection ($from);
+   unless ($con) {
+      warn "No connection to send message:\n" . $node->as_string (1) . "\n";
+      return;
+   }
+
+   $con->send ($node);
+}
+
+sub recv {
    my ($self, $node) = @_;
 }
 
@@ -147,7 +170,7 @@ sub spawn_connection {
          $conhdl->{timeout} = $self->{initial_reconnect_interval};
          delete $conhdl->{timer};
 
-         $self->init_connection ($con, $njid);
+         $self->init_connection ($con);
       },
       connect_error => sub {
          my ($con, $msg) = @_;
@@ -158,8 +181,12 @@ sub spawn_connection {
       },
       error => sub {
          my ($con, $error) = @_;
-         $self->error ($jid, $error);
+         $self->error ($con->jid, $error);
          $con->stop_event;
+      },
+      recv => sub {
+         my ($con, $node) = @_;
+         $self->recv ($node); # $node is already tagged with 'from' attr.
       },
       disconnected => sub {
          my ($con, $h, $p, $reason) = @_;
@@ -256,6 +283,25 @@ This error is emitted when a problem occurred while the TCP connection
 was being made. C<$jid> is the account, C<$reason> is the human readable error
 message and C<$reconnect_timeout> contains the seconds to the next
 retry.
+
+=cut
+
+sub connect_error {
+   my ($self, $jid, $reason, $recon_tout) = @_;
+
+   if ($DEBUG) {
+      print "$jid: CONNECT ERROR: $reason, reconnect in $recon_tout seconds.\n";
+   }
+}
+
+=item initial_presence => $jid
+
+This event is emitted shortly before the C<connected> event and gives
+the user the chance to specify his own initial presence. If the event
+is not stopped via a C<stop_event> call, it will send out a default initial
+presence.
+
+=cut
 
 =item disconnected => $jid, $peer_host, $peer_port, $reason, $reconnect_timeout
 

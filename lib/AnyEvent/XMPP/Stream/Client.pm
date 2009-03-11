@@ -602,7 +602,10 @@ sub send {
 
    $self->{tracker}->register ($node);
 
-   if (xmpp_ns ($self->{default_stream_namespace}) eq xmpp_ns ('client')) {
+   if ($node->name eq 'iq'
+       || $node->name eq 'message' 
+       || $node->name eq 'presence') {
+
       if (cmp_jid ($node->attr ('to'), $self->{server_jid})) {
          $node->attr (to => undef);
       }

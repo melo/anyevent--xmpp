@@ -96,6 +96,8 @@ sub handle_stanza {
    my ($self, $node) = @_;
 
    return if $node->meta->{type} ne 'iq';
+   return if $node->attr ('type') eq 'get' 
+             || $node->attr ('type') eq 'set';
 
    my $track = delete $self->{tracked}->{$node->attr ('id')}
       or return;

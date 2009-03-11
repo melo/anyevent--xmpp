@@ -5,6 +5,7 @@ use Encode;
 use Net::LibIDN qw/idn_prep_name idn_prep_resource idn_prep_node/;
 use AnyEvent::Socket;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns_maybe xmpp_ns/;
+use AnyEvent::XMPP::Error::Stanza;
 require Exporter;
 our @EXPORT_OK = qw/resourceprep nodeprep prep_join_jid join_jid
                     split_jid stringprep_jid prep_bare_jid bare_jid
@@ -15,7 +16,7 @@ our @EXPORT_OK = qw/resourceprep nodeprep prep_join_jid join_jid
                     from_xmpp_datetime to_xmpp_datetime to_xmpp_time
                     xmpp_datetime_as_timestamp
                     filter_xml_chars filter_xml_attr_hash_chars xml_escape
-                    new_iq
+                    new_iq new_reply new_error
                     /;
 our @ISA = qw/Exporter/;
 
@@ -471,7 +472,7 @@ sub new_iq {
 
    my @reply_info;
    if (my $cb = delete $args{cb}) {
-      (@reply_info) = ($cb, $args{timeout});
+      (@reply_info) = ($cb, delete $args{timeout});
    }
 
    $node->attr ($_ => $args{$_}) for keys %args;
@@ -480,6 +481,40 @@ sub new_iq {
    $meta->set_reply_cb (@reply_info);
 
    $node
+}
+
+sub new_reply {
+   my ($node, $child, %attrs) = @_;
+   my $nnode = AnyEvent::XMPP::Node->new ($node->namespace, $node->name, \%attrs);
+   $nnode->attr (id => $node->attr ('id')) if defined $node->attr ('id');
+   $nnode->attr (to => $node->attr ('from')) if defined $node->attr ('from');
+   $nnode->attr (from => $node->attr ('to')) if defined $node->attr ('to');
+   $nnode->add ($child);
+   $nnode
+}
+
+sub new_error {
+   my ($errstanza, $error, $type) = @_;
+
+   my @add;
+
+   unless (defined ($type)
+           && defined $AnyEvent::XMPP::Error::Stanza::STANZA_ERRORS{$error}) {
+      $type = $AnyEvent::XMPP::Error::Stanza::STANZA_ERRORS{$error}->[0];
+   }
+
+   push @add, (type => $type) if defined $type;
+   push @add, (code => $AnyEvent::XMPP::Error::Stanza::STANZA_ERRORS{$error}->[1]);
+
+   AnyEvent::XMPP::Node::simxml (
+      defns => $errstanza->namespace,
+      node => {
+         name => 'error', attrs => \@add,
+         childs => [
+            { dns => 'stanzas', name => $error }
+         ]
+      }
+   )
 }
 
 =back
