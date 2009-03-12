@@ -25,3 +25,8 @@ jabberd2:
    client: 5992
    server: 5969
    service: 5347, ?, abc321
+
+jabberd14:
+   client: 5772
+   server: 5669
+   service: 7009, test.localhost, abcX23
