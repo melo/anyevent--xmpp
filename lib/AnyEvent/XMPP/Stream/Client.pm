@@ -577,11 +577,11 @@ sub recv {
    }
 
    if (defined $self->{jid}) {
-      $node->meta->{dest} = stringprep_jid $self->{jid};
+      $node->meta->{dest} = $resjid;
    }
 
    if (defined $self->{server_jid}) {
-      $node->meta->{src} = stringprep_jid $self->{server_jid};
+      $node->meta->{src} = $self->{server_jid};
    }
 
    $self->{tracker}->handle_stanza ($node);

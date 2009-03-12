@@ -482,8 +482,8 @@ sub new_iq {
    $node->attr ($_ => $args{$_}) for keys %args;
 
    my $meta = $node->meta;
-   $meta->{src}  = stringprep_jid $src if defined $src;
-   $meta->{dest} = stringprep_jid $dest if defined $dest;
+   $meta->{src}  = $src if defined $src;
+   $meta->{dest} = $dest if defined $dest;
    $meta->set_reply_cb (@reply_info);
    $meta->add_sent_cb ($sent_cb) if defined $sent_cb;
 
@@ -528,8 +528,8 @@ sub new_message {
 
    my $meta = $node->meta;
 
-   $meta->{src}  = stringprep_jid $src if defined $src;
-   $meta->{dest} = stringprep_jid $dest if defined $dest;
+   $meta->{src}  = $src if defined $src;
+   $meta->{dest} = $dest if defined $dest;
    $meta->add_sent_cb ($sent_cb) if defined $sent_cb;
 
    $node
@@ -561,8 +561,8 @@ sub new_presence {
 
    my $meta = $node->meta;
 
-   $meta->{src}  = stringprep_jid $src if defined $src;
-   $meta->{dest} = stringprep_jid $dest if defined $dest;
+   $meta->{src}  = $src if defined $src;
+   $meta->{dest} = $dest if defined $dest;
    $meta->add_sent_cb ($sent_cb) if defined $sent_cb;
 
    $node
