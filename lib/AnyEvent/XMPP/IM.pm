@@ -7,7 +7,6 @@ use AnyEvent::XMPP::Node qw/simxml/;
 use base qw/Object::Event AnyEvent::XMPP::StanzaHandler AnyEvent::XMPP::Extendable/;
 
 __PACKAGE__->inherit_event_methods_from (qw/
-   AnyEvent::XMPP::Stream
    AnyEvent::XMPP::StanzaHandler
    AnyEvent::XMPP::Extendable
 /);

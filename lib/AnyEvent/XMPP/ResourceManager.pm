@@ -31,19 +31,19 @@ sub new {
    return $self
 }
 
-sub add {
-   my ($self, $jid) = @_;
-
-   $self->{resources}->{stringprep_jid $jid} = 1;
-}
-
-sub any_jid {
-   my ($self) = @_;
-   return unless %{$self->{resources} || {}};
-
-   my ($k) = keys %{$self->{resources}};
-   $k
-}
+#sub add {
+#   my ($self, $jid) = @_;
+#
+#   $self->{resources}->{stringprep_jid $jid} = 1;
+#}
+#
+#sub any_jid {
+#   my ($self) = @_;
+#   return unless %{$self->{resources} || {}};
+#
+#   my ($k) = keys %{$self->{resources}};
+#   $k
+#}
 
 sub bind {
    my ($self, $resource, $cb) = @_;

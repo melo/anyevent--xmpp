@@ -16,7 +16,7 @@ our @EXPORT_OK = qw/resourceprep nodeprep prep_join_jid join_jid
                     from_xmpp_datetime to_xmpp_datetime to_xmpp_time
                     xmpp_datetime_as_timestamp
                     filter_xml_chars filter_xml_attr_hash_chars xml_escape
-                    new_iq new_reply new_error
+                    new_iq new_reply new_error new_presence new_message
                     /;
 our @ISA = qw/Exporter/;
 
@@ -475,15 +475,95 @@ sub new_iq {
       (@reply_info) = ($cb, delete $args{timeout});
    }
 
-   my $src  = delete $args{src};
-   my $dest = delete $args{dest};
+   my $sent_cb = delete $args{sent_cb};
+   my $src     = delete $args{src};
+   my $dest    = delete $args{dest};
 
    $node->attr ($_ => $args{$_}) for keys %args;
 
    my $meta = $node->meta;
-   $meta->{src}  = $src if defined $src;
-   $meta->{dest} = $dest if defined $dest;
+   $meta->{src}  = stringprep_jid $src if defined $src;
+   $meta->{dest} = stringprep_jid $dest if defined $dest;
    $meta->set_reply_cb (@reply_info);
+   $meta->add_sent_cb ($sent_cb) if defined $sent_cb;
+
+   $node
+}
+
+sub new_message {
+   my ($type, $body, %args) = @_;
+
+   my $node = AnyEvent::XMPP::Node->new (xmpp_ns ('client') => 'message');
+   $node->attr ('type', $type || 'chat');
+
+   if (defined $body) {
+      $node->add ({ defns => 'client', node => { name => 'body', childs => [ $body ] } });
+   }
+
+   if (my $subject = delete $args{subject}) {
+      $node->add ({ defns => 'client', node => { name => 'subject', childs => [ $body ] } });
+   }
+
+   if (my $thread = delete $args{thread}) {
+      my @attrs;
+      if (ref $thread) {
+         push @attrs, (parent => $thread->[0]);
+         $thread = $thread->[1];
+      }
+
+      $node->add ({ defns => 'client', node => {
+         name => 'thread', attrs => \@attrs, childs => [ $body ] }
+      });
+   }
+
+   if (my $int = delete $args{create}) {
+      $node->add ($int);
+   }
+
+   my $sent_cb = delete $args{sent_cb};
+   my $src     = delete $args{src};
+   my $dest    = delete $args{dest};
+
+   $node->attr ($_ => $args{$_}) for keys %args;
+
+   my $meta = $node->meta;
+
+   $meta->{src}  = stringprep_jid $src if defined $src;
+   $meta->{dest} = stringprep_jid $dest if defined $dest;
+   $meta->add_sent_cb ($sent_cb) if defined $sent_cb;
+
+   $node
+}
+
+sub new_presence {
+   my ($type, $status, $show, %args) = @_;
+
+   my $node = AnyEvent::XMPP::Node->new (xmpp_ns ('client') => 'presence');
+   $node->attr ('type', $type) if defined $type;
+
+   if (my $int = delete $args{create}) {
+      $node->add ($int);
+   }
+
+   if (defined $status) {
+      $node->add ({ node => { name => 'status', childs => [ $status ] } });
+   }
+
+   if (defined $show) {
+      $node->add ({ node => { name => 'status', childs => [ $show ] } });
+   }
+
+   my $sent_cb = delete $args{sent_cb};
+   my $src     = delete $args{src};
+   my $dest    = delete $args{dest};
+
+   $node->attr ($_ => $args{$_}) for keys %args;
+
+   my $meta = $node->meta;
+
+   $meta->{src}  = stringprep_jid $src if defined $src;
+   $meta->{dest} = stringprep_jid $dest if defined $dest;
+   $meta->add_sent_cb ($sent_cb) if defined $sent_cb;
 
    $node
 }

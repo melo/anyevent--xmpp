@@ -33,8 +33,9 @@ AnyEvent::XMPP::StanzaHandler - A stanza handler super class for clients
    my $con = MyCon->new (...);
 
    $con->reg_cb (
+      send_message    => sub { ... },
       recv_message    => sub { ... },
-      recv_presence   => sub { ... },
+
       recv_iq         => sub {
          my ($con, $iq_type, $node) = @_;
 
@@ -67,6 +68,27 @@ sub init {
    my ($self) = @_;
 
    $self->reg_cb (
+      send => -100 => sub {
+         my ($delivery, $node) = @_;
+         my $t = $node->meta->{type};
+         
+         if ($t eq 'presence') {
+            $delivery->event (send_presence => $node);
+
+         } elsif ($t eq 'message') {
+            $delivery->event (send_message => $node);
+
+         } elsif ($t eq 'iq') {
+            my $iq_t = $node->attr ('type');
+            
+            if ($iq_t eq 'set' || $iq_t eq 'get') {
+               $delivery->event (send_iq => $node);
+
+            } else {
+               $delivery->event (send_iq_reply => $node);
+            }
+         }
+      },
       recv => sub {
          my ($delivery, $node) = @_;
          my $t = $node->meta->{type};
@@ -82,6 +104,7 @@ sub init {
 
             if ($iq_t eq 'set' || $iq_t eq 'get') {
                $delivery->event (recv_iq => $node);
+
             } else {
                $delivery->event (recv_iq_reply => $node);
             }
@@ -108,6 +131,7 @@ sub init {
 
 __PACKAGE__->hand_event_methods_down (qw/
    recv_presence recv_message recv_iq recv_iq_reply
+   send_presence send_message send_iq send_iq_reply
 /);
 
 =head1 EVENTS
@@ -121,6 +145,14 @@ __PACKAGE__->hand_event_methods_down (qw/
 =item recv_presence => $node
 
 =item recv_message => $node
+
+=item send_iq => $node
+
+=item send_iq_reply => $node
+
+=item send_presence => $node
+
+=item send_message => $node
 
 =back
 

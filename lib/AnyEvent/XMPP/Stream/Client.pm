@@ -480,7 +480,6 @@ sub start_authenticator {
          $self->{authenticated} = 1;
 
          if (defined $jid) {
-            $self->{res_manager}->add ($jid);
             $self->{jid} = $jid;
             $self->stream_ready ($jid);
 
@@ -577,12 +576,12 @@ sub recv {
       $self->stop_event;
    }
 
-   if (defined (my $resjid = $self->{res_manager}->any_jid)) {
-      $node->meta->{dest} = $resjid;
+   if (defined $self->{jid}) {
+      $node->meta->{dest} = stringprep_jid $self->{jid};
    }
 
    if (defined $self->{server_jid}) {
-      $node->meta->{src} = $self->{server_jid};
+      $node->meta->{src} = stringprep_jid $self->{server_jid};
    }
 
    $self->{tracker}->handle_stanza ($node);
