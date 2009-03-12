@@ -195,7 +195,7 @@ sub new {
                })
          );
 
-         $self->event (sent_stanza_xml => $stanza_data);
+         $self->sent_stanza_xml ($stanza_data);
       },
       ext_after_error => sub {
          my ($self, $error) = @_;
@@ -324,7 +324,7 @@ sub set_handle {
    $self->{peer_port} = $peer_port;
    
    $self->reinit;
-   $self->event (connected => $peer_host, $peer_port);
+   $self->connected ($peer_host, $peer_port);
 }
 
 =item $stream->write_data ($data)
@@ -484,11 +484,11 @@ sub disconnect {
 
    if ($self->{connected}) {
       delete $self->{handle};
-      $self->event (disconnected => $self->{peer_host}, $self->{peer_port}, $msg);
+      $self->disconnected ($self->{peer_host}, $self->{peer_port}, $msg);
 
    } elsif ($self->{handle}) {
       delete $self->{handle};
-      $self->event (connect_error => $msg);
+      $self->connect_error ($msg);
    }
 
    $self->cleanup_flags;

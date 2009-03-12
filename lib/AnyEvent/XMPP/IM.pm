@@ -1,7 +1,7 @@
 package AnyEvent::XMPP::IM;
 use strict;
 no warnings;
-use AnyEvent::XMPP::Util qw/prep_bare_jid new_iq/;
+use AnyEvent::XMPP::Util qw/prep_bare_jid new_iq new_presence/;
 use AnyEvent::XMPP::Stream::Client;
 use AnyEvent::XMPP::Node qw/simxml/;
 use base qw/Object::Event AnyEvent::XMPP::StanzaHandler AnyEvent::XMPP::Extendable/;
@@ -70,9 +70,7 @@ sub new {
       },
       ext_after_initial_presence => sub {
          my ($self, $jid) = @_;
-         $self->send (simxml (node =>
-            { name => 'presence', attrs => [ from => $jid ] }
-         ));
+         $self->send (new_presence (undef, undef, undef, src => $jid));
       }
    );
 
@@ -205,6 +203,14 @@ sub spawn_connection {
 
          $self->disconnected ($jid, $h, $p, $reason, $conhdl->{timeout});
       },
+      source_available => sub {
+         my ($con, $jid) = @_;
+         $self->source_available ($jid);
+      },
+      source_unavailable => sub {
+         my ($con, $jid) = @_;
+         $self->source_unavailable ($jid);
+      }
    );
 
    $conhdl->{con}->connect;
@@ -329,6 +335,9 @@ sub disconnected {
            ." reconnecting in $recontout seconds\n";
    }
 }
+
+sub source_available   { }
+sub source_unavailable { }
 
 =back
 

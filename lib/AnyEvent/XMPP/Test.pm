@@ -4,7 +4,7 @@ no warnings;
 
 use Test::More;
 use AnyEvent::XMPP::IM;
-use AnyEvent::XMPP::Util qw/cmp_bare_jid/;
+use AnyEvent::XMPP::Util qw/cmp_bare_jid new_presence/;
 
 require Exporter;
 our @ISA = qw/Exporter/;
@@ -72,7 +72,14 @@ sub start {
          } else {
             $FJID2 = $jid;
          }
-         $cb->($im, $cv) if ++$cnt >= 2;
+
+         if (++$cnt >= 2) {
+            # sending directed presence for IQ exchange:
+            $im->send (new_presence (undef, undef, undef, src => $FJID1, to => $FJID2));
+            $im->send (new_presence (undef, undef, undef, src => $FJID2, to => $FJID1));
+
+            $cb->($im, $cv) if ++$cnt >= 2;
+         }
       },
       connect_error => sub {
          my ($im, $jid, $reason, $recon_tout) = @_;

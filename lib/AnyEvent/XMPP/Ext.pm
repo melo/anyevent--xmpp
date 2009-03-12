@@ -3,8 +3,6 @@ no warnings;
 use strict;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 
-use base qw/Object::Event/;
-
 =head1 NAME
 
 AnyEvent::XMPP::Ext - Extension baseclass and documentation
@@ -28,16 +26,36 @@ a list of namespace URIs of the features that the extension enables.
 
 =cut
 
-sub disco_feature {
+sub new {
+   my $this = shift;
+   my $class = ref($this) || $this;
+   my $self = bless { @_ }, $class;
 
+   if ($self->disco_feature) {
+      my @own_disco_feat = $self->disco_feature;
+
+      $self->{disco_feat_guard} = $self->{extendable}->reg_cb (
+         discover_features => sub {
+            my ($ext, $features) = @_;
+            push @$features, @own_disco_feat;
+            ()
+         }
+      );
+   }
+
+   $self->init;
+   $self
 }
+
+sub required_extensions { }
+
+sub disco_feature { }
 
 sub disco_feature_standard {
    (
       xmpp_ns ('data_form'),
    )
 }
-
 
 =back
 
@@ -51,7 +69,7 @@ This is the list of supported XMPP extensions:
 
 This extension handles data forms as described in XEP-0004.
 L<AnyEvent::XMPP::Ext::DataForm> allows you to construct, receive and
-answer data forms. This is neccessary for all sorts of things in XMPP.
+answer data forms. This is necessary for all sorts of things in XMPP.
 For example XEP-0055 (Jabber Search) or also In-band registration.
 
 =item XEP-0030 - Service Discovery (Version 2.3)

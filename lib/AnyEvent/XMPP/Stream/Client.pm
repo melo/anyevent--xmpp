@@ -251,7 +251,7 @@ sub new {
              && not ($self->{disable_old_jabber_authentication})
              && not ($self->{authenticated})) {
 
-            $self->event ('pre_authentication;')
+            $self->pre_authentication;
          }
       },
       connected => sub {
@@ -296,7 +296,7 @@ sub new {
                         $self->send_header;
 
                      } elsif ($type eq 'tls_failure') {
-                        $self->event (error => 
+                        $self->error (
                            AnyEvent::XMPP::Error->new (text => 'tls negotiation failed')
                         );
                         $self->disconnect ("TLS handshake failure");
@@ -329,7 +329,7 @@ sub new {
 
                if ($error) {
                   # TODO FIXME: make proper error?!
-                  $self->event (error => $error);
+                  $self->error ($error);
 
                } else {
                   $self->{jid} = $jid;
@@ -493,7 +493,7 @@ sub start_authenticator {
       },
       auth_fail => sub {
          my ($auth, $error) = @_;
-         $self->event (error => $error);
+         $self->error ($error);
          $self->disconnect ("authentication failed");
 
          $self->{authenticator}->disconnect;
@@ -532,7 +532,7 @@ L<AnyEvent::XMPP::Ext::Registration>.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/stream_ready/);
+__PACKAGE__->hand_event_methods_down (qw/pre_authentication/);
 sub pre_authentication { }
 
 =item stream_ready
@@ -544,6 +544,10 @@ was bound.
 
 __PACKAGE__->hand_event_methods_down (qw/stream_ready/);
 sub stream_ready { 
+   my ($self) = @_;
+
+   $self->source_available ($self->{jid});
+
    if ($DEBUG) {
       print "stream ready!\n";
    }
@@ -564,8 +568,8 @@ C<before_recv> you are able to intercept any stanzas before this class gets a
 chance to look at them. (Please only do this if you know what you are doing, of
 course).
 
-Please note that upon receiving a stanza the C<from> and C<to> fields of
-it are defaulted to the server JID (C<from>) and your full JID (C<to>).
+Please note that upon receiving a stanza the C<src> and C<dest> meta fields of
+it are defaulted to the server JID (C<src>) and your full JID (C<dest>).
 
 =cut
 
@@ -577,7 +581,7 @@ sub recv {
    }
 
    if (defined $self->{jid}) {
-      $node->meta->{dest} = $resjid;
+      $node->meta->{dest} = $self->{jid};
    }
 
    if (defined $self->{server_jid}) {
@@ -624,6 +628,36 @@ This event is used to drive the handshake process.
 
 __PACKAGE__->hand_event_methods_down (qw/recv_features/);
 sub recv_features { }
+
+=item source_available => $jid
+
+This is emitted whenever the client resource C<$jid> was successfully bound.
+This event is emitted when the C<stream_ready> event is emitted and has
+nearly the same semantics, only that it's provided to meet the requirements
+of the L<AnyEvent::XMPP::Delivery> interface.
+
+=cut
+
+__PACKAGE__->hand_event_methods_down (qw/source_available/);
+sub source_available { }
+
+=item source_unavailable => $jid
+
+This is emitted whenever the client resource C<$jid> lost the connection
+to the server and thus becomes unavailable for sending. This event
+is emitted whenever a C<disconnected> event is emitted and is
+provided to meed the requirements of the L<AnyEvent::XMPP::Delivery>
+interface.
+
+=cut
+
+sub disconnected {
+   my ($self) = @_;
+   $self->source_unavailable ($self->{jid});
+}
+
+__PACKAGE__->hand_event_methods_down (qw/source_unavailable/);
+sub source_unavailable { }
 
 =back
 

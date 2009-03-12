@@ -6,8 +6,7 @@ use AnyEvent::XMPP::Node qw/simxml/;
 use Scalar::Util qw/weaken/;
 use strict;
 
-#use base qw/AnyEvent::XMPP::Ext/;
-#our @ISA = qw/AnyEvent::XMPP::Ext/;
+use base qw/AnyEvent::XMPP::Ext/;
 
 =head1 NAME
 
@@ -36,21 +35,7 @@ it.
 
 =over 4
 
-=item B<new (%args)>
-
-Creates a new software version handle.
-
 =cut
-
-sub new {
-   my $this = shift;
-   my $class = ref($this) || $this;
-   my $self = bless { @_ }, $class;
-   $self->init;
-   $self
-}
-
-sub required_extensions { }
 
 sub disco_feature { xmpp_ns ('version') }
 
@@ -77,7 +62,7 @@ sub init {
    );
 }
 
-=item B<set_name ($name)>
+=item $ext->set_name ($name)
 
 This method sets the software C<$name> string, the default is "AnyEvent::XMPP".
 
@@ -88,7 +73,7 @@ sub set_name {
    $self->{name} = $name;
 }
 
-=item B<set_version ($version)>
+=item $ext->set_version ($version)
 
 This method sets the software C<$version> string that is replied.
 
@@ -101,7 +86,7 @@ sub set_version {
    $self->{version} = $version;
 }
 
-=item B<set_os ($os)>
+=item $ext->set_os ($os)
 
 This method sets the operating system string C<$os>. If you pass
 undef the string will be removed.
@@ -163,9 +148,9 @@ sub _version_from_node {
    $v
 }
 
-=item $ext->request_version ($from, $dest, $cb->($version, $error), $timeout)
+=item $ext->request_version ($src, $dest, $cb->($version, $error), $timeout)
 
-This method sends a version request to C<$dest> from the (full) JID C<$from>.
+This method sends a version request to C<$dest> from the (full) JID C<$src>.
 
 C<$cb> is the callback that will be called if either an error occurred or the
 result was received.  C<$timeout> is an optional argument, which lets you
@@ -208,11 +193,11 @@ Here an example of the structure of the hash reference:
 =cut
 
 sub request_version {
-   my ($self, $from, $dest, $cb, $tout) = @_;
+   my ($self, $src, $dest, $cb, $tout) = @_;
 
    $self->{extendable}->send (new_iq (
       get =>
-         src => $from,
+         src => $src,
          to  => $dest,
       create => { node  => { dns => 'version', name => 'query' } },
       cb => sub {
