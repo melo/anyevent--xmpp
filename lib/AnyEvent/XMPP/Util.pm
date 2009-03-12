@@ -413,7 +413,8 @@ sub xml_escape {
 
 =item $node = new_iq ($type, %attrs)
 
-This function generates a new L<AnyEvent::XMPP::IQ> object for you.
+This function generates a new L<AnyEvent::XMPP::Node> object for you,
+representing an XMPP IQ stanza.
 
 C<$type> may be one of these 4 values:
 
@@ -490,6 +491,10 @@ sub new_iq {
    $node
 }
 
+=item $node = new_message ($type, $body, %args)
+
+=cut
+
 sub new_message {
    my ($type, $body, %args) = @_;
 
@@ -535,6 +540,10 @@ sub new_message {
    $node
 }
 
+=item $node = new_presence ($type, $status, $show, %args)
+
+=cut
+
 sub new_presence {
    my ($type, $status, $show, %args) = @_;
 
@@ -568,6 +577,10 @@ sub new_presence {
    $node
 }
 
+=item $node = new_reply ($request_node, $create, %attrs)
+
+=cut
+
 sub new_reply {
    my ($node, $child, %attrs) = @_;
    my $nnode = AnyEvent::XMPP::Node->new ($node->namespace, $node->name, \%attrs);
@@ -587,6 +600,10 @@ sub new_reply {
    $nnode->add ($child);
    $nnode
 }
+
+=item $node = new_error ($error_node, $error, $type)
+
+=cut
 
 sub new_error {
    my ($errstanza, $error, $type) = @_;

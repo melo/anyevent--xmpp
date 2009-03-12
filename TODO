@@ -1,5 +1,7 @@
 'x' means: is done!
 
+- document new_* functions in Util
+   - rewrite documentation about add() and simxml().
 - cleanup IM w.r.t. jid/account handling
 X use parse_start of XML::Parser instead of XML::Parser::ExpatNB directly!
 - keep an eye on disco_feature stuff.
