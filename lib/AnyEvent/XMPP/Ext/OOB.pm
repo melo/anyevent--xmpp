@@ -1,9 +1,8 @@
 package AnyEvent::XMPP::Ext::OOB;
 use strict;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
-use AnyEvent::XMPP::Ext;
 
-our @ISA = qw/AnyEvent::XMPP::Ext/;
+use base qw/AnyEvent::XMPP::Ext/;
 
 =head1 NAME
 
@@ -11,33 +10,48 @@ AnyEvent::XMPP::Ext::OOB - XEP-0066 Out of Band Data
 
 =head1 SYNOPSIS
 
+   my $im = AnyEvent::XMPP::IM->new (...);
+   my $ext = $im->add_extension ('AnyEvent::XMPP::Ext::OOB');
 
-   my $con = AnyEvent::XMPP::Connection->new (...);
-   $con->add_extension (my $disco = AnyEvent::XMPP::Ext::Disco->new);
-   $con->add_extension (my $oob = AnyEvent::XMPP::Ext::OOB->new);
-   $disco->enable_feature ($oob->disco_feature);
+   # Example for receiving OOB data via AnyEvent::HTTP:
 
-   $oob->reg_cb (oob_recv => sub {
-      my ($oob, $con, $node, $url) = @_;
+   use AnyEvent::HTTP;
+   $im->reg_cb (
+      ext_oob_recv => sub {
+         my ($im, $node, $oob_data) = @_;
 
-      if (got ($url)) {
-         $oob->reply_success ($con, $node);
-      } else {
-         $oob->reply_failure ($con, $node, 'not-found');
+         if (You Trust: $node->attr ('from')) {
+            http_get $oob_data->{url}, sub {
+               my ($data) = @_;
+               unless (defined $data) {
+                  $ext->reply_failure ($node, 'not-found');
+                  return;
+               }
+
+               # ... write $data out to disk
+
+               $ext->reply_success ($node);
+            };
+         } else {
+            $ext->reply_failure ($node, 'reject');
+         }
       }
-   });
+   );
 
-   $oob->send_url (
-      $con, 'someonewho@wants.an.url.com', "http://nakedgirls.com/marie_021.jpg",
-      "Yaww!!! Hot like SUN!",
+   # Example for sending OOB data:
+
+   $ext->send_url (
+      $src_jid,  # the source JID (the full JID of your own connected resource)
+      $dest_jid, # destination JID
+      'http://www.ta-sa.org/data/imgs//laughing_man_big_2.png',
+      'Some pic I made',
       sub {
          my ($error) = @_;
          if ($error) { # then error
          } else { # everything fine
          }
       }
-   )
-
+   );
 
 =head1 DESCRIPTION
 
