@@ -323,7 +323,7 @@ sub add_field_value {
 
 =item B<to_simxml>
 
-This method converts the form to a data strcuture
+This method converts the form to a data structure
 that you can pass as C<node> argument to the C<simxml>
 function which is documented in L<AnyEvent::XMPP::Util>.
 
@@ -380,7 +380,6 @@ sub to_simxml {
 
    my $fields = [];
    my $top = {
-      ns     => 'data_form',
       dns    => 'data_form',
       name   => 'x',
       attrs  => [],
