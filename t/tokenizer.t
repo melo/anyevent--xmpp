@@ -22,11 +22,28 @@ while (length $e) {
    $p->feed_octets (\$buf);
 }
 
-my $toks = $p->tokenize_chunk ("<elfe fefe='fef >' >fe&gt;ife<a/> </b><![CDATA[[foEOFEOFEOFEOFEOFEO >><><><<>[][][]]][]]]] &gt; ]]></elfe>");
-for (@$toks) {
-   if (ref $_) { 
-      print "{@$_}\n";
-   } else {
-      print "C[$_]\n";
-   }
-}
+$buf = "<s:stream> <m><fe><foo/><fb/></fe><body> feofoefo ef </body></m> <foo/> <bar/> </s:stream>";
+
+$p = AnyEvent::XMPP::StreamParser->new;
+$p->reg_cb (
+   stream_start => sub {
+      my ($p, $node) = @_;
+      
+      print "SS: " . $node->raw_string . "\n";
+      print "    [\n" . $node->as_string (1) . "\n]\n";
+   },
+   stream_end => sub {
+      my ($p, $node) = @_;
+
+      print "SE: " . $node->raw_string . "\n";
+      print "    [\n" . $node->as_string (1) . "\n]\n";
+   },
+   recv => sub {
+      my ($p, $node) = @_;
+
+      print "ST: " . $node->raw_string . "\n";
+      print "    [\n" . $node->as_string (1) . "\n]\n";
+   },
+);
+
+$p->feed_octets (\$buf);

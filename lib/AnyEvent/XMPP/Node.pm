@@ -218,6 +218,11 @@ sub new {
    return $self
 }
 
+sub shallow_clone {
+   my ($self) = @_;
+   $self->new ($self->[NS], $self->[NAME], $self->[ATTRS]);
+}
+
 =item B<name>
 
 The tag name of this node.
@@ -336,6 +341,23 @@ sub attr {
               : delete $_[0]->[ATTRS]->{$_[0]->[NS] . "|" . $_[1]}
         )
       : $_[0]->[ATTRS]->{$_[0]->[NS] . "|" . $_[1]}
+}
+
+=item B<attr_ns ($ns, $name, $value)>
+
+Returns the contents of the C<$name> attribute in the namespace C<$ns>.
+C<$value> is optional, and if not undef it will replace the attribute value.
+
+=cut
+
+sub attr_ns {
+   @_ > 3
+      ? (
+           defined $_[2]
+              ? $_[0]->[ATTRS]->{$_[1] . "|" . $_[2]} = $_[3]
+              : delete $_[0]->[ATTRS]->{$_[1] . "|" . $_[2]}
+        )
+      : $_[0]->[ATTRS]->{$_[1] . "|" . $_[2]}
 }
 
 =item B<attrs>
@@ -564,7 +586,7 @@ sub as_string {
             $str = ${$_->[1]};
          }
 
-         $str . ($indent ? "\n" : "")
+         $str ne '' ?  $str . ($indent ? "\n" : "") : ''
       } @{$self->[NODES]};
 
    if ($indent) {

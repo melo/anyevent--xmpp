@@ -32,6 +32,7 @@ use constant {
    DECL       => 4,
    ATTR       => 5,
    ATTR_LIST_END => 6,
+   PARSED     => 7
 
 };
 our $S    = qr/[\x20\x09\x0d\x0a]+/;
@@ -40,15 +41,18 @@ our $Name = qr/[\p{Letter}_:][^\x20\x09\x0d\x0a>=\/]*/;
 sub new {
    my $this  = shift;
    my $class = ref($this) || $this;
-   my $self  = {
+   my $self  = $class->SUPER::new (
       max_buf_len => 102400,
       @_,
+      enable_methods => 1,
       state       => 0,
       pstate      => 0,
       buf         => '',
       tokens      => [],
       nodestack   => [],
-   };
+      ns_decl_stack => [ { xml => 'http://www.w3.org/XML/1998/namespace' } ],
+      unknown_ns_cnt => 1,
+   );
    bless $self, $class;
 
    return $self
@@ -73,20 +77,24 @@ sub tokenize_chunk {
 
          if ($buf =~ s/^($Name)($S|>|\/>)/\2/o) {
             push @$tokens, [ELEM, $1];
+            push @$tokens, [PARSED, '<' . $1];
             $state = ATTR_LIST;
             next;
 
          } elsif ($buf =~ s/^\?xml([^>]+)\?>//o) {
             push @$tokens, [DECL, $1];
+            push @$tokens, [PARSED, '<' . $&];
             next;
 
          } elsif ($buf =~ s/^\/($Name)$S?>//o) {
+            push @$tokens, [PARSED, '<' . $&];
             push @$tokens, [END_ELEM, $1];
             $state = 0;
             next;
 
          } elsif ($buf =~ s/^!\[CDATA\[ ( (?: [^\]]+ | \][^\]] | \]\][^>] )* ) \]\]> //xo) {
             push @$tokens, $1; #TODO decode
+            push @$tokens, [PARSED, '<' . $&];
             $state = 0;
             next;
 
@@ -97,18 +105,21 @@ sub tokenize_chunk {
       } elsif ($state == ATTR_LIST) {
 
          if ($buf =~ s/^$S?>//o) {
+            push @$tokens, [PARSED, $&];
             push @$tokens, [ATTR_LIST_END];
             $state = 0;
             next;
 
-         } elsif ($buf =~ s/^$S?\/>//o) {
+         } elsif ($buf =~ s/^($S?)\/>//o) {
             push @$tokens, [ATTR_LIST_END];
-            push @$tokens, [EMPTY_ELEM];
+            push @$tokens, [PARSED, $&];
+            push @$tokens, [END_ELEM];
             $state = 0;
             next;
 
          } elsif ($buf =~ s/^$S?($Name)$S?=$S?(?:'([^']*)'|"([^"]*)")//o) {
             push @$tokens, [ATTR, $1 => $2 . $3];
+            push @$tokens, [PARSED, $&];
             next;
 
          } else {
@@ -123,6 +134,7 @@ sub tokenize_chunk {
 
          } elsif ($buf =~ s/^([^<]+)//o) {
             push @$tokens, $1;
+            push @$tokens, [PARSED, $&];
             next;
 
          } else {
@@ -141,28 +153,106 @@ sub tokenize_chunk {
    $self->parse_tokens ($tokens);
 }
 
+sub _strip_ns {
+   my ($qname, $nsdecl, $runknown_cnt, $attr) = @_;
+
+   if ($qname =~ s/^([^:]+):(.*)$/\1/o) {
+      my $ns = $nsdecl->{$1};
+      unless (defined $ns) {
+         $ns = $nsdecl->{$1} = 'aexmpp:unknown:' . $$runknown_cnt++
+      }
+
+      return ($ns, $2);
+   } else {
+      unless (defined $nsdecl->{''}) {
+         $nsdecl->{''} = 'aexmpp:unknown:' . $$runknown_cnt++;
+      }
+      return (($attr ? undef : $nsdecl->{''}), $qname);
+   }
+}
+
 sub parse_tokens {
    my ($self, $tokens) = @_;
 
-   my $nstack = $self->{nodestack};
+   my $nstack  = $self->{nodestack};
+   my $nsdecls = $self->{ns_decl_stack};
+   my $curdecl = $nsdecls->[-1];
+   my $state   = $self->{pstate};
    my $cur;
 
-   for my $tok (@$tokens) {
+   while (@$tokens) {
+      my $tok = shift @$tokens;
       unless (ref $tok) {
          $cur->add ($tok) if $cur;
          next;
       }
 
       my ($type, @args) = @$tok;
+      warn "TOK {$type} [@args]\n";
+
       if ($type == ELEM) {
-      } elsif ($type == EMPTY_ELEM) {
-      } elsif ($type == END_ELEM) {
+         push @$nsdecls, $curdecl = { %$curdecl };
+         my ($ns, $name) = _strip_ns ($args[0], $curdecl, \$self->{unknown_ns_cnt});
+         $cur = AnyEvent::XMPP::Node->new ($ns, $name);
+
+      } elsif ($type == ATTR_LIST_END) {
+         # FIXME: delay namespacing to ATTR_LIST_END, due to decls!
+         if (@$nstack) {
+            push @$nstack, $cur;
+
+         } else {
+            $cur->set_only_start;
+            $self->stream_start ($cur);
+            $cur = $cur->shallow_clone;
+            $cur->set_only_end;
+            push @$nstack, $cur;
+         }
+
+      } elsif ($type == EMPTY_ELEM || $type == END_ELEM) {
+         next unless @$nstack;
+
+         my $node = pop @$nstack;
+         pop @$nsdecls;
+         $cur = @$nstack ? $nstack->[-1] : undef;
+
+         warn "NSTACK: " . scalar (@$nstack) . "\n";
+
+         if (@$nstack == 0) {
+            $self->stream_end ($node);
+
+         } elsif (@$nstack == 1) {
+            $self->recv ($node);
+           
+         } else {
+            $cur->add ($node) if $cur;
+         }
+
       } elsif ($type == ATTR) {
-      } elsif ($type == DECL) {
+         next unless $cur;
+
+         my ($ns, $attr) = _strip_ns ($args[0], $curdecl, \$self->{unknown_ns_cnt});
+         if (not defined $ns) {
+            $cur->attr ($attr, $args[1]);
+         } else {
+            $cur->attr_ns ($ns, $attr, $args[1]);
+         }
+
+      } elsif ($type == PARSED) {
+         unless ($cur) {
+            warn "CAN'T APPEND PARSED DATA: [$args[0]]\n";
+            next;
+         }
+         $cur->append_parsed ($args[0]);
       }
    }
-   $tokens
+
+   $self->{pstate} = $state;
+   ()
 }
+
+sub stream_start { }
+sub stream_end { }
+sub recv { }
 
 =back
 
