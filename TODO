@@ -1,5 +1,6 @@
 'x' means: is done!
 
+- check our internal namespace and replace it at a sane place.
 - document new_* functions in Util
    - rewrite documentation about add() and simxml().
 - cleanup IM w.r.t. jid/account handling

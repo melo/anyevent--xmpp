@@ -69,7 +69,7 @@ sub send_second {
                 . "ok 8 - error type correct.\n");
          print (($error->condition eq 'service-unavailable' ? '' : 'not ')
                 . "ok 9 - error condition correct.\n");
-         print (($error->node && $error->node->find_all ([qw/client query/])
+         print (($error->node && $error->node->find_all ([qw/stanza query/])
                    ? '' : 'not ')
                 . "ok 10 - error contained query node.\n");
 

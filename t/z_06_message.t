@@ -21,7 +21,7 @@ AnyEvent::XMPP::Test::start (sub {
       recv_message => sub {
          my ($im, $node) = @_;
 
-         if (($node->find_all ([qw/client body/]))[0]->text =~ /Hi There/) {
+         if (($node->find_all ([qw/stanza body/]))[0]->text =~ /Hi There/) {
             print "ok 2 - received message\n";
             print ((($node->attr ('type') eq 'chat')
                       ? '' : 'not ')

@@ -19,7 +19,6 @@ my $n = 0;
 $im->reg_cb (
    connected => sub {
       my ($self, $jid) = @_;
-      $self->get_connection ($jid)->send (simxml (node => { dns => 'client', name => 'presence' }));
       my $reg = AnyEvent::XMPP::Ext::Registration->new (delivery => $self->get_connection ($jid));
       $reg->send_unregistration_request (sub {
          my ($reg, $ok, $error, $form) = @_;

@@ -617,12 +617,7 @@ This method is called by the parser to store original strings of this element.
 
 sub append_parsed {
    my ($self, $str) = @_;
-   my ($np) = grep { $_->[0] == NPARS } @{$self->[NODES]};
-   if ($np) {
-      $np->[1] .= $str;
-   } else {
-      push @{$self->[NODES]}, [NPARS, $str];
-   }
+   push @{$self->[NODES]}, [NPARS, $str];
 }
 
 =item B<to_sax_events ($handler)>

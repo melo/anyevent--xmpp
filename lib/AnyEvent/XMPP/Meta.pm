@@ -38,19 +38,17 @@ sub new {
 }
 
 sub analyze {
-   my ($self, $node, $stream_ns) = @_;
-
-   $self->{stream_ns} = $stream_ns;
+   my ($self, $node) = @_;
 
    my $type;
 
-   if ($node->eq ($stream_ns => 'presence')) {
+   if ($node->eq (stanza => 'presence')) {
       $type = 'presence';
 
-   } elsif ($node->eq ($stream_ns => 'iq')) {
+   } elsif ($node->eq (stanza => 'iq')) {
       $type = 'iq';
 
-   } elsif ($node->eq ($stream_ns => 'message')) {
+   } elsif ($node->eq (stanza => 'message')) {
       $type = 'message';
 
    } elsif ($node->eq (stream => 'features')) {

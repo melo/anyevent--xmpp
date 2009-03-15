@@ -16,6 +16,7 @@ my $stream =
       domain => $SERVICE, secret => $SECRET . 'a',
    );
 
+my $try = 1;
 $stream->reg_cb (
    stream_ready => sub {
       print "ok 2 - connected and stream ready\n";
@@ -23,7 +24,7 @@ $stream->reg_cb (
    },
    disconnected => sub {
       my ($stream, $h, $p, $reas) = @_;
-      if ($reas =~ /handshake|not-author/i) {
+      if ($reas =~ /handshake|not-author/i && $try-- > 0) {
          print "ok 1 - disconnected due to wrong password\n";
          $stream->{secret} = $SECRET;
          $stream->connect ($HOST, $PORT);

@@ -97,7 +97,7 @@ sub stream_start {
       lc sha1_hex ($id . encode ('utf-8', xml_escape ($self->{secret})));
 
    $self->send (simxml (
-      defns => 'component', node => {
+      defns => 'stanza', node => {
          name => 'handshake',
          childs => [ $handshake_secret ]
       }
@@ -110,7 +110,7 @@ sub recv {
    unless ($self->{authenticated}) {
       $self->stop_event;
 
-      if ($node->eq (component => 'handshake')) {
+      if ($node->eq (stanza => 'handshake')) {
          $self->{authenticated} = 1;
          $self->stream_ready;
       }

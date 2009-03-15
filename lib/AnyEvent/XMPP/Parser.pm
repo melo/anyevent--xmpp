@@ -77,6 +77,8 @@ sub feed {
 sub tokenize_chunk {
    my ($self, $buf) = @_;
 
+   $self->feed_text ($buf);
+
    $buf = $self->{buf} . $buf;
 
    my $state = $self->{state};
@@ -93,9 +95,10 @@ sub tokenize_chunk {
             $state = ATTR_LIST;
             next;
 
-         } elsif ($buf =~ s/^\?xml([^>]+)\?>//o) {
+         } elsif ($buf =~ s/^\?xml([^>\?]+)\?>//o) {
             push @$tokens, [DECL, $1];
             push @$tokens, [PARSED, '<' . $&];
+            $state = 0;
             next;
 
          } elsif ($buf =~ s/^\/($Name)$S?>//o) {
@@ -251,8 +254,14 @@ sub parse_tokens {
 
                my %attrs;
 
+               unless (@$nstack) { # replace toplevel default namespace
+                  if (defined $curdecl->{''}) {
+                     $curdecl->{''} = 'ae:xmpp:stream:default_ns';
+                  }
+               }
+
                for my $nsattrname (keys %nsattrs) {
-                  my ($ns, $attrname) = _strip_ns ($nsattrname, $curdecl, \$self->{unknown_ns_cnt});
+                  my ($ns, $attrname) = _strip_ns ($nsattrname, $curdecl, \$self->{unknown_ns_cnt}, 1);
                   $attrs{(defined ($ns) ? ($ns . '|') : '') . $attrname} = $nsattrs{$nsattrname};
                }
 
@@ -265,10 +274,6 @@ sub parse_tokens {
                   push @$nstack, $cur;
 
                } else {
-                  if (defined $curdecl->{''}) {
-                     $curdecl->{''} = 'ae:xmpp:stream:default_ns';
-                  }
-
                   $cur->set_only_start;
                   $self->stream_start ($cur);
                   $cur = $cur->shallow_clone;
@@ -303,6 +308,7 @@ sub parse_tokens {
 
          my $node = pop @$nstack;
          pop @$nsdecls;
+         $curdecl = $nsdecls->[-1];
          $cur = @$nstack ? $nstack->[-1] : undef;
 
          if (@$nstack == 0) {
@@ -329,6 +335,7 @@ sub parse_tokens {
 sub stream_start { }
 sub stream_end { }
 sub recv { }
+sub feed_text { }
 
 =back
 

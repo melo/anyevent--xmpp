@@ -128,6 +128,10 @@ sub new {
    $self->{parser} = AnyEvent::XMPP::Parser->new;
 
    $self->{parser}->reg_cb (
+      feed_text => sub {
+         my ($parser, $txt) = @_;
+         $self->debug_recv ($txt);
+      },
       stream_start => sub {
          my ($parser, $node) = @_;
          $self->recv_stanza_xml ($node);
@@ -309,12 +313,7 @@ sub set_handle {
          },
          on_read => sub {
             my ($hdl) = @_;
-            my $data   = $hdl->rbuf;
-            $hdl->rbuf = '';
-            $data      = decode_utf8 $data;
-
-            $self->debug_recv ($data);
-            $self->{parser}->feed ($data);
+            $self->{parser}->feed (\$hdl->{rbuf});
          },
       );
 

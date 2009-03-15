@@ -47,7 +47,7 @@ sub init {
    }
 
    my @error;
-   my ($err) = $node->find_all ([$node->meta->{stream_ns}, 'error']);
+   my ($err) = $node->find_all ([stanza => 'error']);
 
    unless ($err) {
       warn "No error element found in error stanza!";
