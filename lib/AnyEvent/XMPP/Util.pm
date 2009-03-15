@@ -17,6 +17,7 @@ our @EXPORT_OK = qw/resourceprep nodeprep prep_join_jid join_jid
                     xmpp_datetime_as_timestamp
                     filter_xml_chars filter_xml_attr_hash_chars xml_escape
                     new_iq new_reply new_error new_presence new_message
+                    xml_unescape
                     /;
 our @ISA = qw/Exporter/;
 
@@ -402,12 +403,47 @@ also run the output through filter_xml_chars, just for convenience.
 
 =cut
 
+our %UNESC_MAP = (
+   lt => '<',
+   gt => '>',
+   amp => '&',
+   quot => '"',
+   apos => "'",
+);
+
+our %ESC_MAP = map { $UNESC_MAP{$_} => $_ } keys %UNESC_MAP;
+
 sub xml_escape {
    my $str = shift;
-   $str =~ s/</&lt;/g;
-   $str =~ s/>/&gt;/g;
-   $str =~ s/&/&amp;/g;
-   $str =~ s/"/&quot;/g;
+   $str =~ s/([<>&"'])/&$ESC_MAP{$1};/g;
+   filter_xml_chars $str
+}
+
+=item $text = xml_unescape ($xmltext)
+
+Replaces predefined XML entities from C<$xmltext>. The inverse function of C<xml_escape>.
+
+=cut
+
+sub xml_unescape {
+   my $str = shift;
+   $str =~ s/
+      &
+      (
+           (\#[0-9]+)
+         | (\#x[0-9a-fA-F]+)
+         | ([a-zA-Z]+)
+      )
+      ;
+   /
+      substr ($1, 0, 2) eq '#x'
+         ? chr (hex (substr ($1, 2)))
+         : (
+            substr ($1, 0, 1) eq '#'
+              ? chr ($1)
+              : $UNESC_MAP{$1}
+         )
+   /gex;
    filter_xml_chars $str
 }
 

@@ -406,7 +406,17 @@ sub add {
    } elsif (@args > 0) {
       push @{$self->[NODES]}, [NNODE, $n = AnyEvent::XMPP::Node->new ($node, @args)];
    } else {
-      push @{$self->[NODES]}, [NTEXT, $n = $node]
+      my $found = 0;
+      for (my $i = @{$self->[NODES]} - 1; $i >= 0; $i--) {
+         next if $self->[NODES]->[$i]->[0] == NPARS;
+         if ($self->[NODES]->[$i]->[0] == NTEXT) {
+            $self->[NODES]->[$i]->[1] .= $node;
+            $found = 1;
+         }
+      }
+      unless ($found) {
+         push @{$self->[NODES]}, [NTEXT, $n = $node]
+      }
    }
    $n
 }
@@ -496,11 +506,10 @@ sub raw_string {
             @{$self->[NODES]};
 }
 
-=item B<as_string ($default_namespace, $indent)>
+=item B<as_string ($indent)>
 
 This function will serialize this node to an unicode XML string,
 ready for being UTF-8 encoded and written to the socket.
-C<$default_namespace> is the default namespace this element is in.
 
 =cut
 
@@ -608,7 +617,12 @@ This method is called by the parser to store original strings of this element.
 
 sub append_parsed {
    my ($self, $str) = @_;
-   push @{$self->[NODES]}, [NPARS, $str];
+   my ($np) = grep { $_->[0] == NPARS } @{$self->[NODES]};
+   if ($np) {
+      $np->[1] .= $str;
+   } else {
+      push @{$self->[NODES]}, [NPARS, $str];
+   }
 }
 
 =item B<to_sax_events ($handler)>

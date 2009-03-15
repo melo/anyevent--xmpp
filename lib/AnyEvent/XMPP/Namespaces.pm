@@ -6,6 +6,7 @@ our @EXPORT_OK = qw/xmpp_ns set_xmpp_ns_alias xmpp_ns_maybe/;
 our @ISA = qw/Exporter/;
 
 our %NAMESPACES = (
+   stanza      => 'ae:xmpp:stream:default_ns',
    stream      => 'http://etherx.jabber.org/streams',
    xml         => 'http://www.w3.org/XML/1998/namespace',
 

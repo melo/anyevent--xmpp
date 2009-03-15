@@ -3,6 +3,7 @@ use strict;
 no warnings;
 use Encode;
 use AnyEvent::XMPP::Node;
+use AnyEvent::XMPP::Util qw/xml_unescape/;
 
 use base qw/Object::Event/;
 
@@ -27,12 +28,13 @@ use constant {
    ATTR_LIST => 2,
 
    ELEM       => 1,
-   EMPTY_ELEM => 2,
-   END_ELEM   => 3,
-   DECL       => 4,
-   ATTR       => 5,
-   ATTR_LIST_END => 6,
-   PARSED     => 7
+   END_ELEM   => 2,
+   DECL       => 3,
+   ATTR       => 4,
+   ATTR_LIST_END => 5,
+   PARSED     => 6,
+
+   P_ELEM_START => 1
 
 };
 our $S    = qr/[\x20\x09\x0d\x0a]+/;
@@ -52,6 +54,7 @@ sub new {
       nodestack   => [],
       ns_decl_stack => [ { xml => 'http://www.w3.org/XML/1998/namespace' } ],
       unknown_ns_cnt => 1,
+      cur_cdata   => '',
    );
    bless $self, $class;
 
@@ -111,14 +114,14 @@ sub tokenize_chunk {
             next;
 
          } elsif ($buf =~ s/^($S?)\/>//o) {
-            push @$tokens, [ATTR_LIST_END];
             push @$tokens, [PARSED, $&];
+            push @$tokens, [ATTR_LIST_END];
             push @$tokens, [END_ELEM];
             $state = 0;
             next;
 
          } elsif ($buf =~ s/^$S?($Name)$S?=$S?(?:'([^']*)'|"([^"]*)")//o) {
-            push @$tokens, [ATTR, $1 => $2 . $3];
+            push @$tokens, [ATTR, $1, $2 . $3];
             push @$tokens, [PARSED, $&];
             next;
 
@@ -171,6 +174,21 @@ sub _strip_ns {
    }
 }
 
+sub _normalize_value {
+   my ($str, $is_attr) = @_;
+   $str =~ s/\xD\xA/\xA/g;
+   $str =~ s/\xD/\xA/g;
+
+   if ($is_attr) {
+      $str =~ s/[\x09\x0d\x0a]/\x20/g;
+      $str = xml_unescape ($str);
+   } else {
+      $str = xml_unescape ($str);
+   }
+
+   $str
+}
+
 sub parse_tokens {
    my ($self, $tokens) = @_;
 
@@ -178,44 +196,105 @@ sub parse_tokens {
    my $nsdecls = $self->{ns_decl_stack};
    my $curdecl = $nsdecls->[-1];
    my $state   = $self->{pstate};
-   my $cur;
+   my $cdata   = $self->{cur_cdata};
+   my $cur     = @$nstack ? $nstack->[-1] : undef;
 
    while (@$tokens) {
       my $tok = shift @$tokens;
       unless (ref $tok) {
-         $cur->add ($tok) if $cur;
+         $cdata .= $tok;
          next;
       }
 
       my ($type, @args) = @$tok;
-      warn "TOK {$type} [@args]\n";
+
+      if ($state) {
+         my ($state_id, $name, @sattrs) = @$state;
+
+         if ($state_id == P_ELEM_START) {
+            if ($type == ATTR) {
+               push @$state, @args;
+
+            } elsif ($type == ATTR_LIST_END) {
+               push @$nsdecls, $curdecl = { %$curdecl };
+
+               my $parsed;
+
+               my %nsattrs;
+               while (@sattrs) {
+                  if (ref ($sattrs[0])) {
+                     $parsed .= join '', @{shift @sattrs};
+                     next;
+                  }
+
+                  my ($attr, $val) = (shift @sattrs, _normalize_value (shift @sattrs, 1));
+
+                  if ($attr =~ /^xmlns(?:\:(.*))?$/) {
+                     if ($1 ne '') {
+                        $curdecl->{$1} = $val;
+                     } else {
+                        $curdecl->{''} = $val;
+                     }
+                  } else {
+                     $nsattrs{$attr} = $val;
+                  }
+               }
+
+               my %attrs;
+
+               for my $nsattrname (keys %nsattrs) {
+                  my ($ns, $attrname) = _strip_ns ($nsattrname, $curdecl, \$self->{unknown_ns_cnt});
+                  $attrs{(defined ($ns) ? ($ns . '|') : '') . $attrname} = $nsattrs{$nsattrname};
+               }
+
+               my $ns;
+               ($ns, $name) = _strip_ns ($name, $curdecl, \$self->{unknown_ns_cnt});
+               $cur = AnyEvent::XMPP::Node->new ($ns, $name, \%attrs);
+               $cur->append_parsed ($parsed);
+
+               if (@$nstack) {
+                  push @$nstack, $cur;
+
+               } else {
+                  if (defined $curdecl->{''}) {
+                     $curdecl->{''} = 'ae:xmpp:stream:default_ns';
+                  }
+
+                  $cur->set_only_start;
+                  $self->stream_start ($cur);
+                  $cur = $cur->shallow_clone;
+                  $cur->set_only_end;
+                  push @$nstack, $cur;
+               }
+
+               $state = undef;
+            } elsif ($type == PARSED) {
+               push @$state, [$args[0]];
+            }
+
+            next;
+         }
+      }
 
       if ($type == ELEM) {
-         push @$nsdecls, $curdecl = { %$curdecl };
-         my ($ns, $name) = _strip_ns ($args[0], $curdecl, \$self->{unknown_ns_cnt});
-         $cur = AnyEvent::XMPP::Node->new ($ns, $name);
+         if ($cdata ne '') {
+            $cur->add (_normalize_value ($cdata)) if $cur;
+            $cdata = '';
+         }
+         $state = [P_ELEM_START, $args[0]];
+         next;
 
-      } elsif ($type == ATTR_LIST_END) {
-         # FIXME: delay namespacing to ATTR_LIST_END, due to decls!
-         if (@$nstack) {
-            push @$nstack, $cur;
-
-         } else {
-            $cur->set_only_start;
-            $self->stream_start ($cur);
-            $cur = $cur->shallow_clone;
-            $cur->set_only_end;
-            push @$nstack, $cur;
+      } elsif ($type == END_ELEM) {
+         if ($cdata ne '') {
+            $cur->add (_normalize_value ($cdata)) if $cur;
+            $cdata = '';
          }
 
-      } elsif ($type == EMPTY_ELEM || $type == END_ELEM) {
          next unless @$nstack;
 
          my $node = pop @$nstack;
          pop @$nsdecls;
          $cur = @$nstack ? $nstack->[-1] : undef;
-
-         warn "NSTACK: " . scalar (@$nstack) . "\n";
 
          if (@$nstack == 0) {
             $self->stream_end ($node);
@@ -227,25 +306,13 @@ sub parse_tokens {
             $cur->add ($node) if $cur;
          }
 
-      } elsif ($type == ATTR) {
-         next unless $cur;
-
-         my ($ns, $attr) = _strip_ns ($args[0], $curdecl, \$self->{unknown_ns_cnt});
-         if (not defined $ns) {
-            $cur->attr ($attr, $args[1]);
-         } else {
-            $cur->attr_ns ($ns, $attr, $args[1]);
-         }
-
       } elsif ($type == PARSED) {
-         unless ($cur) {
-            warn "CAN'T APPEND PARSED DATA: [$args[0]]\n";
-            next;
-         }
+         next unless $cur;
          $cur->append_parsed ($args[0]);
       }
    }
 
+   $self->{cur_cdata} = $cdata;
    $self->{pstate} = $state;
    ()
 }
