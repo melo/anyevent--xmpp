@@ -1,6 +1,10 @@
 package AnyEvent::XMPP::StreamParser;
 use strict;
 no warnings;
+use Encode;
+use AnyEvent::XMPP::Node;
+
+use base qw/Object::Event/;
 
 =head1 NAME
 
@@ -26,8 +30,8 @@ use constant {
    EMPTY_ELEM => 2,
    END_ELEM   => 3,
    DECL       => 4,
-   ENDTAG     => 5,
-   ATTR       => 6,
+   ATTR       => 5,
+   ATTR_LIST_END => 6,
 
 };
 our $S    = qr/[\x20\x09\x0d\x0a]+/;
@@ -36,14 +40,22 @@ our $Name = qr/[\p{Letter}_:][^\x20\x09\x0d\x0a>=\/]*/;
 sub new {
    my $this  = shift;
    my $class = ref($this) || $this;
-   my $self  = { @_ };
+   my $self  = {
+      max_buf_len => 102400,
+      @_,
+      state       => 0,
+      pstate      => 0,
+      buf         => '',
+      tokens      => [],
+      nodestack   => [],
+   };
    bless $self, $class;
 
-   $self->{status} = 0;
-   $self->{buf}    = '';
-   $self->{tokens} = [];
-
    return $self
+}
+
+sub feed_octets {
+   $_[0]->tokenize_chunk (decode ('utf-8', ${$_[1]}, Encode::FB_QUIET));
 }
 
 sub tokenize_chunk {
@@ -51,17 +63,17 @@ sub tokenize_chunk {
 
    $buf = $self->{buf} . $buf;
 
-   my $status = $self->{status};
+   my $state = $self->{state};
    my $tokens = [];
 
    while (1) {
       last if length $buf <= 0;
 
-      if ($status == EL_START) {
+      if ($state == EL_START) {
 
          if ($buf =~ s/^($Name)($S|>|\/>)/\2/o) {
             push @$tokens, [ELEM, $1];
-            $status = ATTR_LIST;
+            $state = ATTR_LIST;
             next;
 
          } elsif ($buf =~ s/^\?xml([^>]+)\?>//o) {
@@ -70,27 +82,29 @@ sub tokenize_chunk {
 
          } elsif ($buf =~ s/^\/($Name)$S?>//o) {
             push @$tokens, [END_ELEM, $1];
-            $status = 0;
+            $state = 0;
             next;
 
          } elsif ($buf =~ s/^!\[CDATA\[ ( (?: [^\]]+ | \][^\]] | \]\][^>] )* ) \]\]> //xo) {
             push @$tokens, $1; #TODO decode
-            $status = 0;
+            $state = 0;
             next;
 
          } else {
             last;
          }
 
-      } elsif ($status == ATTR_LIST) {
+      } elsif ($state == ATTR_LIST) {
 
          if ($buf =~ s/^$S?>//o) {
-            $status = 0;
+            push @$tokens, [ATTR_LIST_END];
+            $state = 0;
             next;
 
          } elsif ($buf =~ s/^$S?\/>//o) {
+            push @$tokens, [ATTR_LIST_END];
             push @$tokens, [EMPTY_ELEM];
-            $status = 0;
+            $state = 0;
             next;
 
          } elsif ($buf =~ s/^$S?($Name)$S?=$S?(?:'([^']*)'|"([^"]*)")//o) {
@@ -104,7 +118,7 @@ sub tokenize_chunk {
       } else {
 
          if ($buf =~ s/^<//o) {
-            $status = EL_START;
+            $state = EL_START;
             next;
 
          } elsif ($buf =~ s/^([^<]+)//o) {
@@ -117,11 +131,36 @@ sub tokenize_chunk {
       }
    }
 
-   $self->{buf} = $buf;
-   $self->{status} = $status;
+   $self->{buf}   = $buf;
+   $self->{state} = $state;
 
-   warn "[$buf][$status]\n";
+   if (length ($self->{buf}) > $self->{max_buf_len}) {
+      die "unprocessed buffer limit ($self->{max_buf_len} bytes) reached\n";
+   }
 
+   $self->parse_tokens ($tokens);
+}
+
+sub parse_tokens {
+   my ($self, $tokens) = @_;
+
+   my $nstack = $self->{nodestack};
+   my $cur;
+
+   for my $tok (@$tokens) {
+      unless (ref $tok) {
+         $cur->add ($tok) if $cur;
+         next;
+      }
+
+      my ($type, @args) = @$tok;
+      if ($type == ELEM) {
+      } elsif ($type == EMPTY_ELEM) {
+      } elsif ($type == END_ELEM) {
+      } elsif ($type == ATTR) {
+      } elsif ($type == DECL) {
+      }
+   }
    $tokens
 }
 
