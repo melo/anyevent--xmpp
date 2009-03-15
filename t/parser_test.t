@@ -7,7 +7,7 @@ use AnyEvent::XMPP::Node qw/simxml/;
 
 my %def = (
    xmpp_ns ('stream') => 'stream',
-   xmpp_ns ('client') => ''
+   xmpp_ns ('stanza') => ''
 );
 
 my $stream_el = AnyEvent::XMPP::Node->new ('http://etherx.jabber.org/streams' => 'stream');
@@ -15,7 +15,7 @@ $stream_el->add_decl_prefix ($_ => $def{$_}) for keys %def;
 $stream_el->set_only_start;
 
 my $iq_el = 
-   simxml (defns => 'jabber:client', node => {
+   simxml (defns => 'stanza', node => {
       name => 'iq', attrs => [ type => 'set' ], childs => [
          { name => 'query', dns => 'roster',
             childs => [
@@ -62,4 +62,4 @@ $p->reg_cb (stream_start => $anal, recv => $anal);
 
 $p->init;
 
-for (@input) { $p->feed ($_) }
+for my $in (@input) { $p->feed (\$in) }

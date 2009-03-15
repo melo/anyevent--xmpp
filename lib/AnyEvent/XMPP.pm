@@ -70,10 +70,6 @@ The former L<AnyEvent::XMPP::Event> module has been outsourced to the L<Object::
 module to provide a more generic way for more other modules to register and call
 event callbacks.
 
-=item L<XML::Parser::Expat>
-
-For parsing partial "XML" stuff.
-
 =item L<MIME::Base64>
 
 For SASL authentication

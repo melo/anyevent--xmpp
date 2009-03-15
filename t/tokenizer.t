@@ -2,7 +2,7 @@
 use strict;
 use utf8;
 use Test::More;
-use AnyEvent::XMPP::StreamParser;
+use AnyEvent::XMPP::Parser;
 use JSON -convert_blessed_universally;
 use Encode;
 
@@ -37,7 +37,7 @@ my @stanzas = (
 );
 
 my (@ss, @se, @st);
-my $p = AnyEvent::XMPP::StreamParser->new;
+my $p = AnyEvent::XMPP::Parser->new;
 $p->reg_cb (
    stream_start => sub {
       my ($p, $node) = @_;

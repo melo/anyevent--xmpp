@@ -14,7 +14,6 @@ WriteMakefile(
         'AnyEvent::Socket'   => 0,
         'AnyEvent::Handle'   => 0,
         'Scalar::Util'       => 0,
-        'XML::Parser::Expat' => 0,
         'MIME::Base64'       => 0,
         'Net::LibIDN'        => 0,
         'Authen::SASL'       => 0,
