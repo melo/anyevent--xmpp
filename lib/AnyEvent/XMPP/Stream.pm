@@ -125,8 +125,7 @@ sub new {
       xmpp_ns ('xml')    => 'xml',
    };
 
-   $self->{parser} =
-      AnyEvent::XMPP::Parser->new ($self->{default_stream_namespace});
+   $self->{parser} = AnyEvent::XMPP::Parser->new;
 
    $self->{parser}->reg_cb (
       stream_start => sub {

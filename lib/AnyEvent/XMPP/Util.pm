@@ -500,7 +500,7 @@ If you set the timeout to 0 no timeout will be generated.
 sub new_iq {
    my ($type, %args) = @_;
 
-   my $node = AnyEvent::XMPP::Node->new (xmpp_ns ('client') => 'iq');
+   my $node = AnyEvent::XMPP::Node->new (xmpp_ns ('stanza') => 'iq');
    $node->attr ('type', $type);
 
    if (my $int = delete $args{create}) {
@@ -534,15 +534,15 @@ sub new_iq {
 sub new_message {
    my ($type, $body, %args) = @_;
 
-   my $node = AnyEvent::XMPP::Node->new (xmpp_ns ('client') => 'message');
+   my $node = AnyEvent::XMPP::Node->new (xmpp_ns ('stanza') => 'message');
    $node->attr ('type', $type || 'chat');
 
    if (defined $body) {
-      $node->add ({ defns => 'client', node => { name => 'body', childs => [ $body ] } });
+      $node->add ({ defns => 'stanza', node => { name => 'body', childs => [ $body ] } });
    }
 
    if (my $subject = delete $args{subject}) {
-      $node->add ({ defns => 'client', node => { name => 'subject', childs => [ $body ] } });
+      $node->add ({ defns => 'stanza', node => { name => 'subject', childs => [ $body ] } });
    }
 
    if (my $thread = delete $args{thread}) {
@@ -552,7 +552,7 @@ sub new_message {
          $thread = $thread->[1];
       }
 
-      $node->add ({ defns => 'client', node => {
+      $node->add ({ defns => 'stanza', node => {
          name => 'thread', attrs => \@attrs, childs => [ $body ] }
       });
    }
@@ -583,7 +583,7 @@ sub new_message {
 sub new_presence {
    my ($type, $status, $show, %args) = @_;
 
-   my $node = AnyEvent::XMPP::Node->new (xmpp_ns ('client') => 'presence');
+   my $node = AnyEvent::XMPP::Node->new (xmpp_ns ('stanza') => 'presence');
    $node->attr ('type', $type) if defined $type;
 
    if (my $int = delete $args{create}) {
