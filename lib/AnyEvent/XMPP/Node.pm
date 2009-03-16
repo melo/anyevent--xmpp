@@ -412,6 +412,8 @@ sub add {
          if ($self->[NODES]->[$i]->[0] == NTEXT) {
             $self->[NODES]->[$i]->[1] .= $node;
             $found = 1;
+         } else {
+            last;
          }
       }
       unless ($found) {
@@ -589,7 +591,7 @@ sub as_string {
             $str = $_->[1]->as_string ($indent, $subdecls, $idcnt)
 
          } elsif ($_->[0] == NTEXT) {
-            $str = xml_escape ($_->[1])
+            $str = xml_escape ($_->[1]);
 
          } elsif ($_->[0] == NRAW) {
             $str = ${$_->[1]};

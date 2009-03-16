@@ -415,7 +415,7 @@ our %ESC_MAP = map { $UNESC_MAP{$_} => $_ } keys %UNESC_MAP;
 
 sub xml_escape {
    my $str = shift;
-   $str =~ s/([<>&"'])/&$ESC_MAP{$1};/g;
+   $str =~ s/([<>&"'])/&$ESC_MAP{$1};/go;
    filter_xml_chars $str
 }
 
@@ -443,7 +443,7 @@ sub xml_unescape {
               ? chr ($1)
               : $UNESC_MAP{$1}
          )
-   /gex;
+   /gexo;
    filter_xml_chars $str
 }
 

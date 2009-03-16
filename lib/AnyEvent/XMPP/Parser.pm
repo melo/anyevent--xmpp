@@ -125,6 +125,24 @@ default namespace will be replaced when parsing and writing out XMPP stanzas.
 This means that all XMPP stanzas given to you by the events emitted from a
 parser object will be in the namespace 'ae:xmpp:stream:default_ns'.
 
+=head1 PERFORMANCE
+
+A small note about performance here: While benchmarking my parser I discovered
+that my old parser didn't really scale that well due to a bug it even had a
+memleak.
+
+Unfortunately the new parser is (if compared to the fixed version of the old
+expat one) ~35% slower (the expat version was ~50% faster).  On my machine that
+meant that the old expat C parser was able to parse ~3800 stanzas per second,
+and the new pure Perl one was able to parse ~2500 stanzas per second.
+
+If you really need those 1300 stanzas more per second you are free to provide a
+patch with the old expat parser backend. But pleast keep in mind that the old
+expat parser would need to cope with badly namespaced XML content in the XMPP
+stanzas. So you would have to handle namespaces yourself in Perl which would
+probably cost performance too.  In the end you may gain more by optimizing this
+pure Perl parser.
+
 =head1 METHODS
 
 =over 4
@@ -145,6 +163,7 @@ use constant {
    ATTR       => 4,
    ATTR_LIST_END => 5,
    PARSED     => 6,
+   TEXT       => 7,
 
    P_ELEM_START => 1
 
@@ -174,19 +193,19 @@ stream can be started. (Is implicitly called by the constructor C<new>).
 
 =cut
 
+our %INIT_DATA = (
+   state       => 0,
+   buf         => '',
+   unknown_ns_cnt => 1,
+   cur_cdata   => '',
+);
+
 sub init {
    my ($self) = @_;
-   my %init = (
-      state       => 0,
-      pstate      => 0,
-      buf         => '',
-      tokens      => [],
-      nodestack   => [],
-      ns_decl_stack => [ { xml => 'http://www.w3.org/XML/1998/namespace' } ],
-      unknown_ns_cnt => 1,
-      cur_cdata   => '',
-   );
-   $self->{$_} = $init{$_} for keys %init;
+   $self->{$_} = $INIT_DATA{$_} for keys %INIT_DATA;
+   $self->{nodestack} = [];
+   $self->{ns_decl_stack} = [ { xml => 'http://www.w3.org/XML/1998/namespace' } ];
+   delete $self->{cur_element};
 }
 
 =item $parser->feed (\$buf)
@@ -218,26 +237,26 @@ sub feed {
       if ($state == EL_START) {
 
          if ($buf =~ /\G($Name)(?=$S|>|\/>)/goc) {
-            push @$tokens, [ELEM, $&];
-            push @$tokens, [PARSED, '<' . $&];
+            push @$tokens, ELEM, $&;
+            push @$tokens, PARSED, '<' . $&;
             $state = ATTR_LIST;
             next;
 
          } elsif ($buf =~ /\G\?xml([^>\?]+)\?>/goc) {
-            push @$tokens, [DECL, $1];
-            push @$tokens, [PARSED, '<' . $&];
+            push @$tokens, DECL, $1;
+            push @$tokens, PARSED, '<' . $&;
             $state = 0;
             next;
 
          } elsif ($buf =~ /\G\/($Name)$S?>/goc) {
-            push @$tokens, [PARSED, '<' . $&];
-            push @$tokens, [END_ELEM];
+            push @$tokens, PARSED, '<' . $&;
+            push @$tokens, END_ELEM, '';
             $state = 0;
             next;
 
          } elsif ($buf =~ /\G!\[CDATA\[ ( (?: [^\]]+ | \][^\]] | \]\][^>] )* ) \]\]> /xgoc) {
-            push @$tokens, xml_escape ($1);
-            push @$tokens, [PARSED, '<' . $&];
+            push @$tokens, TEXT, xml_escape ($1);
+            push @$tokens, PARSED, '<' . $&;
             $state = 0;
             next;
 
@@ -248,19 +267,19 @@ sub feed {
       } elsif ($state == ATTR_LIST) {
 
          if ($buf =~ /\G$S/goc) {
-            push @$tokens, [PARSED, $&];
+            push @$tokens, PARSED, $&;
             next;
 
          } elsif ($buf =~ /\G(\/)?>/goc) {
-            push @$tokens, [PARSED, $&];
-            push @$tokens, [ATTR_LIST_END];
-            push @$tokens, [END_ELEM] if $1 eq '/';
+            push @$tokens, PARSED, $&;
+            push @$tokens, ATTR_LIST_END, '';
+            push @$tokens, END_ELEM, '' if $1 eq '/';
             $state = 0;
             next;
 
          } elsif ($buf =~ /\G($Name)$S?=$S?(?:'([^']*)'|"([^"]*)")/goc) {
-            push @$tokens, [ATTR, $1, $2 . $3];
-            push @$tokens, [PARSED, $&];
+            push @$tokens, ATTR, [$1, $2 . $3];
+            push @$tokens, PARSED, $&;
             next;
 
          } else {
@@ -274,8 +293,8 @@ sub feed {
             next;
 
          } elsif ($buf =~ /\G[^<]+/goc) {
-            push @$tokens, $&;
-            push @$tokens, [PARSED, $&];
+            push @$tokens, TEXT, $&;
+            push @$tokens, PARSED, $&;
             next;
 
          } else {
@@ -316,11 +335,11 @@ sub _strip_ns {
 
 sub _normalize_value {
    my ($str, $is_attr) = @_;
-   $str =~ s/\xD\xA/\xA/g;
-   $str =~ s/\xD/\xA/g;
+   $str =~ s/\xD\xA/\xA/go;
+   $str =~ s/\xD/\xA/go;
 
    if ($is_attr) {
-      $str =~ s/[\x09\x0d\x0a]/\x20/g;
+      $str =~ s/[\x09\x0d\x0a]/\x20/go;
       $str = xml_unescape ($str);
    } else {
       $str = xml_unescape ($str);
@@ -335,100 +354,94 @@ sub parse_tokens {
    my $nstack  = $self->{nodestack};
    my $nsdecls = $self->{ns_decl_stack};
    my $curdecl = $nsdecls->[-1];
-   my $state   = $self->{pstate};
+   my $cur_el  = $self->{cur_element};
    my $cdata   = $self->{cur_cdata};
    my $cur     = @$nstack ? $nstack->[-1] : undef;
 
    while (@$tokens) {
-      my $tok = shift @$tokens;
-      unless (ref $tok) {
-         $cdata .= $tok;
-         next;
-      }
-
-      my ($type, @args) = @$tok;
-
-      if ($state) {
-         my ($state_id, $name, @sattrs) = @$state;
-
-         if ($state_id == P_ELEM_START) {
-            if ($type == ATTR) {
-               push @$state, @args;
-
-            } elsif ($type == ATTR_LIST_END) {
-               push @$nsdecls, $curdecl = { %$curdecl };
-
-               my $parsed;
-
-               my %nsattrs;
-               while (@sattrs) {
-                  if (ref ($sattrs[0])) {
-                     $parsed .= join '', @{shift @sattrs};
-                     next;
-                  }
-
-                  my ($attr, $val) = (shift @sattrs, _normalize_value (shift @sattrs, 1));
-
-                  if ($attr =~ /^xmlns(?:\:(.*))?$/) {
-                     if ($1 ne '') {
-                        $curdecl->{$1} = $val;
-                     } else {
-                        $curdecl->{''} = $val;
-                     }
-                  } else {
-                     $nsattrs{$attr} = $val;
-                  }
-               }
-
-               my %attrs;
-
-               unless (@$nstack) { # replace toplevel default namespace
-                  if (defined $curdecl->{''}) {
-                     $curdecl->{''} = 'ae:xmpp:stream:default_ns';
-                  }
-               }
-
-               for my $nsattrname (keys %nsattrs) {
-                  my ($ns, $attrname) = _strip_ns ($nsattrname, $curdecl, \$self->{unknown_ns_cnt}, 1);
-                  $attrs{(defined ($ns) ? ($ns . '|') : '') . $attrname} = $nsattrs{$nsattrname};
-               }
-
-               my $ns;
-               ($ns, $name) = _strip_ns ($name, $curdecl, \$self->{unknown_ns_cnt});
-               $cur = AnyEvent::XMPP::Node->new ($ns, $name, \%attrs);
-               $cur->append_parsed ($parsed);
-
-               if (@$nstack) {
-                  push @$nstack, $cur;
-
-               } else {
-                  $cur->set_only_start;
-                  $self->stream_start ($cur);
-                  $cur = $cur->shallow_clone;
-                  $cur->set_only_end;
-                  push @$nstack, $cur;
-               }
-
-               $state = undef;
-            } elsif ($type == PARSED) {
-               push @$state, [$args[0]];
-            }
-
-            next;
-         }
-      }
+      my $type = shift @$tokens;
+      my $arg  = shift @$tokens;
 
       if ($type == ELEM) {
          if ($cdata ne '') {
-            $cur->add (_normalize_value ($cdata)) if $cur;
+            $cur->add (_normalize_value ($cdata)) if $cur && @$nstack > 1;
             $cdata = '';
          }
-         $state = [P_ELEM_START, $args[0]];
+
+         $cur_el = [$arg];
          next;
+
+      } elsif ($type == ATTR) {
+         push @$cur_el, @$arg;
+
+      } elsif ($type == ATTR_LIST_END) {
+         my $name = shift @$cur_el;
+
+         push @$nsdecls, $curdecl = { %$curdecl };
+
+         my $parsed;
+
+         my %nsattrs;
+         while (@$cur_el) {
+            if (ref ($cur_el->[0])) {
+               $parsed .= ${shift @$cur_el};
+               next;
+            }
+
+            my ($attr, $val) = (shift @$cur_el, _normalize_value (shift @$cur_el, 1));
+
+            if ($attr =~ /^xmlns(?:\:(.*))?$/) {
+               if ($1 ne '') {
+                  $curdecl->{$1} = $val;
+               } else {
+                  $curdecl->{''} = $val;
+               }
+            } else {
+               $nsattrs{$attr} = $val;
+            }
+         }
+
+         my %attrs;
+
+         unless (@$nstack) { # replace toplevel default namespace
+            if (defined $curdecl->{''}) {
+               $curdecl->{''} = 'ae:xmpp:stream:default_ns';
+            }
+         }
+
+         for my $nsattrname (keys %nsattrs) {
+            my ($ns, $attrname) = _strip_ns ($nsattrname, $curdecl, \$self->{unknown_ns_cnt}, 1);
+            $attrs{(defined ($ns) ? ($ns . '|') : '') . $attrname} = $nsattrs{$nsattrname};
+         }
+
+         my $ns;
+         ($ns, $name) = _strip_ns ($name, $curdecl, \$self->{unknown_ns_cnt});
+         $cur = AnyEvent::XMPP::Node->new ($ns, $name, \%attrs);
+         $cur->append_parsed ($parsed);
+
+         if (@$nstack) {
+            push @$nstack, $cur;
+
+         } else {
+            $cur->set_only_start;
+            $self->stream_start ($cur);
+            $cur = $cur->shallow_clone;
+            $cur->set_only_end;
+            push @$nstack, $cur;
+         }
+
+         $cur_el = undef;
+
+      } elsif ($type == PARSED) {
+         if ($cur_el) {
+            push @$cur_el, \$arg;
+         } elsif ($cur) {
+            $cur->append_parsed ($arg) if @$nstack > 1;
+         }
 
       } elsif ($type == END_ELEM) {
          if ($cdata ne '') {
-            $cur->add (_normalize_value ($cdata)) if $cur;
+            $cur->add (_normalize_value ($cdata)) if $cur && @$nstack > 1;
             $cdata = '';
          }
 
@@ -449,14 +462,13 @@ sub parse_tokens {
             $cur->add ($node) if $cur;
          }
 
-      } elsif ($type == PARSED) {
-         next unless $cur;
-         $cur->append_parsed ($args[0]);
+      } elsif ($type == TEXT) {
+         $cdata .= $arg;
       }
    }
 
    $self->{cur_cdata} = $cdata;
-   $self->{pstate} = $state;
+   $self->{cur_element} = $cur_el;
    ()
 }
 
