@@ -44,7 +44,17 @@ AnyEvent::XMPP::StreamParser - XMPP Stream Parser
 
 =head1 DESCRIPTION
 
+With L<AnyEvent::XMPP> version 0.9 the original expat parser has been
+replaced with a new handwritten, more robust and liberal XMPP stream parser.
 
+The parser can be fed with incoming byte data (usually from a TCP socket) by
+passing the reference to the incoming buffer to the C<feed> method.
+When the stream header has been completely received the C<stream_start>
+event is emitted. All further XMPP stanzas, that have been received completely,
+emit the C<recv> event with the stanza, in the form of an L<AnyEvent::XMPP::Node>
+structure, as argument.
+
+=head2 WHY I NOT USE expat
 
 =head1 METHODS
 
