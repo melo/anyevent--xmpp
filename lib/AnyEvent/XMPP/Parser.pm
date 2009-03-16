@@ -9,17 +9,50 @@ use base qw/Object::Event/;
 
 =head1 NAME
 
-AnyEvent::XMPP::StreamParser - desc
+AnyEvent::XMPP::StreamParser - XMPP Stream Parser
 
 =head1 SYNOPSIS
 
+   use AnyEvent::XMPP::Parser;
+
+   my $p = AnyEvent::XMPP::Parser->new;
+
+   $p->reg_cb (
+      stream_start => sub {
+         my ($p, $node) = @_;
+         # $node contains the stream start tag and it's attributes
+      },
+      stream_end => sub {
+         my ($p, $node) = @_;
+         # $node contains the stream element and it's attributes
+      },
+      recv => sub {
+         my ($p, $node) = @_;
+         # $node is the AnyEvent::XMPP:Node structure of an XMPP Stanza.
+      },
+      feed_text => sub {
+         my ($p, $text) = @_;
+         warn "debug: processing raw unicode chars: [$text]\n"; 
+      }
+   );
+
+   my $buf = ... # should be filled with a chunk of bytes from
+                 # the TCP socket. 
+
+   $p->feed (\$buf); # will try to decode as much utf-8 data as possible
+                     # and process it.
+
 =head1 DESCRIPTION
+
+
 
 =head1 METHODS
 
 =over 4
 
-=item B<new (%args)>
+=item $parser = AnyEvent::XMPP::Parser->new
+
+Creates a new L<AnyEvent::XMPP::Parser> instance.
 
 =cut
 
@@ -55,6 +88,13 @@ sub new {
    return $self
 }
 
+=item $parser->init
+
+Reinitializes the parser and resets it to the initial state so that a new
+stream can be started. (Is implicitly called by the constructor C<new>).
+
+=cut
+
 sub init {
    my ($self) = @_;
    my %init = (
@@ -69,6 +109,17 @@ sub init {
    );
    $self->{$_} = $init{$_} for keys %init;
 }
+
+=item $parser->feed (\$buf)
+
+The first argument has to be a reference to a scalar.
+
+This method tries to decode as much of the byte data in the
+string buffer C<$buf> as possible. It may not process all data
+from C<$buf> as it might contain only partial UTF-8 encoded unicode
+text.
+
+=cut
 
 sub feed {
    $_[0]->tokenize_chunk (decode ('utf-8', ${$_[1]}, Encode::FB_QUIET));
@@ -331,6 +382,26 @@ sub parse_tokens {
    $self->{pstate} = $state;
    ()
 }
+
+=back
+
+=head1 EVENTS
+
+The L<AnyEvent::XMPP::Parser> implements the event callback
+registration interface of L<Object::Event>. Following events
+are emitted by the parser:
+
+=over 4
+
+=item stream_start => $node
+
+=item stream_end => $node
+
+=item recv => $node
+
+=item feed_text => $unicodetext
+
+=cut
 
 sub stream_start { }
 sub stream_end { }
