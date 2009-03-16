@@ -115,10 +115,7 @@ sub init {
 
          $delivery->send (new_reply (
             $node,
-            [
-               map { $_->add_decl_prefix ($_->namespace, ''); $_ } $node->nodes,
-               new_error ($node, 'service-unavailable')
-            ],
+            [ $node->nodes, new_error ($node, 'service-unavailable') ],
             type => 'error'
          ));
       }
