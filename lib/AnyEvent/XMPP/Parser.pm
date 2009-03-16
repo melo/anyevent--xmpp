@@ -77,7 +77,7 @@ prefixes it copes by assigning own namespaces to it.
 
 I deeply dislike the choice of XML as protocol, and I even more dislike the
 way XMPP made use of XML. It requires processing partial XML data, which
-makes the parsers more complicated than it has to be.
+makes the parsers more complicated than they would have to be.
 
 Using XML for a protocol also introduces bloat and burns CPU cycles unnecessarily.
 A JSON based protocol could me much more faster and easier to handle, and
@@ -89,9 +89,15 @@ to process it for you?
 So, if you choose XMPP as protocol for solving your problems please think twice
 and make sure that performance and scalability requirements are met.
 
-One might wonder why to use XMPP anyway: It's the only free and deployed instant messaging
-protocol out there at the moment. There are no as well known alternatives available. Also
-the XML buzzword helped XMPP to have commercial deployments as well.
+One might wonder why to use XMPP anyway: It's the only free and deployed
+instant messaging protocol out there at the moment.  Also the XML buzzword
+helped XMPP to have commercial deployments as well.  Other protocols are in
+development, like PSYC (L<http://www.psyc.eu/>), but it's still unfinished and
+not yet widely deployed. There is of course also IRC (Internet Relay Chat, see
+RFC 1459 and RFC 2812), but IRC is more focused on chats between multiple
+users. Also is IRC the best choice for multi user chats these days, as the
+multi user chats that are based on XMPP suffer from even more serious
+scalability problems than IRC ever did.
 
 As a very educating read I recommend this thread on standards@xmpp.org:
 
