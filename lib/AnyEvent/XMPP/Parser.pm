@@ -3,7 +3,7 @@ use strict;
 no warnings;
 use Encode;
 use AnyEvent::XMPP::Node;
-use AnyEvent::XMPP::Util qw/xml_unescape/;
+use AnyEvent::XMPP::Util qw/xml_unescape xml_escape/;
 
 use base qw/Object::Event/;
 
@@ -201,11 +201,9 @@ text.
 =cut
 
 sub feed {
-   $_[0]->tokenize_chunk (decode ('utf-8', ${$_[1]}, Encode::FB_QUIET));
-}
+   my ($self, $rbuf) = @_;
 
-sub tokenize_chunk {
-   my ($self, $buf) = @_;
+   my $buf = decode ('utf-8', $$rbuf, Encode::FB_QUIET);
 
    $self->feed_text ($buf);
 
@@ -214,31 +212,31 @@ sub tokenize_chunk {
    my $state = $self->{state};
    my $tokens = [];
 
-   while (1) {
-      last if length $buf <= 0;
+   pos ($buf) = 0;
 
+   while (1) {
       if ($state == EL_START) {
 
-         if ($buf =~ s/^($Name)($S|>|\/>)/\2/o) {
-            push @$tokens, [ELEM, $1];
-            push @$tokens, [PARSED, '<' . $1];
+         if ($buf =~ /\G($Name)(?=$S|>|\/>)/goc) {
+            push @$tokens, [ELEM, $&];
+            push @$tokens, [PARSED, '<' . $&];
             $state = ATTR_LIST;
             next;
 
-         } elsif ($buf =~ s/^\?xml([^>\?]+)\?>//o) {
+         } elsif ($buf =~ /\G\?xml([^>\?]+)\?>/goc) {
             push @$tokens, [DECL, $1];
             push @$tokens, [PARSED, '<' . $&];
             $state = 0;
             next;
 
-         } elsif ($buf =~ s/^\/($Name)$S?>//o) {
+         } elsif ($buf =~ /\G\/($Name)$S?>/goc) {
             push @$tokens, [PARSED, '<' . $&];
-            push @$tokens, [END_ELEM, $1];
+            push @$tokens, [END_ELEM];
             $state = 0;
             next;
 
-         } elsif ($buf =~ s/^!\[CDATA\[ ( (?: [^\]]+ | \][^\]] | \]\][^>] )* ) \]\]> //xo) {
-            push @$tokens, $1; #TODO decode
+         } elsif ($buf =~ /\G!\[CDATA\[ ( (?: [^\]]+ | \][^\]] | \]\][^>] )* ) \]\]> /xgoc) {
+            push @$tokens, xml_escape ($1);
             push @$tokens, [PARSED, '<' . $&];
             $state = 0;
             next;
@@ -249,20 +247,18 @@ sub tokenize_chunk {
 
       } elsif ($state == ATTR_LIST) {
 
-         if ($buf =~ s/^$S?>//o) {
+         if ($buf =~ /\G$S/goc) {
+            push @$tokens, [PARSED, $&];
+            next;
+
+         } elsif ($buf =~ /\G(\/)?>/goc) {
             push @$tokens, [PARSED, $&];
             push @$tokens, [ATTR_LIST_END];
+            push @$tokens, [END_ELEM] if $1 eq '/';
             $state = 0;
             next;
 
-         } elsif ($buf =~ s/^($S?)\/>//o) {
-            push @$tokens, [PARSED, $&];
-            push @$tokens, [ATTR_LIST_END];
-            push @$tokens, [END_ELEM];
-            $state = 0;
-            next;
-
-         } elsif ($buf =~ s/^$S?($Name)$S?=$S?(?:'([^']*)'|"([^"]*)")//o) {
+         } elsif ($buf =~ /\G($Name)$S?=$S?(?:'([^']*)'|"([^"]*)")/goc) {
             push @$tokens, [ATTR, $1, $2 . $3];
             push @$tokens, [PARSED, $&];
             next;
@@ -273,12 +269,12 @@ sub tokenize_chunk {
 
       } else {
 
-         if ($buf =~ s/^<//o) {
+         if ($buf =~ /\G</goc) {
             $state = EL_START;
             next;
 
-         } elsif ($buf =~ s/^([^<]+)//o) {
-            push @$tokens, $1;
+         } elsif ($buf =~ /\G[^<]+/goc) {
+            push @$tokens, $&;
             push @$tokens, [PARSED, $&];
             next;
 
@@ -288,9 +284,11 @@ sub tokenize_chunk {
       }
    }
 
+   my $strip = substr $buf, 0, pos ($buf), '';
+
    $self->{buf}   = $buf;
    $self->{state} = $state;
-
+   
    if (length ($self->{buf}) > $self->{max_buf_len}) {
       die "unprocessed buffer limit ($self->{max_buf_len} bytes) reached\n";
    }
