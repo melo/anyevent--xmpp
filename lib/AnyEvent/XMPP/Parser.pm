@@ -54,7 +54,70 @@ event is emitted. All further XMPP stanzas, that have been received completely,
 emit the C<recv> event with the stanza, in the form of an L<AnyEvent::XMPP::Node>
 structure, as argument.
 
-=head2 WHY I NOT USE expat
+=head2 WHY XMPP SUCKS
+
+B<First>: Read L<http://xmlsucks.org/> and explore L<http://c2.com/cgi/wiki?XmlSucks>.
+
+I've changed from expat to my own implementation. This is mostly due
+to the fact that XMPP B<is not> XML.
+
+One of the main advantages of XML is the vast amount of tools to process it.
+The problem with XMPP is, that most servers these days (first quarter of
+2009) may forward not well formed XML, or at least not well formed XML
+namespaces.
+
+That means that any not well formed incoming XML data that is being parsed and
+checked by a real XML parser will lead to an error, and thus close the XMPP
+stream.  And this in turn means that anyone who manages to send some mildly not
+well formed XML through your server to you is able to disconnect you.
+
+Thus I've chosen to write my own pseudo XML XMPP stream parser, which is quite
+liberal in what kind of XML it accepts and in case of undefined XML namespace
+prefixes it copes by assigning own namespaces to it.
+
+I deeply dislike the choice of XML as protocol, and I even more dislike the
+way XMPP made use of XML. It requires processing partial XML data, which
+makes the parsers more complicated than it has to be.
+
+Using XML for a protocol also introduces bloat and burns CPU cycles unnecessarily.
+A JSON based protocol could me much more faster and easier to handle, and
+also 'extensible', like XMPP claims to be (due to (ab)use of XML namespaces).
+Some argue that one has to write his own XMPP parser anyway, for performance reasons.
+But I wonder: Isn't the whole purpose of XML having stable and working tools ready
+to process it for you?
+
+So, if you choose XMPP as protocol for solving your problems please think twice
+and make sure that performance and scalability requirements are met.
+
+One might wonder why to use XMPP anyway: It's the only free and deployed instant messaging
+protocol out there at the moment. There are no as well known alternatives available. Also
+the XML buzzword helped XMPP to have commercial deployments as well.
+
+As a very educating read I recommend this thread on standards@xmpp.org:
+
+L<http://mail.jabber.org/pipermail/standards/2008-October/020171.html>
+
+=head1 A NOTE ABOUT NAMESPACES
+
+This is an XMPP stream parser, and each XMPP stream has a default XML namespace
+assigned to it, which is defined in the stream header. The problem here is,
+that XMPP streams from client to server, from component to server and from
+server to server have different default namespaces ('jabber:client',
+'jabber:component:...' and 'jabber:server').
+
+This parser will normalize all these default namespace to
+'ae:xmpp:stream:default_ns'.  Other XMPP frameworks do a similar normalization
+of the XMPP stream default namespace.
+
+You will find the 'stanza' alias for that namespace in the
+L<AnyEvent::XMPP:Namespaces> module, for more convenient processing.
+
+Due to this normalization you don't need to track which kind of XMPP
+application you are writing with L<AnyEvent::XMPP>, as the normalized internal
+default namespace will be replaced when parsing and writing out XMPP stanzas.
+
+This means that all XMPP stanzas given to you by the events emitted from a
+parser object will be in the namespace 'ae:xmpp:stream:default_ns'.
 
 =head1 METHODS
 
@@ -425,6 +488,10 @@ sub feed_text { }
 Robin Redeker, C<< <elmex@ta-sa.org> >>
 
 =head1 SEE ALSO
+
+L<AnyEvent::XMPP::Node>
+
+L<AnyEvent::XMPP>
 
 =head1 COPYRIGHT & LICENSE
 
