@@ -15,8 +15,6 @@ my $cv = AnyEvent->condvar;
 my $stream = AnyEvent::XMPP::Stream::Client->new (
    jid      => $JID1,
    password => $PASS,
-   host     => $HOST,
-   port     => $PORT,
 );
 
 my $reg = AnyEvent::XMPP::Ext::Registration->new (delivery => $stream);

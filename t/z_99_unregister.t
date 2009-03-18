@@ -6,7 +6,7 @@ use AnyEvent;
 use AnyEvent::XMPP::Test;
 use AnyEvent::XMPP::IM;
 use AnyEvent::XMPP::Ext::Registration;
-use AnyEvent::XMPP::Util qw/split_jid cmp_bare_jid/;
+use AnyEvent::XMPP::Util qw/split_jid cmp_bare_jid new_iq/;
 use AnyEvent::XMPP::Node qw/simxml/;
 
 AnyEvent::XMPP::Test::check ('client');
@@ -16,6 +16,7 @@ my $im = AnyEvent::XMPP::IM->new;
 
 my $cnt = 2;
 my $n = 0;
+my $t = 0;
 $im->reg_cb (
    connected => sub {
       my ($self, $jid) = @_;
@@ -44,8 +45,8 @@ $im->reg_cb (
 );
 
 
-$im->add_account ($JID1, $PASS, host => $HOST, port => $PORT);
-$im->add_account ($JID2, $PASS, host => $HOST, port => $PORT);
+$im->add_account ($JID1, $PASS);
+$im->add_account ($JID2, $PASS);
 
 $im->update_connections;
 

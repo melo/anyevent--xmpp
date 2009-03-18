@@ -51,7 +51,7 @@ sub check {
          exit 0;
       }
 
-      ($HOST, $PORT, $JID1, $JID2, $PASS) =
+      ($JID1, $JID2, $PASS, $HOST, $PORT) =
          split /:/, $ENV{ANYEVENT_XMPP_TEST_CLIENT};
    }
 }
@@ -98,8 +98,12 @@ sub start {
       },
    );
 
-   $im->add_account ($JID1, $PASS, host => $HOST, port => $PORT);
-   $im->add_account ($JID2, $PASS, host => $HOST, port => $PORT);
+   $im->add_account ($JID1, $PASS,
+       (defined $HOST ? (host => $HOST) : ()),
+       (defined $PORT ? (port => $PORT) : ()));
+   $im->add_account ($JID2, $PASS,
+       (defined $HOST ? (host => $HOST) : ()),
+       (defined $PORT ? (port => $PORT) : ()));
 
    $im->update_connections;
 

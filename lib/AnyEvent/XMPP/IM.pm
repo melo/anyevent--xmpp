@@ -140,6 +140,12 @@ sub add_account {
    };
 }
 
+sub remove_account {
+   my ($self, $jid) = @_;
+
+   delete $self->{accs}->{prep_bare_jid $jid};
+}
+
 sub set_accounts {
    my ($self, %accs) = @_;
 

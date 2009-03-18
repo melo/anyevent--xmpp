@@ -1,2 +1,2 @@
-export ANYEVENT_XMPP_TEST_COMPONENT="192.168.2.110:5233:test.192.168.2.110:abc123"
-export ANYEVENT_XMPP_TEST_CLIENT="192.168.2.110:5232:test_1@192.168.2.110:test_2@192.168.2.110:lolfe123"
+export ANYEVENT_XMPP_TEST_COMPONENT="jabberd_145a.test:xmpp-component=5000:test.jabberd_145a.test:LOL342"
+export ANYEVENT_XMPP_TEST_CLIENT="test_1@jabberd_145a.test:test_2@jabberd_145a.test:lolfe123"
