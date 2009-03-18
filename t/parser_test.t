@@ -40,8 +40,8 @@ my @input = (
 
 my @expected_output = (
    '<stream:stream>',
-   '<ns1:message xmlns:ns1="jabber:component:accept" to="elmex@jabber.org"><ns1:body>Hi!</ns1:body></ns1:message>',
-   '<iq type="set"><ns1:query xmlns:ns1="jabber:iq:roster"><ns2:immed xmlns:ns2="jabber:component:accept"><ns1:test/></ns2:immed><ns1:test2/></ns1:query></iq>',
+   '<message to="elmex@jabber.org"><body>Hi!</body></message>',
+   '<iq type="set"><ns1:query xmlns:ns1="jabber:iq:roster"><immed><ns1:test/></immed><ns1:test2/></ns1:query></iq>',
 );
 
 plan tests => scalar @input;

@@ -14,7 +14,7 @@ AnyEvent::XMPP::Test::check ('client');
 print "1..10\n";
 
 my $hdl;
-AnyEvent::XMPP::Test::start (sub {
+AnyEvent::XMPP::Test::start (1, sub {
    my ($im, $cv) = @_;
    send_first ($im, $cv);
 });

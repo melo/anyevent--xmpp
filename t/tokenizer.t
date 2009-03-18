@@ -7,7 +7,7 @@ use JSON -convert_blessed_universally;
 use Encode;
 
 my $str = encode ('utf-8', <<INPUT);
-   <s:stream xmlns:s="fefe" xmlns="bar">
+   <s:stream xmlns:s="fefe" xmlns="jabber:client">
    <m><fe><foo/><fb/></fe><body> feofoefo ef </body></m>
    <foo>&gt;\015&lt;\015\012</foo>
    <bar a="&#xd;&#xd;A&#xa;&#xa;B&#xd;&#xa;" b="
@@ -88,9 +88,9 @@ my $str2     = $str;
          ok (1, "serialized version matches expected output");
       } else {
          ok (0, "serialized version didn't match expected output");
-         print "# got     : [$ser]\n";
-         print "# expected: [$s]\n";
-         print "# JSON:\n" . JSON->new->convert_blessed->pretty->encode ($o) . "\n";
+         warn "# got     : [$ser]\n";
+         warn "# expected: [$s]\n";
+         warn "# JSON:\n" . JSON->new->convert_blessed->pretty->encode ($o) . "\n";
       }
    }
 }

@@ -176,6 +176,12 @@ sub new {
    my $class = ref($this) || $this;
    my $self  = $class->SUPER::new (
       max_buf_len => 102400,
+      stream_namespaces => {
+         'jabber:client' => 1,
+         'jabber:server' => 1,
+         'jabber:component:accept' => 1,
+         'jabber:component:connect' => 1,
+      },
       @_,
       enable_methods => 1,
    );
@@ -390,6 +396,11 @@ sub parse_tokens {
 
             my ($attr, $val) = (shift @$cur_el, _normalize_value (shift @$cur_el, 1));
 
+            # replace stanza namespaces:
+            if ($self->{stream_namespaces}->{$val}) {
+               $val = 'ae:xmpp:stream:default_ns';
+            }
+
             if ($attr =~ /^xmlns(?:\:(.*))?$/) {
                if ($1 ne '') {
                   $curdecl->{$1} = $val;
@@ -402,13 +413,6 @@ sub parse_tokens {
          }
 
          my %attrs;
-
-         unless (@$nstack) { # replace toplevel default namespace
-            if (defined $curdecl->{''}) {
-               $curdecl->{''} = 'ae:xmpp:stream:default_ns';
-            }
-         }
-
          for my $nsattrname (keys %nsattrs) {
             my ($ns, $attrname) = _strip_ns ($nsattrname, $curdecl, \$self->{unknown_ns_cnt}, 1);
             $attrs{(defined ($ns) ? ($ns . '|') : '') . $attrname} = $nsattrs{$nsattrname};

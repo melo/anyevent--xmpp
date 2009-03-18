@@ -3,5 +3,5 @@
 #export NET_XMPP2_TEST="test1_netxm2@ejabberd.ta-sa.org/x:lolfe123"
 #export NET_XMPP2_TEST_MUC="conference.ejabberd.ta-sa.org"
 #export NET_XMPP2_TEST_DEBUG=1
-export ANYEVENT_XMPP_TEST_COMPONENT="192.168.2.110:5554:test@xmpptest:secret123"
-export ANYEVENT_XMPP_TEST_CLIENT="192.168.2.110:5822:test_1@xmpptest:test_2@xmpptest:lolfe123"
+export -n ANYEVENT_XMPP_TEST_COMPONENT
+export ANYEVENT_XMPP_TEST_CLIENT="test_1@prosody.test:test_2@prosody.test:lolfe123"
