@@ -3,6 +3,7 @@ use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Util qw/stringprep_jid new_iq new_reply new_presence cmp_jid
                             cmp_bare_jid/;
 use Scalar::Util qw/weaken/;
+no warnings;
 use strict;
 
 use base qw/AnyEvent::XMPP::Ext/;

@@ -60,7 +60,7 @@ sub start {
    my ($cnt, $cb, @exts) = @_;
 
    if (ref $cnt) {
-      unshift @exts, $cb;
+      unshift @exts, $cb if defined $cb;
       $cb = $cnt;
       $cnt = 2;
    }
