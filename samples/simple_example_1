@@ -7,14 +7,11 @@ use AnyEvent::XMPP::Client;
 
 my $j = AnyEvent->condvar;
 my $cl = AnyEvent::XMPP::Client->new (debug => 1);
-$cl->add_account ('net_xmpp2@jabber.org', 'test');
+$cl->add_account ('elmex@amessage.eu', 'lolfe123');
 $cl->reg_cb (
    session_ready => sub {
       my ($cl, $acc) = @_;
       print "session ready\n";
-      $cl->send_message (
-         "Hi! I'm too lazy to adjust examples!" => 'elmex@jabber.org', undef, 'chat'
-      );
    },
    disconnect => sub {
       my ($cl, $acc, $h, $p, $reas) = @_;

@@ -4,7 +4,7 @@ no warnings;
 
 use Test::More;
 use AnyEvent::XMPP::IM;
-use AnyEvent::XMPP::Util qw/cmp_bare_jid new_presence/;
+use AnyEvent::XMPP::Util qw/cmp_bare_jid new_presence stringprep_jid/;
 
 require Exporter;
 our @ISA = qw/Exporter/;
@@ -57,29 +57,30 @@ sub check {
 }
 
 sub start {
-   my ($cb) = @_;
+   my ($cnt, $cb, @exts) = @_;
+
+   if (ref $cnt) {
+      unshift @exts, $cb;
+      $cb = $cnt;
+      $cnt = 2;
+   }
 
    my $cv = AnyEvent->condvar;
 
    my $im = AnyEvent::XMPP::IM->new;
-   my $cnt = 0;
+
+   $im->add_extension ($_) for @exts;
 
    $im->reg_cb (
       connected => sub {
          my ($im, $jid) = @_;
          if (cmp_bare_jid ($jid, $JID1)) {
-            $FJID1 = $jid;
+            $FJID1 = stringprep_jid $jid;
          } else {
-            $FJID2 = $jid;
+            $FJID2 = stringprep_jid $jid;
          }
 
-         if (++$cnt >= 2) {
-            # sending directed presence for IQ exchange:
-            $im->send (new_presence (undef, undef, undef, src => $FJID1, to => $FJID2));
-            $im->send (new_presence (undef, undef, undef, src => $FJID2, to => $FJID1));
-
-            $cb->($im, $cv) if ++$cnt >= 2;
-         }
+         if (--$cnt <= 0) { $cb->($im, $cv) }
       },
       connect_error => sub {
          my ($im, $jid, $reason, $recon_tout) = @_;
@@ -101,9 +102,12 @@ sub start {
    $im->add_account ($JID1, $PASS,
        (defined $HOST ? (host => $HOST) : ()),
        (defined $PORT ? (port => $PORT) : ()));
-   $im->add_account ($JID2, $PASS,
-       (defined $HOST ? (host => $HOST) : ()),
-       (defined $PORT ? (port => $PORT) : ()));
+
+   if ($cnt > 1) {
+      $im->add_account ($JID2, $PASS,
+          (defined $HOST ? (host => $HOST) : ()),
+          (defined $PORT ? (port => $PORT) : ()));
+   }
 
    $im->update_connections;
 

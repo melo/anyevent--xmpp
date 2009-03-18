@@ -1,49 +1,33 @@
-package AnyEvent::XMPP::Ext::Skel;
-use AnyEvent::XMPP::Ext;
+package AnyEvent::XMPP::Ext::Ping;
+use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
+use AnyEvent::XMPP::Util qw/stringprep_jid new_iq new_reply/;
+use Scalar::Util qw/weaken/;
 use strict;
 
-our @ISA = qw/AnyEvent::XMPP::Ext/;
+use base qw/AnyEvent::XMPP::Ext/;
 
 =head1 NAME
 
-AnyEvent::XMPP::Ext::Skel - Extension skeleton
+AnyEvent::XMPP::Ext::Skel - Skeleton extension
 
 =head1 SYNOPSIS
 
-   use AnyEvent::XMPP::Ext::Skel;
-
 =head1 DESCRIPTION
-
-This is just a skeleton extension.
 
 =head1 METHODS
 
 =over 4
 
-=item B<new (%args)>
-
-Creates a new extension handle.
-
 =cut
 
-sub new {
-   my $this = shift;
-   my $class = ref($this) || $this;
-   my $self = bless { @_ }, $class;
-   $self->init;
-   $self
-}
+sub disco_feature { }
 
 sub init {
    my ($self) = @_;
 
-   $self->{cb_id} = $self->reg_cb (
+   $self->{iq_guard} = $self->{extendable}->reg_cb (
+      recv_iq => sub { }
    );
-}
-
-sub DESTROY {
-   my ($self) = @_;
-   $self->unreg_cb ($self->{cb_id})
 }
 
 =back

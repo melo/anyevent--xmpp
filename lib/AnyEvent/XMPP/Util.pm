@@ -519,8 +519,8 @@ sub new_iq {
    $node->attr ($_ => $args{$_}) for keys %args;
 
    my $meta = $node->meta;
-   $meta->{src}  = $src if defined $src;
-   $meta->{dest} = $dest if defined $dest;
+   $meta->{src}  = stringprep_jid $src if defined $src;
+   $meta->{dest} = stringprep_jid $dest if defined $dest;
    $meta->set_reply_cb (@reply_info);
    $meta->add_sent_cb ($sent_cb) if defined $sent_cb;
 
@@ -569,19 +569,21 @@ sub new_message {
 
    my $meta = $node->meta;
 
-   $meta->{src}  = $src if defined $src;
-   $meta->{dest} = $dest if defined $dest;
+   $meta->{src}  = stringprep_jid $src if defined $src;
+   $meta->{dest} = stringprep_jid $dest if defined $dest;
    $meta->add_sent_cb ($sent_cb) if defined $sent_cb;
 
    $node
 }
 
-=item $node = new_presence ($type, $status, $show, %args)
+=item $node = new_presence ($type, $show, $status, $priority, %args)
 
 =cut
 
 sub new_presence {
-   my ($type, $status, $show, %args) = @_;
+   my ($type, $show, $status, $prio, %args) = @_;
+
+   $type = undef if $type eq 'available';
 
    my $node = AnyEvent::XMPP::Node->new (xmpp_ns ('stanza') => 'presence');
    $node->attr ('type', $type) if defined $type;
@@ -591,11 +593,27 @@ sub new_presence {
    }
 
    if (defined $status) {
-      $node->add ({ node => { name => 'status', childs => [ $status ] } });
+      $status = [ undef, $status ] unless ref $status;
+
+      my @status = @$status;
+
+      while (@status) {
+         my ($lang, $status) = (shift @status, shift @status);
+
+         $node->add ({ defns => 'stanza', node => {
+            name => 'status',
+            (defined $lang ? (attrs => [ [xml => 'lang'] => $lang ]) : ()),
+            childs => [ $status ]
+         }});
+      }
    }
 
    if (defined $show) {
-      $node->add ({ node => { name => 'status', childs => [ $show ] } });
+      $node->add ({ defns => 'stanza', node => { name => 'status', childs => [ $show ] } });
+   }
+
+   if (defined $prio) {
+      $node->add ({ defns => 'stanza', node => { name => 'priority', childs => [ $prio ] } });
    }
 
    my $sent_cb = delete $args{sent_cb};
@@ -606,8 +624,8 @@ sub new_presence {
 
    my $meta = $node->meta;
 
-   $meta->{src}  = $src if defined $src;
-   $meta->{dest} = $dest if defined $dest;
+   $meta->{src}  = stringprep_jid $src if defined $src;
+   $meta->{dest} = stringprep_jid $dest if defined $dest;
    $meta->add_sent_cb ($sent_cb) if defined $sent_cb;
 
    $node
@@ -621,8 +639,8 @@ sub new_reply {
    my ($node, $child, %attrs) = @_;
    my $nnode = AnyEvent::XMPP::Node->new ($node->namespace, $node->name, \%attrs);
 
-   $nnode->meta->{src} = $node->meta->{dest} if defined $node->meta->{dest};
-   $nnode->meta->{dest} = $node->meta->{src} if defined $node->meta->{src};
+   $nnode->meta->{src}  = $node->meta->{dest} if defined $node->meta->{dest};
+   $nnode->meta->{dest} = $node->meta->{src}  if defined $node->meta->{src};
 
    $nnode->attr (id => $node->attr ('id')) if defined $node->attr ('id');
    $nnode->attr (to => $node->attr ('from')) if defined $node->attr ('from');

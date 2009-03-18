@@ -98,6 +98,13 @@ Sets the XML namespace of the stream. The default for C<$namespace> is
 'client'.  Other classes like L<AnyEvent::XMPP::Stream::Component> set it to
 'component' for instance.
 
+=item default_stream_lang => $lang
+
+This should be the language of the human readable contents that
+will be transmitted over the stream. The default will be 'en'.
+
+Please look in RFC 3066 how C<$lang> should look like.
+
 =item stream_end_timeout => $seconds
 
 This is the timeout that is used for closing the connection from our
@@ -114,6 +121,7 @@ sub new {
    my $class = ref($this) || $this;
    my $self  = $class->SUPER::new (
       default_stream_namespace => 'client',
+      default_stream_lang      => 'en',
       stream_end_timeout       => 30,
       enable_methods           => 1,
       @_
@@ -134,6 +142,11 @@ sub new {
       },
       stream_start => sub {
          my ($parser, $node) = @_;
+
+         if (defined (my $lang = $node->attr_ns (xml => 'lang'))) {
+            $self->{stream_in_lang} = $lang;
+         }
+
          $self->recv_stanza_xml ($node);
          $self->stream_start ($node);
       },
@@ -148,6 +161,12 @@ sub new {
 
          my $meta = $node->meta;
          my $type = $meta->{type};
+
+         if (defined (my $lang = $node->attr_ns (xml => 'lang'))) {
+            $meta->{lang} = $lang;
+         } else {
+            $meta->{lang} = $self->{stream_in_lang};
+         }
 
          if ($type ne 'error') {
             $self->recv ($node);
@@ -189,6 +208,15 @@ sub new {
          if ($node->meta->sent_cbs) {
             push @{$self->{write_done_queue}}, $node->meta->sent_cbs
          }
+
+         if ((defined $node->meta->{lang})
+             && $node->meta->{lang} ne $self->{default_stream_lang}) {
+
+            $node->attr_ns (xml => lang => $node->{meta}->{lang});
+         }
+
+         $node->meta->{lang} = $self->{default_stream_lang}
+            unless defined $node->meta->{lang};
 
          $self->write_data (
             my $stanza_data =
@@ -407,30 +435,28 @@ sub starttls {
    $self->reinit;
 }
 
-=item $stream->send_header ($lang, $version, %attrs)
+=item $stream->send_header ($version, %attrs)
 
-This method sends the XMPP stream header. C<$lang> is the language
-of the messages of this stream, the default is 'en'.
-C<$version> is the version for this stream, the default is '1.0'.
-And if C<$version> is the empty string no version attribute will be generated.
+This method sends the XMPP stream header. C<$version> is the version for this
+stream, the default is '1.0'.  And if C<$version> is the empty string no
+version attribute will be generated.
 
 You may pass other attributes for the stream start tag in C<%attrs>.
 
 =cut
 
 sub send_header {
-   my ($self, $lang, $version, %attrs) = @_;
+   my ($self, $version, %attrs) = @_;
    return unless $self->{connected};
 
    $version = '1.0' unless defined $version;
-   $lang    = 'en'  unless defined $lang;
 
    my $node = simxml (
       defns => 'stream',
       node => {
          name => 'stream',
          attrs => [
-            [xmpp_ns ('xml'), 'lang'] => $lang,
+            [xmpp_ns ('xml'), 'lang'] => $self->{default_stream_lang},
             ($version ne '' ? (version => $version) : ()),
             %attrs
          ]

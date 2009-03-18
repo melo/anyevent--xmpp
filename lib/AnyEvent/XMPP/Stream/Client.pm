@@ -125,13 +125,6 @@ This will set the whitespace ping interval (in seconds). The default interval
 is 60 seconds.  You can disable the whitespace ping by setting C<$interval> to
 0.
 
-=item language => $tag
-
-This should be the language of the human readable contents that
-will be transmitted over the stream. The default will be 'en'.
-
-Please look in RFC 3066 how C<$tag> should look like.
-
 =item use_host_as_sasl_hostname => $bool
 
 This is a special parameter for people who might want to use GSSAPI SASL
@@ -392,7 +385,7 @@ sub send_header {
    my ($self) = @_;
 
    $self->SUPER::send_header (
-      $self->{language}, $self->{stream_version_override}, to => $self->{domain}
+      $self->{stream_version_override}, to => $self->{domain}
    );
 }
 
@@ -546,7 +539,7 @@ __PACKAGE__->hand_event_methods_down (qw/stream_ready/);
 sub stream_ready { 
    my ($self) = @_;
 
-   $self->source_available ($self->{jid});
+   $self->source_available (stringprep_jid $self->{jid});
 
    if ($DEBUG) {
       print "stream ready!\n";
@@ -581,11 +574,11 @@ sub recv {
    }
 
    if (defined $self->{jid}) {
-      $node->meta->{dest} = $self->{jid};
+      $node->meta->{dest} = stringprep_jid $self->{jid};
    }
 
    if (defined $self->{server_jid}) {
-      $node->meta->{src} = $self->{server_jid};
+      $node->meta->{src} = stringprep_jid $self->{server_jid};
    }
 
    $self->{tracker}->handle_stanza ($node);
@@ -653,7 +646,7 @@ interface.
 
 sub disconnected {
    my ($self) = @_;
-   $self->source_unavailable ($self->{jid});
+   $self->source_unavailable (stringprep_jid $self->{jid});
 }
 
 __PACKAGE__->hand_event_methods_down (qw/source_unavailable/);

@@ -74,6 +74,10 @@ However, other extensions might just signal availability of a
 L<AnyEvent::XMPP::Stream::Component> connection by giving the component's JID
 (if it has one) in C<$jid>.
 
+B<NOTE>: The C<$jid> must be normalized by the class that implements this interface,
+so that the JID can be used as 'unique' key for storing information
+that is related to that resource.
+
 =back
 
 =head1 AUTHOR

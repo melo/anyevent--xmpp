@@ -1,6 +1,7 @@
 package AnyEvent::XMPP::Meta;
 use strict;
 no warnings;
+use AnyEvent::XMPP::Util qw/cmp_jid cmp_bare_jid stringprep_jid/;
 
 =head1 NAME
 
@@ -44,6 +45,7 @@ sub analyze {
 
    if ($node->eq (stanza => 'presence')) {
       $type = 'presence';
+      $self->analyze_presence ($node);
 
    } elsif ($node->eq (stanza => 'iq')) {
       $type = 'iq';
@@ -98,9 +100,22 @@ sub set_reply_cb {
 
 =back
 
+=head1 LANGAUGE
+
+Each stanza sent over the stream has a default language attached to it.
+It is usually defaulted by the stream it was received by or sent with.
+
+The C<lang> meta attribute will contain the language of the stanza,
+which will be defaulted to the receiving stream's language.
+
+If the stanza is on it's way out the C<lang> meta attribute will
+be used to determine whether to attach a xml:lang attribute on
+the outgoing stanza. That is done if the C<lang> attribute is defined
+and doesn't match the outgoing stream default language.
+
 =head1 SOURCE & DESTINATION
 
-TODO: Document C<src> and C<dest>.
+TODO: Document C<src> and C<dest>. Which are both stringprep normalized JIDs.
 
 =head1 META TYPE
 
@@ -173,6 +188,43 @@ sub analyze_features {
    # care about it...
    # my @reg = $node->find_all ([qw/register register/]);
 }
+
+=item B<presence>
+
+This is the type of a presence stanza, that either contains
+presence information or subscription-state changing requests.
+
+The meta information for those stanzas contains these further keys:
+
+=over 4
+
+=item is_resource_presence => $bool
+
+C<$bool> is true whenever the presence originated from the same bare JID it was
+received at. This means that some resource changed it's presence status.
+
+=item presence => 'available' | 'unavailable' | undef
+
+If this is not undef this stanza contains real presence information
+and not just a subscription related request.
+
+=back
+
+=cut
+
+sub analyze_presence {
+   my ($self, $node) = @_;
+
+   my $from = stringprep_jid $node->attr ('from');
+   my $to   = stringprep_jid $node->attr ('to');
+
+   $self->{is_resource_presence} = cmp_bare_jid ($from, $to);
+
+   if ((not defined $node->attr ('type')) || $node->attr ('type') eq 'unavailable') {
+      $self->{presence} = $node->attr ('type') || 'available';
+   }
+}
+
 
 =back
 

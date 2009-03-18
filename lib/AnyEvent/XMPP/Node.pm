@@ -204,7 +204,7 @@ sub new {
       my ($name, $value) = (shift @a, shift @a);
 
       if (ref $name) {
-         $name = join "|", @$name
+         $name = join "|", (xmpp_ns_maybe ($name->[0]), $name->[1])
       } else {
          unless ($name =~ /\|/) {
             $name = $self->[NS] . "|" . $name
@@ -353,18 +353,18 @@ C<$value> is optional, and if not undef it will replace the attribute value.
 sub attr_ns {
    @_ > 3
       ? (
-           defined $_[2]
-              ? $_[0]->[ATTRS]->{$_[1] . "|" . $_[2]} = $_[3]
-              : delete $_[0]->[ATTRS]->{$_[1] . "|" . $_[2]}
+           defined $_[3]
+              ? $_[0]->[ATTRS]->{xmpp_ns_maybe ($_[1]) . "|" . $_[2]} = $_[3]
+              : delete $_[0]->[ATTRS]->{xmpp_ns_maybe ($_[1]) . "|" . $_[2]}
         )
-      : $_[0]->[ATTRS]->{$_[1] . "|" . $_[2]}
+      : $_[0]->[ATTRS]->{xmpp_ns_maybe ($_[1]) . "|" . $_[2]}
 }
 
 =item B<attrs>
 
 Returns a hash reference of attributes of this node.  The keys of the hash
 reference have the namespace of the attribute and the name of the attribute
-concationated with a '|' within, like this:
+concatenated with a '|' within, like this:
 
     {
        "$namespace|$name" => $value,

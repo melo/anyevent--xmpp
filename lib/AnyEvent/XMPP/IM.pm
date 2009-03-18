@@ -1,7 +1,7 @@
 package AnyEvent::XMPP::IM;
 use strict;
 no warnings;
-use AnyEvent::XMPP::Util qw/prep_bare_jid new_iq new_presence/;
+use AnyEvent::XMPP::Util qw/prep_bare_jid new_iq new_presence stringprep_jid/;
 use AnyEvent::XMPP::Stream::Client;
 use AnyEvent::XMPP::Node qw/simxml/;
 use base qw/Object::Event AnyEvent::XMPP::StanzaHandler AnyEvent::XMPP::Extendable/;
@@ -67,10 +67,6 @@ sub new {
          warn "unhandled error in AnyEvent::XMPP::IM: " . $error->string . "."
               ." Please read the documentation of the 'error' event, to inhibit this"
               ." warning!\n";
-      },
-      ext_after_initial_presence => sub {
-         my ($self, $jid) = @_;
-         $self->send (new_presence (undef, undef, undef, src => $jid));
       }
    );
 
@@ -80,7 +76,6 @@ sub new {
 sub finish_session {
    my ($self, $con) = @_;
    $con->{_im_session_ready} = 1;
-   $self->initial_presence ($con->jid);
    $self->connected ($con->jid, $con->{peer_host}, $con->{peer_port});
 }
 
@@ -209,10 +204,6 @@ sub spawn_connection {
 
          $self->disconnected ($jid, $h, $p, $reason, $conhdl->{timeout});
       },
-      source_available => sub {
-         my ($con, $jid) = @_;
-         $self->source_available ($jid);
-      },
       source_unavailable => sub {
          my ($con, $jid) = @_;
          $self->source_unavailable ($jid);
@@ -278,6 +269,8 @@ was initiated and everything is ready to send IM stanzas (iq, presence, messages
 sub connected {
    my ($self, $jid, $ph, $pp) = @_;
 
+   $self->source_available (stringprep_jid $jid);
+
    if ($DEBUG) {
       print "$jid: connected and session ready for $ph:$pp!\n";
    }
@@ -315,15 +308,6 @@ sub connect_error {
       print "$jid: CONNECT ERROR: $reason, reconnect in $recon_tout seconds.\n";
    }
 }
-
-=item initial_presence => $jid
-
-This event is emitted shortly before the C<connected> event and gives
-the user the chance to specify his own initial presence. If the event
-is not stopped via a C<stop_event> call, it will send out a default initial
-presence.
-
-=cut
 
 =item disconnected => $jid, $peer_host, $peer_port, $reason, $reconnect_timeout
 

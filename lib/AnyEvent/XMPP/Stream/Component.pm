@@ -86,7 +86,7 @@ sub new {
 
 sub connected {
    my $self = shift;
-   $self->send_header (undef, undef, to => $self->{domain});
+   $self->send_header (undef, to => $self->{domain});
 };
 
 sub stream_start {
