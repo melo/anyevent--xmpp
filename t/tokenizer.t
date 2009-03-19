@@ -81,7 +81,8 @@ my $str2     = $str;
 
       my $ser = $o->as_string (0, {
          'http://www.w3.org/XML/1998/namespace' => 'xml',
-         'ae:xmpp:stream:default_ns' => ''
+         'jabber:client' => '',
+         STREAM_NS => 'jabber:client'
       });
 
       if ($ser eq $s) {
@@ -118,7 +119,8 @@ my $str2     = $str;
 
       my $ser = $o->as_string (0, {
          'http://www.w3.org/XML/1998/namespace' => 'xml',
-         'ae:xmpp:stream:default_ns' => ''
+         'jabber:client' => '',
+         STREAM_NS => 'jabber:client'
       });
 
       if ($ser eq $s) {

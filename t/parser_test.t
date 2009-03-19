@@ -7,7 +7,7 @@ use AnyEvent::XMPP::Node qw/simxml/;
 
 my %def = (
    xmpp_ns ('stream') => 'stream',
-   xmpp_ns ('stanza') => ''
+   xmpp_ns ('component') => ''
 );
 
 my $stream_el = AnyEvent::XMPP::Node->new ('http://etherx.jabber.org/streams' => 'stream');
@@ -29,13 +29,13 @@ my $iq_el =
    });
 
 my @input = (
-   $stream_el->as_string (0, {}),
+   $stream_el->as_string (0, { STREAM_NS => xmpp_ns ('component') }),
    simxml (defns => 'component', node => {
       name => 'message', attrs => [ to => "elmex\@jabber.org" ], childs => [
          { name => 'body', childs => [ "Hi!" ] }
       ]
-   })->as_string (0, \%def),
-   $iq_el->as_string (0, \%def),
+   })->as_string (0, { %def, STREAM_NS => xmpp_ns ('component') }),
+   $iq_el->as_string (0, { %def, STREAM_NS => xmpp_ns ('component') }),
 );
 
 my @expected_output = (
@@ -52,7 +52,7 @@ my $anal = sub {
    my ($p, $node) = @_;
    my $str;
    is (
-      $str = $node->as_string (0, \%def),
+      $str = $node->as_string (0, { %def, STREAM_NS => xmpp_ns ('component') }),
       (shift @expected_output),
       "[" . substr ($str, 0, 16) . "...] stanza was parsed correctly and serialized correctly"
    );

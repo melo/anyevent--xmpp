@@ -6,7 +6,7 @@ use AnyEvent::Handle;
 use AnyEvent::XMPP::Parser;
 use AnyEvent::XMPP::Error::Exception;
 use AnyEvent::XMPP::Util qw/dump_twig_xml/;
-use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
+use AnyEvent::XMPP::Namespaces qw/xmpp_ns xmpp_ns_maybe/;
 use AnyEvent::XMPP::Node qw/simxml/;
 use Encode;
 
@@ -127,6 +127,8 @@ sub new {
       @_
    );
 
+   $self->{default_stream_namespace} = xmpp_ns_maybe ($self->{default_stream_namespace});
+
    $self->{namespace_prefixes} = {
       $self->{default_stream_namespace} => '',
       xmpp_ns ('stream') => 'stream',
@@ -222,7 +224,7 @@ sub new {
             my $stanza_data =
                $node->as_string (0, {
                   %{$self->{namespace_prefixes}},
-                  $node->namespace => ''
+                  STREAM_NS => $self->{default_stream_namespace}
                })
          );
 

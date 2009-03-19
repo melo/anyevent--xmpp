@@ -1,7 +1,7 @@
 package AnyEvent::XMPP::Node;
 use strict;
 no warnings;
-use AnyEvent::XMPP::Namespaces qw/xmpp_ns_maybe/;
+use AnyEvent::XMPP::Namespaces qw/xmpp_ns_maybe xmpp_ns/;
 use AnyEvent::XMPP::Util qw/xml_escape/;
 use AnyEvent::XMPP::Meta;
 require Exporter;
@@ -523,19 +523,36 @@ sub as_string {
    my $ns        = $self->[NS];
    my $elem_name = $name;
 
+   my $stream_ns = xmpp_ns_maybe ($subdecls->{'STREAM_NS'});
    $subdecls = { %{$subdecls || {}} };
    my @attrs;
 
-   for (sort { $a->[1] cmp $b->[1] } @{$self->[NSDECLS] || []}) {
-      if (not (exists $subdecls->{$_->[1]})
-          || $subdecls->{$_->[1]} ne $_->[0]) {
+   #d# warn "MAKE $name ($ns)[$stream_ns] " . join (', ', map { "$_:$subdecls->{$_}" } keys %$subdecls) . "\n";
 
-         push @attrs, [$_->[1], $_->[0], 'xmlns'];
-         $subdecls->{$_->[0]} = $_->[1];
+   for my $nsdecl (sort { $a->[1] cmp $b->[1] } @{$self->[NSDECLS] || []}) {
+      my ($decl_ns, $decl_pref) = @$nsdecl;
+
+      # just a safety...
+      $decl_ns = $stream_ns if defined $stream_ns && ($decl_ns eq xmpp_ns ('stanza'));
+
+      # move old decls out of the way:
+      for (grep {
+              $_ ne 'STREAM_NS'
+              && $subdecls->{$_} eq $decl_pref
+          } keys %$subdecls) {
+
+         delete $subdecls->{$_};
       }
+
+      push @attrs, [$decl_pref, $decl_ns, 'xmlns'];
+      $subdecls->{$decl_ns} = $decl_pref;
    }
 
    if (defined ($ns)) {
+      # mostly a hack around XMPP's crazy default namespacing:
+      # replace 'ae:xmpp:stream:default_ns':
+      $ns = $stream_ns if defined $stream_ns && ($ns eq xmpp_ns ('stanza'));
+
       unless (exists $subdecls->{$ns}) {
          my $pref = $subdecls->{$ns} = 'ns' . ++$idcnt;
          unshift @attrs, [$pref, $ns, 'xmlns']
@@ -547,8 +564,12 @@ sub as_string {
       my ($ans, $name) = split /\|/, $ak;
       my $pref;
 
+      # mostly a hack around XMPP's crazy default namespacing:
+      # replace 'ae:xmpp:stream:default_ns':
+      $ans = $stream_ns if defined $stream_ns && ($ans eq xmpp_ns ('stanza'));
+
       if ($ans ne $ns) { # optimisation: attributes without prefix have
-                         # the namespace of the lement they are in
+                         # the namespace of the element they are in
          if (exists $subdecls->{$ans}) {
             $pref = $subdecls->{$ans};
 
