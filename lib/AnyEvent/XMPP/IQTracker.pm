@@ -37,11 +37,12 @@ is 60 seconds. (If C<$seconds> is 0, timeouts are disabled).
 sub new {
    my $this  = shift;
    my $class = ref($this) || $this;
-   my $self  = { @_ };
+   my $self  = {
+      default_iq_timeout => 60,
+      id                 => 0,
+      @_
+   };
    bless $self, $class;
-
-   $self->{default_iq_timeout} = 60;
-   $self->{id} = 0;
 
    return $self
 }

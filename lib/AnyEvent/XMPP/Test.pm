@@ -4,7 +4,7 @@ no warnings;
 
 use Test::More;
 use AnyEvent::XMPP::IM;
-use AnyEvent::XMPP::Util qw/cmp_bare_jid new_presence stringprep_jid/;
+use AnyEvent::XMPP::Util qw/cmp_jid cmp_bare_jid new_presence stringprep_jid/;
 
 require Exporter;
 our @ISA = qw/Exporter/;
@@ -66,21 +66,78 @@ sub start {
    }
 
    my $cv = AnyEvent->condvar;
-
    my $im = AnyEvent::XMPP::IM->new;
 
-   $im->add_extension ($_) for @exts;
+   my @aexts;
+   my $two_accs = $cnt > 1;
+   my $has_presence;
+
+   for my $e (@exts) {
+      if (ref ($e) eq 'CODE') {
+         $e->($im, $cv, @aexts);
+      } else {
+         push @aexts, $im->add_extension ($e);
+         $has_presence = $aexts[-1] if $e eq 'AnyEvent::XMPP::Ext::Presence';
+      }
+   }
 
    $im->reg_cb (
       connected => sub {
          my ($im, $jid) = @_;
+
          if (cmp_bare_jid ($jid, $JID1)) {
             $FJID1 = stringprep_jid $jid;
          } else {
             $FJID2 = stringprep_jid $jid;
          }
 
-         if (--$cnt <= 0) { $cb->($im, $cv) }
+         if (--$cnt <= 0) {
+            $im->send (new_presence (
+               available => undef, undef, undef, src => $FJID1
+            )) unless $has_presence;
+
+            if ($two_accs) {
+               # sending directed presence for IQ exchange:
+
+               if ($has_presence) {
+                  $has_presence->send_directed ($FJID1, $FJID2);
+                  $has_presence->send_directed ($FJID2, $FJID1);
+
+               } else {
+                  $im->send (new_presence (
+                     available => undef, undef, undef, src => $FJID2
+                  ));
+                  $im->send (new_presence (
+                     available => undef, undef, undef, src => $FJID1, to => $FJID2));
+                  $im->send (new_presence (
+                     available => undef, undef, undef, src => $FJID2, to => $FJID1));
+               }
+
+               my $one_to_2 = 0;
+               my $two_to_1 = 0;
+
+               $im->reg_cb (
+                  recv_presence => sub {
+                     my ($im, $pres) = @_;
+                     if (cmp_jid ($pres->attr ('from'), $FJID1)
+                         && cmp_jid ($pres->attr ('to'), $FJID2)) {
+                        $one_to_2 = 1;
+                     } elsif (cmp_jid ($pres->attr ('from'), $FJID2)
+                         && cmp_jid ($pres->attr ('to'), $FJID1)) {
+                        $two_to_1 = 1;
+                     }
+
+                     if ($one_to_2 && $two_to_1) {
+                        $im->unreg_me;
+
+                        $cb->($im, $cv, @aexts)
+                     }
+                  }
+               );
+            } else {
+               $cb->($im, $cv, @aexts)
+            }
+         }
       },
       connect_error => sub {
          my ($im, $jid, $reason, $recon_tout) = @_;
@@ -103,7 +160,7 @@ sub start {
        (defined $HOST ? (host => $HOST) : ()),
        (defined $PORT ? (port => $PORT) : ()));
 
-   if ($cnt > 1) {
+   if ($two_accs) {
       $im->add_account ($JID2, $PASS,
           (defined $HOST ? (host => $HOST) : ()),
           (defined $PORT ? (port => $PORT) : ()));

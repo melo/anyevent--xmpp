@@ -15,29 +15,28 @@ AnyEvent::XMPP::Test::check ('client');
 
 my %pres;
 my $cnt = 2;
-AnyEvent::XMPP::Test::start (sub {
-   my ($im, $cv) = @_;
+AnyEvent::XMPP::Test::start (sub { },
+   'AnyEvent::XMPP::Ext::Presence', sub {
+      my ($im, $cv, $pres) = @_;
 
-   my $pres = $im->get_extension ('AnyEvent::XMPP::Ext::Presence');
+      $im->reg_cb (
+         ext_presence_self => sub {
+            my ($im, $resjid, $jid, $old, $new) = @_;
+            $pres{$resjid} = [$jid => $new];
 
-   $im->reg_cb (
-      ext_presence_self => sub {
-         my ($im, $resjid, $jid, $old, $new) = @_;
-         $pres{$resjid} = [$jid => $new];
+            if ($new->{status} =~ /playing/) {
+               $cv->send if --$cnt <= 0;
+            }
+         },
+      );
 
-         if ($new->{status} =~ /playing/) {
-            $cv->send if --$cnt <= 0;
-         }
-      },
-   );
-
-   $pres->set_default (available => [
-      en => "I'm playing stuff",
-      de => "Ich spiele sachen",
-      ja => "にほんじん",
-   ], 10);
-
-}, 'AnyEvent::XMPP::Ext::Presence');
+      $pres->set_default (available => [
+         en => "I'm playing stuff",
+         de => "Ich spiele sachen",
+         ja => "にほんじん",
+      ], 10);
+   }
+);
 
 sub _tostr {
    my ($t) = @_;

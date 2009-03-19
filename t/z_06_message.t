@@ -15,7 +15,7 @@ print "1..6\n";
 
 my $hdl;
 AnyEvent::XMPP::Test::start (sub {
-   my ($im, $cv) = @_;
+   my ($im, $cv, $pres) = @_;
 
    $im->reg_cb (
       recv_message => sub {
@@ -50,4 +50,7 @@ AnyEvent::XMPP::Test::start (sub {
       src  => $FJID1,
       sent_cb => sub { print "ok 1 - sent message\n" }
    ));
+}, 'AnyEvent::XMPP::Ext::Presence', sub {
+   my ($im, $cv, $pres) = @_;
+   $pres->set_default (available => 'online and ready for messages', 10);
 });

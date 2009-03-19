@@ -208,13 +208,8 @@ sub set_presence {
    $self->update ($jid)
 }
 
-sub update {
+sub _build_own_presence {
    my ($self, $jid) = @_;
-
-   unless (defined $jid) {
-      $self->update ($_) for keys %{$self->{own_p}};
-      return;
-   }
 
    $jid = stringprep_jid $jid;
 
@@ -227,11 +222,54 @@ sub update {
    $show = undef if $show eq 'available';
 
    my $node = new_presence (available => $show, $status, $prio, src => $jid);
+   $self->generated_presence ($node);
+   $node
+}
+
+sub update {
+   my ($self, $jid) = @_;
+
+   unless (defined $jid) {
+      $self->update ($_) for keys %{$self->{own_p}};
+      return;
+   }
+
+   my $node = $self->_build_own_presence ($jid);
    $self->{extendable}->send ($node);
 
    # non-bis behavior:
    $self->_int_upd_presence ($jid, $jid, 1, _to_pres_struct ($node));
 }
+
+sub send_directed {
+   my ($self, $resjid, $jid) = @_;
+
+   my $node = $self->_build_own_presence ($resjid);
+   $node->attr ('to', $jid);
+   $self->{extendable}->send ($node);
+
+   # TODO: Think about storing the state of sent directed presences
+}
+
+=back
+
+=head1 EVENTS
+
+These events are emitted (via the L<Object::Event> interface)
+by this extension:
+
+=over 4
+
+=item generated_presence => $node
+
+Whenever this extension generates a presence update for some
+entity this event is emitted. It can be used (for example by the
+'Entity Capabilities' extension) to add further children elements
+to the presence.
+
+=cut
+
+sub generated_presence { }
 
 =back
 

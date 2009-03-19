@@ -1,5 +1,6 @@
 package AnyEvent::XMPP::Stream::Client;
 use strict;
+no warnings;
 use AnyEvent;
 use AnyEvent::XMPP::IQTracker;
 use AnyEvent::XMPP::Authenticator;
@@ -118,6 +119,12 @@ B<no> DNS SRV lookup will be done when connecting.
 This sets the connection timeout. If the socket connect takes too long
 a C<disconnect> event will be generated with an appropriate error message.
 If this argument is not given no timeout is installed for the connects.
+
+=item default_iq_timeout => $seconds
+
+This will set the default IQ timeout for IQs that are sent
+over this connection. If this argument is not given the default for C<$seconds>
+will be as specified in the L<AnyEvent::XMPP::IQTracker> module.
 
 =item whitespace_ping_interval => $interval
 
@@ -321,8 +328,12 @@ sub new {
                my ($jid, $error) = @_;
 
                if ($error) {
-                  # TODO FIXME: make proper error?!
+                  # TODO FIXME: make proper error class?!
                   $self->error ($error);
+                  $self->disconnect (
+                     "Disconnecting due to error: Couldn't bind to resource"
+                     ." '$self->{resource}': " . $error->string
+                  );
 
                } else {
                   $self->{jid} = $jid;
@@ -374,7 +385,13 @@ sub init {
 
    $self->cleanup_state;
 
-   $self->{tracker} = AnyEvent::XMPP::IQTracker->new;
+   $self->{tracker} =
+      AnyEvent::XMPP::IQTracker->new (
+         (defined $self->{default_iq_timeout}
+            ? (default_iq_timeout => $self->{default_iq_timeout})
+            : ()
+         )
+      );
    $self->{res_manager} =
       AnyEvent::XMPP::ResourceManager->new (
          connection => $self

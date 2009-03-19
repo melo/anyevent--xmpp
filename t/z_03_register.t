@@ -15,6 +15,7 @@ my $cv = AnyEvent->condvar;
 my $stream = AnyEvent::XMPP::Stream::Client->new (
    jid      => $JID1,
    password => $PASS,
+   default_iq_timeout => 2
 );
 
 my $reg = AnyEvent::XMPP::Ext::Registration->new (delivery => $stream);
@@ -63,6 +64,11 @@ $stream->reg_cb (
             $ev->();
          });
       });
+   },
+   error => sub {
+      my ($stream, $error) = @_;
+      print "# error: " . $error->string . "\n";
+      $stream->stop_event;
    },
    stream_ready => sub {
       my ($stream) = @_;
