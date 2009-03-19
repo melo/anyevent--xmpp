@@ -4,7 +4,8 @@ no warnings;
 use AnyEvent;
 use AnyEvent::XMPP::IQTracker;
 use AnyEvent::XMPP::Authenticator;
-use AnyEvent::XMPP::Util qw/split_jid join_jid dump_twig_xml stringprep_jid cmp_jid/;
+use AnyEvent::XMPP::Util qw/split_jid join_jid dump_twig_xml stringprep_jid cmp_jid
+                            new_iq/;
 use AnyEvent::XMPP::Node qw/simxml/;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Error;
@@ -337,7 +338,33 @@ sub new {
 
                } else {
                   $self->{jid} = $jid;
-                  $self->stream_ready ($jid);
+
+                  if ($node->meta->{session}
+                      && $node->meta->{session} ne 'optional') {
+
+                     $self->send (new_iq (set => create => {
+                        node => { dns => 'session', name => 'session' }
+                     }, cb => sub {
+                        my ($node, $error) = @_;
+
+                        if ($node) {
+                           $self->{session_ready} = 1;
+                           $self->stream_ready ($jid);
+
+                        } else {
+                           # TODO FIXME: make proper error class?
+                           $self->error ($error);
+                           $self->disconnect (
+                              "Disconnecting due to error: Couldn't establish session: "
+                              . $error->string
+                           );
+                        }
+                     }));
+
+                  } else {
+                     $self->{session_ready} = 1;
+                     $self->stream_ready ($jid);
+                  }
                }
             });
          }
@@ -468,7 +495,10 @@ a resource is bound).
 =cut
 
 sub is_ready {
-   $_[0]->is_connected && $_[0]->{authenticated} && defined $_[0]->{jid}
+   $_[0]->is_connected
+   && $_[0]->{authenticated}
+   && defined $_[0]->{jid}
+   && $_[0]->{session_ready}
 }
 
 =item $con->send ($node)
@@ -491,6 +521,7 @@ sub start_authenticator {
 
          if (defined $jid) {
             $self->{jid} = $jid;
+            $self->{session_ready} = 1;
             $self->stream_ready ($jid);
 
          } else {

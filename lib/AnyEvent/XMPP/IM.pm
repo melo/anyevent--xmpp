@@ -73,34 +73,6 @@ sub new {
    return $self
 }
 
-sub finish_session {
-   my ($self, $con) = @_;
-   $con->{_im_session_ready} = 1;
-   $self->connected ($con->jid, $con->{peer_host}, $con->{peer_port});
-}
-
-sub init_connection {
-   my ($self, $con) = @_;
-
-   if ($con->features->meta->{session}) {
-      $con->send (new_iq (set => create => {
-         node => { dns => 'session', name => 'session' }
-      }, cb => sub {
-         my ($node, $error) = @_;
-
-         if ($node) {
-            $self->finish_session ($con);
-
-         } else {
-            $self->error ($con->jid, $error);
-         }
-      }));
-
-   } else {
-      $self->finish_session ($con);
-   }
-}
-
 sub send {
    my ($self, $node) = @_;
 
@@ -179,7 +151,7 @@ sub spawn_connection {
          $conhdl->{timeout} = $self->{initial_reconnect_interval};
          delete $conhdl->{timer};
 
-         $self->init_connection ($con);
+         $self->connected ($con->jid, $con->{peer_host}, $con->{peer_port});
       },
       connect_error => sub {
          my ($con, $msg) = @_;
@@ -245,8 +217,6 @@ sub get_connection {
       or return;
    $c = $c->{con};
    $c->is_ready 
-      or return;
-   $c->{_im_session_ready}
       or return;
    $c
 }
