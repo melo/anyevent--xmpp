@@ -6,7 +6,7 @@ no warnings;
 use AnyEvent;
 use AnyEvent::XMPP::Test;
 use AnyEvent::XMPP::IM;
-use AnyEvent::XMPP::Util qw/split_jid cmp_bare_jid new_iq new_message/;
+use AnyEvent::XMPP::Util qw/split_jid cmp_bare_jid new_iq new_message new_presence/;
 use AnyEvent::XMPP::Node qw/simxml/;
 use AnyEvent::XMPP::StanzaHandler;
 use JSON -convert_blessed_universally;
@@ -15,19 +15,30 @@ AnyEvent::XMPP::Test::check ('client');
 
 my %pres;
 my $cnt = 2;
-AnyEvent::XMPP::Test::start (sub { },
-   'AnyEvent::XMPP::Ext::Presence', sub {
+my $pres_ext;
+AnyEvent::XMPP::Test::start (sub {
+   my ($im, $cv, $pres) = @_;
+
+   $im->send (new_presence (
+      available => away => "Going out" => -10, src => $FJID1, to => $FJID2
+   ));
+}, 'AnyEvent::XMPP::Ext::Presence', sub {
       my ($im, $cv, $pres) = @_;
+
+      $pres_ext = $pres;
 
       $im->reg_cb (
          ext_presence_self => sub {
             my ($im, $resjid, $jid, $old, $new) = @_;
             $pres{$resjid} = [$jid => $new];
-
-            if ($new->{status} =~ /playing/) {
-               $cv->send if --$cnt <= 0;
-            }
          },
+         ext_presence_change => sub {
+            my ($im, $resjid, $jid) = @_;
+
+            if ($cnt-- <= 0) {
+               $cv->send;
+            }
+         }
       );
 
       $pres->set_default (available => [
@@ -65,3 +76,5 @@ for my $jid ($FJID1, $FJID2) {
    }
    $n++;
 }
+
+print JSON->new->convert_blessed->pretty->encode ($pres_ext->{p}) . "\n";

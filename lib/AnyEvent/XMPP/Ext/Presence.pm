@@ -40,12 +40,14 @@ AnyEvent::XMPP::Ext::Presence - Presence tracker
       },
    );
 
-   my @presences = $pres->my_presences; # returns list of presence structs
-
-   my @jids = $pres->presences ($my_jid1); # returns list of jids we have received 
-                                           # presence for, w.r.t. a connected resource
-
-   my $struct = $pres->get ($my_jid1, $jids[0]); # returns presence struct
+#   my @presences = $pres->my_presences; # returns list of presence structs
+#
+#   my @jids = $pres->presences ($my_jid1); # returns list of (bare) jids we have received 
+#                                           # presence for, w.r.t. a connected resource
+#
+#   my $struct    = $pres->get ($my_jid1, $jids[0]); # returns highest prio presence struct
+#   my $struct    = $pres->get ($my_jid1, $fulljid); # returns presence struct for $fulljid
+#   my (@structs) = $pres->get_all ($my_jid1, $jids[0]); # returns all presence structs
 
    # to send out an presence update for a specific resource:
    $pres->update ($my_jid1);
@@ -80,12 +82,14 @@ sub init {
       source_unavailable => sub {
          my ($ext, $jid) = @_;
 
-         for my $rjid (keys %{$self->{own_p}->{$jid} || {}}) {
-            $ext->event (ext_presence_self => $jid, $rjid, $self->{own_p}->{$jid}, undef);
+         for my $pres ($self->my_presences ($jid)) {
+            $ext->event (ext_presence_self =>
+                            $jid, stringprep_jid ($pres->{jid}), $pres, undef);
          }
 
-         for my $pjid (keys %{$self->{p}->{$jid} || {}}) {
-            $ext->event (ext_presence_change => $jid, $pjid, $self->{p}->{$jid}, undef);
+         for my $pres ($self->presences ($jid)) {
+            $ext->event (ext_presence_change =>
+                            $jid, stringprep_jid ($pres->{jid}), $pres, undef);
          }
 
          delete $self->{own_p}->{$jid};
@@ -98,8 +102,73 @@ sub init {
    );
 }
 
+# $jid needs to be stringprepped
+sub _build_own_presence {
+   my ($self, $jid) = @_;
+
+   my ($show, $status, $prio) = @{
+      $self->{set}->{$jid}
+      || $self->{def}
+      || [available => undef, undef]
+   };
+
+   $show = undef if $show eq 'available';
+
+   my $node = new_presence (available => $show, $status, $prio, src => $jid);
+   $self->generated_presence ($node);
+   $node
+}
+
+sub update {
+   my ($self, $jid) = @_;
+
+   unless (defined $jid) {
+      $self->update ($_) for keys %{$self->{own_p}};
+      return;
+   }
+
+   $jid = stringprep_jid $jid;
+
+   my $node = $self->_build_own_presence ($jid);
+   $self->{extendable}->send ($node);
+
+   # non-bis behavior:
+   $self->_int_upd_presence ($jid, $jid, 1, _to_pres_struct ($node, $jid));
+}
+
+sub send_directed {
+   my ($self, $resjid, $jid) = @_;
+
+   my $node = $self->_build_own_presence (stringprep_jid $resjid);
+   $node->attr ('to', $jid);
+   $self->{extendable}->send ($node);
+
+   # TODO: Think about storing the state of sent directed presences
+}
+
+sub set_default {
+   my ($self, $show, $status, $prio) = @_;
+   $self->{def} = [$show, $status, $prio];
+
+   for (keys %{$self->{own_p}}) {
+      $self->update ($_) unless exists $self->{set}->{$_};
+   }
+}
+
+sub set_presence {
+   my ($self, $jid, @args) = @_;
+   
+   if (@args) {
+      $self->{set}->{stringprep_jid $jid} = [@args];
+   } else {
+      delete $self->{set}->{stringprep_jid $jid};
+   }
+
+   $self->update ($jid)
+}
+
 sub _to_pres_struct {
-   my ($node) = @_;
+   my ($node, $jid) = @_;
 
    my $struct = { };
 
@@ -107,6 +176,7 @@ sub _to_pres_struct {
    my (@status) = $node->find_all ([qw/stanza status/]);
    my (@prio)   = $node->find_all ([qw/stanza priority/]);
 
+   $struct->{jid}      = defined $jid ? $jid : $node->attr ('from');
    $struct->{show}     = @show ? $show[0]       : 'available';
    $struct->{priority} = @prio ? $prio[0]->text : 0;
 
@@ -136,6 +206,7 @@ sub _eq_pres {
    my ($a, $b) = @_;
 
    return 0 if defined ($a) != defined ($b);
+   return 0 if not cmp_jid ($a->{jid}, $b->{jid});
    return 0 if $a->{status}   ne $b->{status};
    return 0 if $a->{show}     ne $b->{show};
    return 0 if $a->{priority} ne $b->{priority};
@@ -171,6 +242,7 @@ sub analyze_stanza {
    }
 }
 
+# $resjid and $jid needs to be stringprepped
 sub _int_upd_presence {
    my ($self, $resjid, $jid, $is_own, $new) = @_;
 
@@ -179,76 +251,85 @@ sub _int_upd_presence {
          ? (own_p => 'ext_presence_self')
          : (p     => 'ext_presence_change');
 
-   my $prev = $self->{$key}->{$resjid}->{$jid};
-   $self->{$key}->{$resjid}->{$jid} = $new;
+   my $bjid = prep_bare_jid ($jid);
+   my $res  = prep_res_jid ($jid);
+
+   my $respres = $self->{$key}->{$resjid};
+   my $prev    = exists $respres->{$bjid} ? $respres->{$bjid} : undef;
+
+   $self->{$key}->{$resjid}->{$bjid}->{$res} = $new;
 
    unless (_eq_pres ($prev, $new)) {
       $self->{extendable}->event ($ev => $resjid, $jid, $prev, $new);
    }
 }
 
-sub set_default {
-   my ($self, $show, $status, $prio) = @_;
-   $self->{def} = [$show, $status, $prio];
+sub my_presences {
+   my ($self, $resjid) = @_;
 
-   for (keys %{$self->{own_p}}) {
-      $self->update ($_) unless exists $self->{set}->{$_};
-   }
-}
-
-sub set_presence {
-   my ($self, $jid, @args) = @_;
-   
-   if (@args) {
-      $self->{set}->{stringprep_jid $jid} = [@args];
-   } else {
-      delete $self->{set}->{stringprep_jid $jid};
+   unless (defined $resjid) {
+      return map { $self->my_presences ($_) } keys %{$self->{own_p}};
    }
 
-   $self->update ($jid)
+   $resjid = stringprep_jid $resjid;
+
+   my $bjids = $self->{own_p}->{$resjid};
+
+   my @pres;
+   for my $bjid (keys %{$bjids || {}}) {
+      push @pres, values %{$bjids->{$bjid}};
+   }
+
+   @pres
 }
 
-sub _build_own_presence {
-   my ($self, $jid) = @_;
+sub presences {
+   my ($self, $jid, $pjid) = @_;
 
    $jid = stringprep_jid $jid;
+   return () unless exists $self->{p}->{$jid};
 
-   my ($show, $status, $prio) = @{
-      $self->{set}->{$jid}
-      || $self->{def}
-      || [available => undef, undef]
-   };
+   if (defined $pjid) {
+      $pjid = stringprep_jid $pjid;
+      return () unless exists $self->{p}->{$jid}->{$pjid};
+      my $res = res_jid ($pjid);
 
-   $show = undef if $show eq 'available';
+      if (defined $res) {
+         return $self->{p}->{$jid}->{$pjid}->{$res}
+      } else {
+         return values %{$self->{p}->{$jid}->{$pjid}}
+      }
 
-   my $node = new_presence (available => $show, $status, $prio, src => $jid);
-   $self->generated_presence ($node);
-   $node
-}
+   } else {
 
-sub update {
-   my ($self, $jid) = @_;
-
-   unless (defined $jid) {
-      $self->update ($_) for keys %{$self->{own_p}};
-      return;
+      my @p;
+      for my $bjid (keys %{$self->{p}->{$jid}}) {
+         push @p, $self->presences ($jid, $bjid);
+      }
+      return @p;
    }
-
-   my $node = $self->_build_own_presence ($jid);
-   $self->{extendable}->send ($node);
-
-   # non-bis behavior:
-   $self->_int_upd_presence ($jid, $jid, 1, _to_pres_struct ($node));
 }
 
-sub send_directed {
-   my ($self, $resjid, $jid) = @_;
+sub highest_prio_presence {
+   my ($self, $jid, $bjid) = @_;
 
-   my $node = $self->_build_own_presence ($resjid);
-   $node->attr ('to', $jid);
-   $self->{extendable}->send ($node);
+   if (defined $bjid) {
+      my @p = $self->presences ($jid, bare_jid $bjid);
+      @p = sort { $b->{priority} <=> $a->{priority} } @p;
+      return @p ? $p[0] : undef;
 
-   # TODO: Think about storing the state of sent directed presences
+   } else {
+      $jid = stringprep_jid $jid;
+      return undef unless exists $self->{p}->{$jid};
+
+      my @p;
+      for my $bjid (keys %{$self->{p}->{$jid}}) {
+         my $p = $self->highest_prio_presence ($jid, $bjid);
+         push @p, $p if defined $p;
+      }
+
+      return @p;
+   }
 }
 
 =back

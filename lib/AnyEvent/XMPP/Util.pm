@@ -157,9 +157,13 @@ sub node_jid   { (split_jid ($_[0]))[0] }
 sub domain_jid { (split_jid ($_[0]))[1] }
 sub res_jid    { (split_jid ($_[0]))[2] }
 
-sub prep_node_jid   { nodeprep     (node_jid   ($_[0])) }
-sub prep_domain_jid {              (domain_jid ($_[0])) }
-sub prep_res_jid    { resourceprep (res_jid    ($_[0])) }
+sub prep_node_jid {
+   my $node = node_jid ($_[0]); defined $node ? nodeprep ($node) : undef
+}
+sub prep_domain_jid { domain_jid ($_[0]) }
+sub prep_res_jid    {
+   my $res = res_jid ($_[0]); defined $res ? resourceprep ($res) : undef
+}
 
 =item B<stringprep_jid ($jid)>
 
