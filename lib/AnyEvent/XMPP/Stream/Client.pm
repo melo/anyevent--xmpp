@@ -5,7 +5,7 @@ use AnyEvent;
 use AnyEvent::XMPP::IQTracker;
 use AnyEvent::XMPP::Authenticator;
 use AnyEvent::XMPP::Util qw/split_jid join_jid dump_twig_xml stringprep_jid cmp_jid
-                            new_iq/;
+                            new_iq res_jid node_jid/;
 use AnyEvent::XMPP::Node qw/simxml/;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Error;
@@ -610,8 +610,44 @@ sub recv {
       $self->stop_event;
    }
 
+   my $to = $node->attr ('to');
+
+   # next comes some 'to' address validation. It might be possible
+   # to receive some badly addressed stuff, so we pre-sort some here.
+   #
+   # scary fact:
+   # - openfire sends us this stuff for example:
+   # <iq id="1" to="openfire.test/87007d75" type="result">
+   #    <bind xmlns="urn:ietf:params:xml:ns:xmpp-bind">
+   #       <jid>test_1@openfire.test/87007d75</jid>
+   #    </bind>
+   # </iq>
+
+   # XXX: I've disabled to-validation. It trips on too many differences
+   # between servers...
+
+
    if (defined $self->{jid}) {
       $node->meta->{dest} = stringprep_jid $self->{jid};
+
+      #if ((defined (res_jid $to)
+      #       && defined (node_jid $to)
+      #       && not (cmp_jid ($to, $self->{jid})))
+      #    || (not (defined res_jid $to)
+      #          && (defined node_jid $to)
+      #          && not (cmp_bare_jid ($to, $self->{jid})))) {
+
+      #   warn "server sent us badly addressed stanza: " . $node->raw_string . "\n";
+      #   $self->stop_event;
+      #   return;
+      #}
+   } else {
+      #if ((defined (res_jid $to) && defined (node_jid $to)) || defined (node_jid $to)) {
+      #   warn "server sent us badly addressed stanza while not being bound: "
+      #        . $node->raw_string . "\n";
+      #   $self->stop_event;
+      #   return;
+      #}
    }
 
    if (defined $self->{server_jid}) {

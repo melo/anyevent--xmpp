@@ -2,7 +2,7 @@ package AnyEvent::XMPP::Ext::Presence;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Util qw/stringprep_jid new_iq new_reply new_presence cmp_jid
                             cmp_bare_jid res_jid prep_bare_jid prep_res_jid
-                            bare_jid/;
+                            bare_jid node_jid res_jid/;
 use Scalar::Util qw/weaken/;
 no warnings;
 use strict;
@@ -41,20 +41,41 @@ AnyEvent::XMPP::Ext::Presence - Presence tracker
       },
    );
 
-#   my @presences = $pres->my_presences; # returns list of presence structs
-#
-#   my @jids = $pres->presences ($my_jid1); # returns list of (bare) jids we have received 
-#                                           # presence for, w.r.t. a connected resource
-#
-#   my $struct    = $pres->get ($my_jid1, $jids[0]); # returns highest prio presence struct
-#   my $struct    = $pres->get ($my_jid1, $fulljid); # returns presence struct for $fulljid
-#   my (@structs) = $pres->get_all ($my_jid1, $jids[0]); # returns all presence structs
+   my @presences = $pres->presences ($my_jid);
+   my @presences = $pres->presences ($my_jid, $bare_jid);
+   my $presence  = $pres->presences ($my_jid, $full_jid);
+
+   my @presences = $pres->highest_prio_presence ($my_jid);
+   my @presences = $pres->highest_prio_presence ($my_jid, $bare_jid);
+   my @presences = $pres->highest_prio_presence ($my_jid, $full_jid);
 
    # to send out an presence update for a specific resource:
    $pres->update ($my_jid1);
 
    # or all resources:
    $pres->update;
+
+   # subscription handling:
+
+   $im->reg_cb (
+      ext_presence_subscription_request => sub { },
+      ext_presence_subscribed           => sub { },
+      ext_presence_unsubscribed         => sub { },
+   );
+
+   $pres->send_subscription_request (
+      $my_jid, $your_jid, 1, "Hi! I would love to have a mutual subscription!");
+
+   my @pres_reqs = $pres->pending_subscription_requests;
+
+   $pres->handle_subscription_request (
+      $my_jid, $pres_reqs[-1], 1, 1, "Ok, I want to subscribe to you too!");
+
+   $pres->handle_subscription_request (
+      $my_jid, $pres_reqs[-1]->{from}, 1, 0, "Ok, but I don't want to see u!");
+
+   $pres->handle_subscription_request (
+      $my_jid, $pres_reqs[-1], 0, 0, "No, I don't like you!");
 
 =head1 DESCRIPTION
 
@@ -75,8 +96,9 @@ sub init {
       source_available => sub {
          my ($ext, $jid) = @_;
 
-         $self->{p}->{$jid}     = { };
-         $self->{own_p}->{$jid} = { };
+         $self->{p}->{$jid}          = { };
+         $self->{own_p}->{$jid}      = { };
+         $self->{subsc_reqs}->{$jid} = { };
 
          $self->update ($jid);
       },
@@ -95,6 +117,7 @@ sub init {
 
          delete $self->{own_p}->{$jid};
          delete $self->{p}->{$jid};
+         delete $self->{subsc_reqs}->{$jid};
       },
       recv_presence => sub {
          my ($ext, $node) = @_;
@@ -168,18 +191,10 @@ sub set_presence {
    $self->update ($jid)
 }
 
-sub _to_pres_struct {
-   my ($node, $jid) = @_;
+sub _extract_status {
+   my ($node, $struct) = @_;
 
-   my $struct = { };
-
-   my (@show)   = $node->find_all ([qw/stanza show/]);
    my (@status) = $node->find_all ([qw/stanza status/]);
-   my (@prio)   = $node->find_all ([qw/stanza priority/]);
-
-   $struct->{jid}      = defined $jid ? $jid : $node->attr ('from');
-   $struct->{show}     = @show ? $show[0]->text : 'available';
-   $struct->{priority} = @prio ? $prio[0]->text : 0;
 
    my $def_status;
 
@@ -198,7 +213,24 @@ sub _to_pres_struct {
    $def_status = $struct->{all_status}->{''} unless defined $def_status;
    $def_status = $status[-1]->text           if ((not defined $def_status) && @status);
 
-   $struct->{status}   = $def_status;
+   $struct->{status} = $def_status;
+}
+
+sub _to_pres_struct {
+   my ($node, $jid) = @_;
+
+   my $struct = { };
+
+   my (@show)   = $node->find_all ([qw/stanza show/]);
+   my (@prio)   = $node->find_all ([qw/stanza priority/]);
+
+   $struct->{jid}      = defined $jid ? $jid : $node->attr ('from');
+   $struct->{show}     =
+      @show
+         ? $show[0]->text
+         : ($node->attr ('type') eq 'unavailable' ? 'unavailable' : 'available');
+   $struct->{priority} = @prio ? $prio[0]->text : 0;
+   _extract_status ($node, $struct);
 
    $struct
 }
@@ -234,12 +266,109 @@ sub analyze_stanza {
    my $from   = stringprep_jid $node->attr ('from');
    my $to     = stringprep_jid $node->attr ('to');
 
-   return unless cmp_jid ($to, $resjid);
+   $to = $resjid unless defined $to;
+
+   unless (defined (node_jid $to)) {
+      warn "$resjid: Ignoring badly addressed presence stanza: " . $node->raw_string . "\n";
+      return;
+   }
 
    if ($meta->{presence}) {
       $self->_int_upd_presence (
          $resjid, $from, $meta->{is_resource_presence}, _to_pres_struct ($node));
+
    } else {
+      my $type   = $node->attr ('type');
+      my $status = { };
+      _extract_status ($node, $status);
+
+      if ($type eq 'subscribe') {
+         $self->{subsc_reqs}->{$resjid}->{bare_jid $from} = {
+            from    => bare_jid ($from),
+            node    => $node, 
+            comment => $status
+         };
+
+         if (delete $self->{subsc_mutual}->{$resjid}->{bare_jid $from}) {
+            $self->handle_subscription_request ($resjid, $from, 1, 0);
+            return;
+         }
+
+         $self->{extendable}->event (
+            ext_presence_subscription_request => $resjid, bare_jid ($from), $status);
+
+      } elsif ($type eq 'subscribed') {
+         $self->{extendable}->event (
+            ext_presence_subscribed => $resjid, bare_jid ($from), $status);
+
+      } elsif ($type eq 'unsubscribed') {
+         $self->{extendable}->event (
+            ext_presence_unsubscribed => $resjid, bare_jid ($from), $status);
+
+         # it's hilarious... but servers (Openfire) don't always send
+         # a unavailable presence when you are unsubscribed... so we fake it here:
+         for my $p ($self->presences ($resjid, bare_jid $from)) {
+            $self->_int_upd_presence ($resjid, $p->{jid}, 0, undef);
+         }
+      }
+   }
+}
+
+sub send_subscription_request {
+   my ($self, $resjid, $jid, $allow_mutual, $comment) = @_;
+
+   $resjid = stringprep_jid $resjid;
+
+   $self->{extendable}->send (new_presence (
+       subscribe => undef, $comment, undef, src => $resjid, to => bare_jid ($jid)));
+
+   if ($allow_mutual) {
+      $self->{subsc_mutual}->{$resjid}->{prep_bare_jid $jid} = 1;
+   }
+}
+
+sub send_unsubscription {
+   my ($self, $resjid, $jid, $mutual, $comment) = @_;
+
+   $self->{extendable}->send (new_presence (
+       unsubscribe => undef, $comment, undef, src => $resjid, to => bare_jid ($jid)));
+
+   if ($mutual) {
+      $self->{extendable}->send (new_presence (
+          unsubscribed => undef, $comment, undef, src => $resjid, to => bare_jid ($jid)));
+   }
+}
+
+sub pending_subscription_requests {
+   my ($self, $resjid) = @_;
+   values %{$self->{subsc_reqs}->{stringprep_jid $resjid}}
+}
+
+sub handle_subscription_request {
+   my ($self, $resjid, $jid, $subscribe, $mutual, $comment) = @_;
+
+   $jid = $jid->{from} if ref $jid;
+
+   $resjid = stringprep_jid $resjid;
+   $jid    = prep_bare_jid $jid;
+
+   return unless (exists $self->{subsc_reqs}->{$resjid})
+                 && (exists $self->{subsc_reqs}->{$resjid}->{$jid});
+
+   delete $self->{subsc_reqs}->{$resjid}->{$jid};
+   my $pres;
+
+   if ($subscribe) {
+      $self->{extendable}->send (new_presence (
+         subscribed => undef, $comment, undef, src => $resjid, to => $jid));
+
+      if ($mutual) {
+         $self->{extendable}->send (new_presence (
+            subscribe => undef, $comment, undef, src => $resjid, to => $jid));
+      }
+   } else {
+      $self->{extendable}->send (new_presence (
+         unsubscribed => undef, $comment, undef, src => $resjid, to => $jid));
    }
 }
 
@@ -256,9 +385,28 @@ sub _int_upd_presence {
    my $res  = prep_res_jid ($jid);
 
    my $respres = $self->{$key}->{$resjid};
-   my $prev    = exists $respres->{$bjid} ? $respres->{$bjid} : undef;
+   my $prev    =
+      exists ($respres->{$bjid}) && exists ($respres->{$bjid}->{$res})
+        ? $respres->{$bjid}->{$res}
+        : {
+            priority => 0,
+            all_status => { },
+            status => undef,
+            show => 'unavailable',
+            jid => $jid
+        };
 
-   $self->{$key}->{$resjid}->{$bjid}->{$res} = $new;
+   if (defined $new) {
+      $self->{$key}->{$resjid}->{$bjid}->{$res} = $new;
+   } else {
+      $self->{$key}->{$resjid}->{$bjid}->{$res} = $new = {
+         priority => 0,
+         all_status => { },
+         status => undef,
+         show => 'unavailable',
+         jid => $jid
+      };
+   }
 
    unless (_eq_pres ($prev, $new)) {
       $self->{extendable}->event ($ev => $resjid, $jid, $prev, $new);

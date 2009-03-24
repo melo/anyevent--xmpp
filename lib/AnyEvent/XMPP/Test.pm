@@ -29,6 +29,8 @@ our ($HOST, $PORT, $SECRET, $SERVICE);
 our ($JID1, $JID2, $PASS);
 our ($FJID1, $FJID2);
 
+our $TOUT;
+
 sub check {
    my ($what) = @_;
 
@@ -130,12 +132,14 @@ sub start {
                      if ($one_to_2 && $two_to_1) {
                         $im->unreg_me;
 
-                        $cb->($im, $cv, @aexts)
+                        $cb->($im, $cv, @aexts);
+                        $TOUT = AnyEvent->timer (after => 20, cb => sub { $cv->send });
                      }
                   }
                );
             } else {
-               $cb->($im, $cv, @aexts)
+               $cb->($im, $cv, @aexts);
+               $TOUT = AnyEvent->timer (after => 20, cb => sub { $cv->send });
             }
          }
       },
