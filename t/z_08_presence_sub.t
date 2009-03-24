@@ -27,6 +27,11 @@ my $ctx = pred_ctx {
    pred_decl 'start';
 
    pred_action start => sub {
+      $IM->send (new_iq (get => src => $FJID1,
+                         create => { node => { name => "query", dns => "roster" } }));
+      $IM->send (new_iq (get => src => $FJID2,
+                         create => { node => { name => "query", dns => "roster" } }));
+
       $tout = AnyEvent->timer (after => 10, cb => sub {
          my $cnt = 0;
          $IM->get_connection ($FJID1)->reg_cb (send_buffer_empty => sub {
@@ -97,7 +102,7 @@ AnyEvent::XMPP::Test::start (sub {
       ext_presence_unsubscribed => sub {
          my ($self, $resjid, $jid) = @_;
 
-         if (pred ($ctx, 'subscribed_1')) {
+         if (cmp_jid ($resjid, $FJID2) && pred ($ctx, 'subscribed_1')) {
             $flags->{unsubscribed}++;
             pred_check ($ctx);
          }
