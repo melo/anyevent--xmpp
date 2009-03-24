@@ -613,7 +613,7 @@ sub new_presence {
    }
 
    if (defined $show) {
-      $node->add ({ defns => 'stanza', node => { name => 'status', childs => [ $show ] } });
+      $node->add ({ defns => 'stanza', node => { name => 'show', childs => [ $show ] } });
    }
 
    if (defined $prio) {

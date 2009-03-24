@@ -193,7 +193,8 @@ sub send_iq_auth {
 
    if ($fields->{digest}) {
       my $out_password = encode ("utf-8", $password);
-      my $out          = lc sha1_hex ($self->{connection}->stream_id () . $out_password);
+      my $stream_id    = $self->{connection}->stream_header->attr ('id');
+      my $out          = lc sha1_hex ($stream_id . $out_password);
 
       $fields = {
          username => $username,

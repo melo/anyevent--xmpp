@@ -145,8 +145,13 @@ sub new {
       stream_start => sub {
          my ($parser, $node) = @_;
 
+         $self->{stream_header} = $node;
+
          if (defined (my $lang = $node->attr_ns (xml => 'lang'))) {
             $self->{stream_in_lang} = $lang;
+         } else {
+            warn "Server did not send xml:lang, defaulting to default language!\n";
+            $self->{stream_in_lang} = $self->{default_stream_lang};
          }
 
          $self->recv_stanza_xml ($node);
@@ -519,6 +524,15 @@ sub disconnect {
 
    $self->cleanup_flags;
 }
+
+=item $con->stream_header ()
+
+This method will return the start element the other side sent us as
+L<AnyEvent::XMPP::Node> object.
+
+=cut
+
+sub stream_header { $_[0]->{stream_header} }
 
 =item $stream->is_connected ()
 

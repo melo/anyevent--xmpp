@@ -237,16 +237,14 @@ sub new {
       ext_before_stream_start => sub {
          my ($self, $node) = @_;
 
-         $self->{stream_id}  = $node->attr ('id');
          $self->{server_jid} = $node->attr ('from');
-         $self->{stream_start_cnt}++;
       },
       ext_after_stream_start => sub {
          my ($self, $node) = @_;
 
          # This is some very bad "hack" for _very_ old jabber
          # servers to work with AnyEvent::XMPP
-         if ($self->{stream_start_cnt} == 1 # only for first stream!
+         if (++$self->{stream_start_cnt} == 1 # only for first stream!
              && not (defined $node->attr ('version'))
              && not ($self->{disable_iq_auth})
              && not ($self->{disable_old_jabber_authentication})
@@ -380,7 +378,6 @@ sub cleanup_state {
    delete $self->{jid};
    delete $self->{timeout};
    delete $self->{server_jid};
-   delete $self->{stream_id};
    delete $self->{authenticated};
    delete $self->{res_manager};
    delete $self->{stream_start_cnt};
@@ -478,14 +475,6 @@ L<AnyEvent::XMPP::Node> object.
 =cut
 
 sub features { $_[0]->{features} }
-
-=item $con->stream_id ()
-
-This is the ID of this stream that was given us by the server.
-
-=cut
-
-sub stream_id { $_[0]->{stream_id} }
 
 =item $con->is_ready ()
 
@@ -643,21 +632,6 @@ sub send {
    my ($self, $node) = @_;
 
    $self->{tracker}->register ($node);
-
-   # XXX: This was code before we found out that from/to are not
-   #      good for storing the source/dest for internal routing...
-   #if ($node->name eq 'iq'
-   #    || $node->name eq 'message' 
-   #    || $node->name eq 'presence') {
-
-   #   #if (cmp_jid ($node->attr ('to'), $self->{server_jid})) {
-   #   #  # $node->attr (to => undef);
-   #   #}
-
-   #   if (cmp_jid ($node->attr ('from'), $self->{jid})) {
-   #      $node->attr (from => undef);
-   #   }
-   #}
 }
 
 =item recv_features => $node

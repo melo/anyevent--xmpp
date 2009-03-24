@@ -1,7 +1,8 @@
 package AnyEvent::XMPP::Ext::Presence;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Util qw/stringprep_jid new_iq new_reply new_presence cmp_jid
-                            cmp_bare_jid/;
+                            cmp_bare_jid res_jid prep_bare_jid prep_res_jid
+                            bare_jid/;
 use Scalar::Util qw/weaken/;
 no warnings;
 use strict;
@@ -177,7 +178,7 @@ sub _to_pres_struct {
    my (@prio)   = $node->find_all ([qw/stanza priority/]);
 
    $struct->{jid}      = defined $jid ? $jid : $node->attr ('from');
-   $struct->{show}     = @show ? $show[0]       : 'available';
+   $struct->{show}     = @show ? $show[0]->text : 'available';
    $struct->{priority} = @prio ? $prio[0]->text : 0;
 
    my $def_status;
@@ -291,13 +292,14 @@ sub presences {
 
    if (defined $pjid) {
       $pjid = stringprep_jid $pjid;
-      return () unless exists $self->{p}->{$jid}->{$pjid};
+      my $bpjid = bare_jid $pjid;
+      return () unless exists $self->{p}->{$jid}->{$bpjid};
       my $res = res_jid ($pjid);
 
       if (defined $res) {
-         return $self->{p}->{$jid}->{$pjid}->{$res}
+         return $self->{p}->{$jid}->{$bpjid}->{$res}
       } else {
-         return values %{$self->{p}->{$jid}->{$pjid}}
+         return values %{$self->{p}->{$jid}->{$bpjid}}
       }
 
    } else {

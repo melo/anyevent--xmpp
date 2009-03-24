@@ -6,7 +6,7 @@ no warnings;
 use AnyEvent;
 use AnyEvent::XMPP::Test;
 use AnyEvent::XMPP::IM;
-use AnyEvent::XMPP::Util qw/split_jid cmp_bare_jid new_iq new_message new_presence/;
+use AnyEvent::XMPP::Util qw/split_jid cmp_bare_jid new_iq new_message new_presence bare_jid/;
 use AnyEvent::XMPP::Node qw/simxml/;
 use AnyEvent::XMPP::StanzaHandler;
 use JSON -convert_blessed_universally;
@@ -22,6 +22,7 @@ AnyEvent::XMPP::Test::start (sub {
    $im->send (new_presence (
       available => away => "Going out" => -10, src => $FJID1, to => $FJID2
    ));
+
 }, 'AnyEvent::XMPP::Ext::Presence', sub {
       my ($im, $cv, $pres) = @_;
 
@@ -61,7 +62,7 @@ sub _tostr {
       $t->[1]->{all_status}->{de},
 }
 
-print "1..2\n";
+print "1..17\n";
 
 my $n = 1;
 for my $jid ($FJID1, $FJID2) {
@@ -76,5 +77,43 @@ for my $jid ($FJID1, $FJID2) {
    }
    $n++;
 }
+
+sub _check_pres {
+   my ($struct, $p, $desc) = @_;
+
+   for (keys %$struct) {
+      if ($struct->{$_} eq $p->{$_}) {
+         print "ok $n - $_ of $desc presence\n";
+      } else {
+         print "not ok $n - $_ of $desc presence\n";
+         print "# got     : [$p->{$_}]\n";
+         print "# expected: [$struct->{$_}]\n";
+         print "# => " . JSON->new->pretty->convert_blessed->encode ($p) . "\n";
+      }
+      $n++;
+   }
+}
+
+my @ps  = $pres_ext->presences ($FJID2, bare_jid ($FJID1));
+my @ps2 = $pres_ext->presences ($FJID2, $FJID1);
+my @ps3 = $pres_ext->presences ($FJID1);
+my @ps4 = $pres_ext->highest_prio_presence ($FJID1);
+my @ps5 = $pres_ext->highest_prio_presence ($FJID2);
+
+_check_pres ({
+   show => 'away', priority => -10, status => 'Going out'
+}, $ps[-1], "bare jid1");
+_check_pres ({
+   show => 'away', priority => -10, status => 'Going out'
+}, $ps2[-1], "jid1");
+_check_pres ({
+   show => 'available', priority => 10, status => "I'm playing stuff"
+}, $ps3[-1], "any jid1 other");
+_check_pres ({
+   show => 'available', priority => 10, status => "I'm playing stuff"
+}, $ps4[-1], "highest of jid1");
+_check_pres ({
+   show => 'away', priority => -10, status => 'Going out'
+}, $ps5[-1], "highest of jid2");
 
 print JSON->new->convert_blessed->pretty->encode ($pres_ext->{p}) . "\n";
