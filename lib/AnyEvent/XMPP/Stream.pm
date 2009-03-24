@@ -150,7 +150,6 @@ sub new {
          if (defined (my $lang = $node->attr_ns (xml => 'lang'))) {
             $self->{stream_in_lang} = $lang;
          } else {
-            warn "Server did not send xml:lang, defaulting to default language!\n";
             $self->{stream_in_lang} = $self->{default_stream_lang};
          }
 

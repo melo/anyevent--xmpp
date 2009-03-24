@@ -116,4 +116,4 @@ _check_pres ({
    show => 'away', priority => -10, status => 'Going out'
 }, $ps5[-1], "highest of jid2");
 
-print JSON->new->convert_blessed->pretty->encode ($pres_ext->{p}) . "\n";
+# print JSON->new->convert_blessed->pretty->encode ($pres_ext->{p}) . "\n";
