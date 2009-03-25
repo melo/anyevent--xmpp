@@ -21,6 +21,7 @@ my $CV;
 my $PRES;
 my $IM;
 
+my $jid2_pres_jid1;
 my $flags = { };
 my $tout;
 my $ctx = pred_ctx {
@@ -60,10 +61,19 @@ my $ctx = pred_ctx {
       print "ok 2 - subscription successful, sending unsubscr.\n";
    };
 
-   pred_decl
-      unsubscribed_1 => sub { pred ('subscribed_1') && $flags->{unsubscribed} == 1 };
+   pred_decl unsubscribed_1 => sub {
+      pred ('subscribed_1') && $flags->{unsubscribed} == 1
+   };
    pred_action unsubscribed_1 => sub {
       print "ok 3 - successfully unsubscribedd\n";
+   };
+
+   pred_decl first_presence_unav => sub {
+      pred ('unsubscribed_1') && $jid2_pres_jid1->{show} eq 'unavailable'
+   };
+   pred_action first_presence_unav => sub {
+      print "ok 4 - new presence is unavailable\n";
+      $CV->send;
    };
 
 };
@@ -105,13 +115,11 @@ AnyEvent::XMPP::Test::start (sub {
          my ($pres, $resjid, $jid, $old, $new) = @_;
 
          if (cmp_jid ($resjid, $FJID2)
-             && cmp_jid ($jid, $FJID1)
-             && pred ($ctx, 'unsubscribed_1')) {
+             && cmp_jid ($jid, $FJID1)) {
 
-            print (($new->{show} eq 'unavailable' ? '' : 'not ')
-                   . "ok 4 - new presence is unavailable\n");
+            $jid2_pres_jid1 = $new;
 
-            $cv->send;
+            pred_check ($ctx);
          }
       }
    );

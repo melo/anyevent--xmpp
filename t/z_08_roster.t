@@ -41,6 +41,13 @@ sub clean {
 sub _check_item {
    my ($expected, $got, $nr, $desc) = @_;
 
+   if ($expected->{groups}) {
+      $expected->{groups} = [ sort { $a cmp $b } @{$expected->{groups}} ];
+   }
+   if ($got->{groups}) {
+      $got->{groups} = [ sort { $a cmp $b } @{$got->{groups}} ];
+   }
+
    my $jse = JSON->new->canonical->encode ($expected);
    my $jsg = JSON->new->canonical->encode ($got);
 
@@ -131,11 +138,6 @@ $ctx = pred_ctx {
       );
 
       clean (sub {
-         print (($ROST->item_jids ($FJID1) == 0 ? "" : "not ")
-               . "ok 6 - first roster empty\n");
-         print (($ROST->item_jids ($FJID2) == 0 ? "" : "not ")
-               . "ok 7 - second roster empty\n");
-
          $IM->get_connection ($FJID1)->disconnect ("done");
          $IM->get_connection ($FJID2)->disconnect ("done");
       });
@@ -143,10 +145,14 @@ $ctx = pred_ctx {
 
    pred_decl 'cleanup', sub {
       pred ('updated_items')
+      && $ROST->item_jids ($FJID1) == 0
+      && $ROST->item_jids ($FJID2) == 0
       && not (defined $roster1)
       && not (defined $roster2)
    };
    pred_action cleanup => sub {
+      print "ok 6 - first roster empty\n";
+      print "ok 7 - second roster empty\n";
       print "ok 8 - cleanup okay\n";
       $CV->send;
    };
