@@ -20,7 +20,8 @@ my $t = 0;
 $im->reg_cb (
    connected => sub {
       my ($self, $jid) = @_;
-      my $reg = AnyEvent::XMPP::Ext::Registration->new (delivery => $self->get_connection ($jid));
+      my $reg =
+         AnyEvent::XMPP::Ext::Registration->new (delivery => $self->get_connection ($jid));
       $reg->send_unregistration_request (sub {
          my ($reg, $ok, $error, $form) = @_;
          $n++;
