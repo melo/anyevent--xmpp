@@ -469,12 +469,28 @@ or these keys:
 
 =over 4
 
-=item create => C<$creation>
+=item create => $creation
 
 This is the most important parameter for any XMPP stanza, it
-allows you to create the content of the stanza.
+allows you to create (custom) content of the stanza.
 
-TODO: Document it!
+The value in C<$creation> will be added directly to the generated
+L<AnyEvent::XMPP::Node> via the C<add> method. So C<$creation> may anything
+that the C<add> method of L<AnyEvent::XMPP::Node> accepts.
+
+=item sent_cb => $callback
+
+The code reference in C<$callback> will be invoked when the serialized bytes
+of the generated L<AnyEvent::XMPP::Node> is completely written out to the operating
+system.
+
+=item src => $src_jid
+
+=item dest => $dest_jid
+
+These two keys will set the C<src> and C<dest> keys in the meta information
+of the generated L<AnyEvent::XMPP::Node> object. See L<AnyEvent::XMPP::Meta>
+about the meaning of them.
 
 =item cb => $callback
 
@@ -533,6 +549,8 @@ sub new_iq {
 
 =item $node = new_message ($type, $body, %args)
 
+# TODO: document this!
+
 =cut
 
 sub new_message {
@@ -582,6 +600,56 @@ sub new_message {
 
 =item $node = new_presence ($type, $show, $status, $priority, %args)
 
+This function generates an XMPP presence stanza of type C<$type> and returns it
+as L<AnyEvent::XMPP::Node> structure.
+
+C<$type> can be one of these values:
+
+   undef           (stands for being 'available')
+   'unavailable'
+   'subscribe'
+   'unsubscribe'
+   'subscribed'
+   'unsubscribed'
+
+C<$show> will be the presence status, which has to be one of these:
+
+   'available'
+   'chat'
+   'away'
+   'xa'
+   'dnd'
+
+If C<$show> is undefined it has the same meaning as being 'available'.
+
+C<$status> contains the human readable presence status. It can either be a
+simple string or a hash reference. If it is a hash reference the keys define
+the language tag and the values the human readable text for the status in that
+language.
+
+C<$priority> is the priority of the presence. C<$priority> should be either
+a number or undef.
+
+C<%args> can contain further attributes for the presence XML element or one
+of these special keys:
+
+=over 4
+
+=item create => $creation
+
+=item sent_cb => $coderef
+
+=item src => $src_jid
+
+=item dest => $dest_jid
+
+See C<new_iq> documentation about these keys.
+
+=back
+
+All other keys found in C<%args> are appended as they are
+as XML element attributes.
+
 =cut
 
 sub new_presence {
@@ -597,17 +665,21 @@ sub new_presence {
    }
 
    if (defined $status) {
-      $status = [ undef, $status ] unless ref $status;
 
-      my @status = @$status;
+      if (ref ($status)) {
+         $status = { @$status }
+            if ref ($status) eq 'ARRAY';
+      } else {
+         $status = { '' => $status };
+      }
 
-      while (@status) {
-         my ($lang, $status) = (shift @status, shift @status);
+      for my $lang (keys %$status) {
+         next unless $status->{$lang} ne '';
 
          $node->add ({ defns => 'stanza', node => {
             name => 'status',
-            (defined $lang ? (attrs => [ [xml => 'lang'] => $lang ]) : ()),
-            childs => [ $status ]
+            ($lang ne '' ? (attrs => [ [xml => 'lang'] => $lang ]) : ()),
+            childs => [ $status->{$lang} ]
          }});
       }
    }
@@ -637,6 +709,8 @@ sub new_presence {
 
 =item $node = new_reply ($request_node, $create, %attrs)
 
+# TODO: document this!
+
 =cut
 
 sub new_reply {
@@ -660,6 +734,8 @@ sub new_reply {
 }
 
 =item $node = new_error ($error_node, $error, $type)
+
+# TODO: document this!
 
 =cut
 

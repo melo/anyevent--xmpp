@@ -42,11 +42,11 @@ AnyEvent::XMPP::Test::start (sub {
          }
       );
 
-      $pres->set_default (available => [
+      $pres->set_default (available => {
          en => "I'm playing stuff",
          de => "Ich spiele sachen",
          ja => "にほんじん",
-      ], 10);
+      }, 10);
    }
 );
 
