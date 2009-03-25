@@ -40,22 +40,23 @@ my $ctx = pred_ctx {
          $IM->get_connection ($FJID2)->reg_cb (send_buffer_empty => sub {
             if (++$cnt >= 2) { $CV->send }
          });
-         $PRES->send_unsubscription ($FJID1, $FJID2, 1, "Nope! NONE ANYMROE!");
-         $PRES->send_unsubscription ($FJID2, $FJID1, 1, "Nope! NONE ANYMROE!");
+         $PRES->send_unsubscription ($FJID1, bare_jid ($FJID2), 1, "Nope! NONE ANYMROE!");
+         $PRES->send_unsubscription ($FJID2, bare_jid ($FJID1), 1, "Nope! NONE ANYMROE!");
       });
 
-      $PRES->send_subscription_request ($FJID1, $FJID2, 1, "Hi! Lets be friends!");
+      $PRES->send_subscription_request (
+         $FJID1, bare_jid ($FJID2), 1, "Hi! Lets be friends!");
    };
 
    pred_decl   subsc_recv_1 => sub { pred ('start') && $flags->{subsc_recv} == 1 };
    pred_action subsc_recv_1 => sub {
-      $PRES->handle_subscription_request ($FJID2, $FJID1, 1, 1, "Ok, lets be!");
+      $PRES->handle_subscription_request ($FJID2, bare_jid ($FJID1), 1, 1, "Ok, lets be!");
       print "ok 1 - sent subscription request\n";
    };
 
    pred_decl   subscribed_1 => sub { pred ('subsc_recv_1') && $flags->{subscribed} == 1 };
    pred_action subscribed_1 => sub {
-      $PRES->send_unsubscription ($FJID1, $FJID2, 1, "Lets NOT be friends!");
+      $PRES->send_unsubscription ($FJID1, bare_jid ($FJID2), 1, "Lets NOT be friends!");
       print "ok 2 - subscription successful, sending unsubscr.\n";
    };
 

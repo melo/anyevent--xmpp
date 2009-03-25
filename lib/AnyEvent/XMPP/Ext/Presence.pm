@@ -443,7 +443,7 @@ sub _int_handle_subscription {
          comment => $status
       };
 
-      if (delete $self->{subsc_mutual}->{$resjid}->{bare_jid $from}) {
+      if (delete $self->{subsc_mutual}->{$resjid}->{stringprep_jid $from}) {
          $self->handle_subscription_request ($resjid, $from, 1, 0);
          return;
       }
@@ -468,12 +468,13 @@ sub send_subscription_request {
    my ($self, $resjid, $jid, $allow_mutual, $comment) = @_;
 
    $resjid = stringprep_jid $resjid;
+   $jid    = stringprep_jid $jid;
 
    $self->{extendable}->send (new_presence (
-       subscribe => undef, $comment, undef, src => $resjid, to => bare_jid ($jid)));
+       subscribe => undef, $comment, undef, src => $resjid, to => $jid));
 
    if ($allow_mutual) {
-      $self->{subsc_mutual}->{$resjid}->{prep_bare_jid $jid} = 1;
+      $self->{subsc_mutual}->{$resjid}->{$jid} = 1;
    }
 }
 
@@ -481,11 +482,11 @@ sub send_unsubscription {
    my ($self, $resjid, $jid, $mutual, $comment) = @_;
 
    $self->{extendable}->send (new_presence (
-       unsubscribe => undef, $comment, undef, src => $resjid, to => bare_jid ($jid)));
+       unsubscribe => undef, $comment, undef, src => $resjid, to => $jid));
 
    if ($mutual) {
       $self->{extendable}->send (new_presence (
-          unsubscribed => undef, $comment, undef, src => $resjid, to => bare_jid ($jid)));
+          unsubscribed => undef, $comment, undef, src => $resjid, to => $jid));
    }
 }
 
@@ -560,7 +561,7 @@ Robin Redeker, C<< <elmex at ta-sa.org> >>, JID: C<< <elmex at jabber.org> >>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2007, 2008 Robin Redeker, all rights reserved.
+Copyright 2009 Robin Redeker, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
