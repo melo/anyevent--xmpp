@@ -140,6 +140,7 @@ $ctx = pred_ctx {
       clean (sub {
          $IM->get_connection ($FJID1)->disconnect ("done");
          $IM->get_connection ($FJID2)->disconnect ("done");
+         pred_check $ctx;
       });
    };
 

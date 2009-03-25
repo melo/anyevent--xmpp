@@ -5,6 +5,7 @@ no warnings;
 use Test::More;
 use AnyEvent::XMPP::IM;
 use AnyEvent::XMPP::Util qw/cmp_jid cmp_bare_jid new_presence stringprep_jid/;
+use Time::HiRes qw/usleep/;
 
 require Exporter;
 our @ISA = qw/Exporter/;
@@ -60,6 +61,8 @@ sub check {
 
 sub start {
    my ($cnt, $cb, @exts) = @_;
+
+   usleep (300); # some fugde time for some servers...
 
    if (ref $cnt) {
       unshift @exts, $cb if defined $cb;
@@ -155,8 +158,11 @@ sub start {
       },
       disconnected => sub {
          my ($self, $jid, $ph, $pp, $reaso) = @_;
-         print "# disconnected $jid,$ph:$pp: $reaso\n";
-         $cv->send;
+
+         if ($reaso ne 'done') {
+            print "# disconnected $jid,$ph:$pp: $reaso\n";
+            $cv->send;
+         }
       },
    );
 
