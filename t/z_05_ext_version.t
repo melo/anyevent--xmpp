@@ -17,7 +17,7 @@ my $hdl;
 AnyEvent::XMPP::Test::start (1, sub {
    my ($im, $cv) = @_;
 
-   my $version = $im->add_extension ('AnyEvent::XMPP::Ext::Version');
+   my $version = $im->add_ext ('Version');
 
    $version->request_version ($FJID1, $im->get_connection ($FJID1)->{server_jid}, sub {
       my ($v, $e) = @_;

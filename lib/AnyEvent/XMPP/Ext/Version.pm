@@ -14,7 +14,7 @@ AnyEvent::XMPP::Ext::Version - XEP-0092: Software version
 
 =head1 SYNOPSIS
 
-   my $version = $extendable->add_extension ('AnyEvent::XMPP::Ext::Version');
+   my $version = $extendable->add_ext ('Version');
    $version->set_name    ("My client");
    $version->set_version ("0.3");
    $version->set_os      (`uname -a`);

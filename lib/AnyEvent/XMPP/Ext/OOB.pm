@@ -11,7 +11,7 @@ AnyEvent::XMPP::Ext::OOB - XEP-0066 Out of Band Data
 =head1 SYNOPSIS
 
    my $im = AnyEvent::XMPP::IM->new (...);
-   my $ext = $im->add_extension ('AnyEvent::XMPP::Ext::OOB');
+   my $ext = $im->add_ext ('OOB');
 
    # Example for receiving OOB data via AnyEvent::HTTP:
 

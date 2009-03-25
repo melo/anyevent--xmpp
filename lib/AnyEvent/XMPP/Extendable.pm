@@ -35,8 +35,8 @@ AnyEvent::XMPP::Extendable - Superclass for extendable things.
    package main;
    my $con = MyCon->new (...);
 
-   $con->add_extension ('AnyEvent::XMPP::Ext::Disco');
-   $con->add_extension ('AnyEvent::XMPP::Ext::Ping');
+   $con->add_extension ('AnyEvent::XMPP::Ext::Ping'); # same as: $con->add_ext ('Ping')
+   $con->add_ext ('Disco');
    ...
 
 
@@ -74,6 +74,28 @@ sub init {
 
 }
 
+=item $extendable->add_ext ($shortcut)
+
+The same as C<add_extension> just that C<AnyEvent::XMPP::Ext::>
+is put in front of C<$shortcut>. That means this:
+
+   $extendable->add_ext ('Disco');
+
+Is the same as this:
+
+   $extendable->add_extension ('AnyEvent::XMPP::Ext::Disco');
+
+=cut
+
+sub add_ext {
+   my ($self, $short) = @_;
+   $self->add_extension ('AnyEvent::XMPP::Ext::' . $short);
+}
+
+=item $extendable->add_extension ($full_classname)
+
+=cut
+
 sub add_extension {
    my ($self, $pkg) = @_;
    eval "require $pkg";
@@ -92,6 +114,23 @@ sub add_extension {
    $self->{_ext_ids}->{$pkg}
       = $pkg->new (extendable => $self)
 }
+
+=item $extendable->get_ext ($shortcut)
+
+The same as:
+
+   $extendable->get_extension ('AnyEvent::XMPP::Ext::' . $shortcut)
+
+=cut
+
+sub get_ext {
+   my ($self, $ext) = @_;
+   $self->get_extension ('AnyEvent::XMPP::Ext::' . $ext)
+}
+
+=item $extendable->get_extension ($shortcut)
+
+=cut
 
 sub get_extension {
    my ($self, $id) = @_;

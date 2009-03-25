@@ -445,6 +445,15 @@ sub text {
    join '', map $_->[1], grep { $_->[0] == NTEXT } @{$_[0]->[NODES]}
 }
 
+=item B<find ($ns, $name)>
+
+This method returns all child elements with the name C<$name> and in the
+namespace C<$ns>.
+
+=cut
+
+sub find { grep { $_->eq ($_[1], $_[2]) } $_[0]->nodes }
+
 =item B<find_all (@path)>
 
 This method does a recursive descent through the sub-nodes and

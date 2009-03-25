@@ -15,7 +15,7 @@ AnyEvent::XMPP::Ext::Presence - RFC 3921 Presence handling
 
 =head1 SYNOPSIS
 
-   my $pres = $im->add_extension ('AnyEvent::XMPP::Ext::Presence');
+   my $pres = $im->add_ext ('Presence');
 
    # setting default presence for all connected resources:
    $pres->set_default ('available', 'working on something', 10);
@@ -105,7 +105,7 @@ sub init {
    weaken $self;
 
    $self->{guard} = $self->{extendable}->reg_cb (
-      source_available => sub {
+      source_available => -10 => sub {
          my ($ext, $jid) = @_;
 
          $self->{p}->{$jid}          = { };
@@ -114,7 +114,7 @@ sub init {
 
          $self->update ($jid);
       },
-      source_unavailable => sub {
+      source_unavailable => -10 => sub {
          my ($ext, $jid) = @_;
 
          for my $pres ($self->my_presences ($jid)) {
@@ -129,7 +129,7 @@ sub init {
          delete $self->{p}->{$jid};
          delete $self->{subsc_reqs}->{$jid};
       },
-      recv_presence => sub {
+      recv_presence => -10 => sub {
          my ($ext, $node) = @_;
          $self->_analyze_stanza ($node);
       }

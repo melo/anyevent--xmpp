@@ -13,7 +13,7 @@ AnyEvent::XMPP::Ext::Ping - Implementation of XMPP Ping XEP-0199
 =head1 SYNOPSIS
 
    my $con = AnyEvent::XMPP::IM->new (...);
-   my $ext = $con->add_extension ('AnyEvent::XMPP::Ext::Ping');
+   my $ext = $con->add_ext ('Ping');
    $ext->auto_timeout (10);
 
    $ext->reg_cb (

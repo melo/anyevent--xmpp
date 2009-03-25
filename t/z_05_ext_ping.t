@@ -17,10 +17,10 @@ my $hdl;
 AnyEvent::XMPP::Test::start (sub {
    my ($im, $cv) = @_;
 
-   $im->add_extension ('AnyEvent::XMPP::Ext::Ping');
+   $im->add_ext ('Ping');
 
    # while we are at it, test the Extendable interface:
-   my $ext = $im->get_extension ('AnyEvent::XMPP::Ext::Ping');
+   my $ext = $im->get_ext ('Ping');
    
    $ext->ping ($FJID1, undef, sub {
       my ($latency, $error) = @_;
@@ -49,11 +49,15 @@ AnyEvent::XMPP::Test::start (sub {
 
          my $cnt = 1;
 
+         my @ping_ids;
          $im->get_connection ($FJID1)->reg_cb (
+            send => sub {
+               my ($im, $node) = @_;
+               push @ping_ids, $node->attr ('id') if $node->find (ping => 'ping');
+            },
             recv => 1 => sub {
                my ($im, $node) = @_;
-
-               if ($node->find_all ([qw/ping ping/])) {
+               if (grep { $node->attr ('id') eq $_ } @ping_ids) {
                   $im->stop_event if --$cnt <= 0;
                }
             }
