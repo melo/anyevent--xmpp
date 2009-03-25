@@ -5,13 +5,13 @@ no warnings;
 use AnyEvent;
 use AnyEvent::XMPP::Test;
 use AnyEvent::XMPP::IM;
-use AnyEvent::XMPP::Util qw/split_jid cmp_bare_jid new_iq new_message/;
+use AnyEvent::XMPP::Util qw/split_jid cmp_bare_jid new_iq new_message cmp_jid/;
 use AnyEvent::XMPP::Node qw/simxml/;
 use AnyEvent::XMPP::StanzaHandler;
 
 AnyEvent::XMPP::Test::check ('client');
 
-print "1..2\n";
+print "1..3\n";
 
 my $hdl;
 AnyEvent::XMPP::Test::start (sub {
@@ -45,7 +45,30 @@ AnyEvent::XMPP::Test::start (sub {
             print "ok 2 - received ping reply from second jid: $latency seconds\n";
          }
 
-         $cv->send;
+         $ext->enable_timeout ($FJID1, 1);
+
+         my $cnt = 1;
+
+         $im->get_connection ($FJID1)->reg_cb (
+            recv => 1 => sub {
+               my ($im, $node) = @_;
+
+               if ($node->find_all ([qw/ping ping/])) {
+                  $im->stop_event if --$cnt <= 0;
+               }
+            }
+         );
+
+         $ext->reg_cb (
+            ping_timeout => sub {
+               my ($ext, $jid) = @_;
+
+               print ((cmp_jid ($jid, $FJID1) ? "" : "not ")
+                      . "ok 3 - received ping timeout\n");
+
+               $cv->send;
+            }
+         );
       });
    });
 });

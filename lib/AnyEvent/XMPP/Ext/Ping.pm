@@ -1,6 +1,6 @@
 package AnyEvent::XMPP::Ext::Ping;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
-use AnyEvent::XMPP::Util qw/stringprep_jid new_iq new_reply/;
+use AnyEvent::XMPP::Util qw/stringprep_jid new_iq new_reply domain_jid/;
 use Scalar::Util qw/weaken/;
 use strict;
 
@@ -16,9 +16,9 @@ AnyEvent::XMPP::Ext::Ping - Implementation of XMPP Ping XEP-0199
    my $ext = $con->add_extension ('AnyEvent::XMPP::Ext::Ping');
    $ext->auto_timeout (10);
 
-   $con->reg_cb (
-      ext_ping_timeout => sub {
-         my ($con, $srcjid, $timeout) = @_;
+   $ext->reg_cb (
+      ping_timeout => sub {
+         my ($ext, $srcjid, $timeout) = @_;
 
          $con->get_connection ($srcjid)->disconnect ("XMPP Ping timeouted!");
       }
@@ -85,8 +85,8 @@ sub auto_timeout {
 This enables a periodical ping from the source JID C<$src> to it's server,
 C<$timeout> must be the seconds that the ping intervals last.
 
-If the reply didn't come until the next ping would be sent the C<ext_ping_timeout>
-event is generated on the object that was extended with this extension.
+If the reply didn't come until the next ping would be sent the C<ping_timeout>
+event is emitted on the extension object C<$ext>.
 
 Please note that there already is a basic timeout mechanism
 for dead TCP connections in L<AnyEvent::XMPP::Stream> already: See
@@ -125,7 +125,7 @@ sub _start_cust_timeout {
             my ($t, $e) = @_;
 
             if (defined ($e) && $e->condition eq 'client-timeout') {
-               $self->{extendable}->event ('ext_ping_timeout' => $jid, $$rtimeout);
+               $self->ping_timeout ($jid, $$rtimeout);
 
             } else {
                $self->_start_cust_timeout ($jid, $rtimeout)
@@ -232,6 +232,18 @@ sub ignore_pings {
    my ($self, $enable) = @_;
    $self->{ignore_pings} = $enable;
 }
+
+=back
+
+=head1 EVENTS
+
+These events are emitted by this extension:
+
+=over 4
+
+=item ping_timeout => $srcjid
+
+Please consult the C<enable_timeout> method for documentation of this event.
 
 =back
 
