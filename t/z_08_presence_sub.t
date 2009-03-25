@@ -75,40 +75,33 @@ AnyEvent::XMPP::Test::start (sub {
    $PRES = $pres;
    $CV   = $cv;
 
-   $im->reg_cb (
-      recv_iq => sub {
-         my ($im, $node) = @_;
-         $im->stop_event if $node->find_all ([qw/roster query/]);
-      }
-   );
-
-   $im->reg_cb (
-      ext_presence_subscription_request => sub {
-         my ($self, $resjid, $jid, $req) = @_;
+   $pres->reg_cb (
+      subscription_request => sub {
+         my ($pres, $resjid, $jid, $req) = @_;
 
          if (cmp_jid ($resjid, $FJID2) && $req->{status} =~ /friends/) {
             $flags->{subsc_recv}++;
             pred_check ($ctx);
          }
       },
-      ext_presence_subscribed => sub {
-         my ($self, $resjid, $jid) = @_;
+      subscribed => sub {
+         my ($pres, $resjid, $jid) = @_;
 
          if (cmp_jid ($resjid, $FJID2)) {
             $flags->{subscribed}++;
             pred_check ($ctx);
          }
       },
-      ext_presence_unsubscribed => sub {
-         my ($self, $resjid, $jid) = @_;
+      unsubscribed => sub {
+         my ($pres, $resjid, $jid) = @_;
 
          if (cmp_jid ($resjid, $FJID2) && pred ($ctx, 'subscribed_1')) {
             $flags->{unsubscribed}++;
             pred_check ($ctx);
          }
       },
-      ext_presence_change => sub {
-         my ($self, $resjid, $jid, $old, $new) = @_;
+      change => sub {
+         my ($pres, $resjid, $jid, $old, $new) = @_;
 
          if (cmp_jid ($resjid, $FJID2)
              && cmp_jid ($jid, $FJID1)

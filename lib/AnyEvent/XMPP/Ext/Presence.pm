@@ -26,15 +26,15 @@ AnyEvent::XMPP::Ext::Presence - RFC 3921 Presence handling
    # unsetting resource specific presence:
    $pres->set_presence ($resource1_jid);
 
-   $im->reg_cb (
-      ext_presence_self => sub {
-         my ($im, $resjid, $jid, $old_presence_struct, $presence_struct) = @_;
+   $ext->reg_cb (
+      self => sub {
+         my ($ext, $resjid, $jid, $old_presence_struct, $presence_struct) = @_;
 
          # called when the presence for one of
          # our own resources changes.
       },
-      ext_presence_change => sub {
-         my ($im, $resjid, $jid, $old_presence_struct, $presence_struct) = @_;
+      change => sub {
+         my ($ext, $resjid, $jid, $old_presence_struct, $presence_struct) = @_;
 
          # called when presence of some contact or other
          # XMPP entity changed.
@@ -57,10 +57,10 @@ AnyEvent::XMPP::Ext::Presence - RFC 3921 Presence handling
 
    # subscription handling:
 
-   $im->reg_cb (
-      ext_presence_subscription_request => sub { },
-      ext_presence_subscribed           => sub { },
-      ext_presence_unsubscribed         => sub { },
+   $ext->reg_cb (
+      subscription_request => sub { },
+      subscribed           => sub { },
+      unsubscribed         => sub { },
    );
 
    $pres->send_subscription_request (
@@ -118,13 +118,11 @@ sub init {
          my ($ext, $jid) = @_;
 
          for my $pres ($self->my_presences ($jid)) {
-            $ext->event (ext_presence_self =>
-                            $jid, stringprep_jid ($pres->{jid}), $pres, undef);
+            $self->_int_upd_presence ($jid, $pres->{jid}, 1, undef);
          }
 
          for my $pres ($self->presences ($jid)) {
-            $ext->event (ext_presence_change =>
-                            $jid, stringprep_jid ($pres->{jid}), $pres, undef);
+            $self->_int_upd_presence ($jid, $pres->{jid}, 0, undef);
          }
 
          delete $self->{own_p}->{$jid};
@@ -253,8 +251,8 @@ sub _int_upd_presence {
 
    my ($key, $ev) =
       $is_own
-         ? (own_p => 'ext_presence_self')
-         : (p     => 'ext_presence_change');
+         ? (own_p => 'self')
+         : (p     => 'change');
 
    my $bjid = prep_bare_jid ($jid);
    my $res  = prep_res_jid ($jid);
@@ -285,7 +283,7 @@ sub _int_upd_presence {
    }
 
    unless (_eq_pres ($prev, $new)) {
-      $self->{extendable}->event ($ev => $resjid, $jid, $prev, $new);
+      $self->event ($ev => $resjid, $jid, $prev, $new);
    }
 }
 
@@ -450,16 +448,13 @@ sub _int_handle_subscription {
          return;
       }
 
-      $self->{extendable}->event (
-         ext_presence_subscription_request => $resjid, bare_jid ($from), $status);
+      $self->subscription_request ($resjid, bare_jid ($from), $status);
 
    } elsif ($type eq 'subscribed') {
-      $self->{extendable}->event (
-         ext_presence_subscribed => $resjid, bare_jid ($from), $status);
+      $self->subscribed ($resjid, bare_jid ($from), $status);
 
    } elsif ($type eq 'unsubscribed') {
-      $self->{extendable}->event (
-         ext_presence_unsubscribed => $resjid, bare_jid ($from), $status);
+      $self->unsubscribed ($resjid, bare_jid ($from), $status);
 
       # it's hilarious... but servers (Openfire) don't always send
       # a unavailable presence when you are unsubscribed... so we fake it here:
@@ -529,7 +524,7 @@ sub handle_subscription_request {
 
 =back
 
-=head1 EXTENSION EVENTS
+=head1 EVENTS
 
 These events are emitted (via the L<Object::Event> interface)
 by an extension object:
@@ -547,14 +542,15 @@ to the presence.
 
 sub generated_presence { }
 
-=back
+sub self { }
 
-=head1 EXTENDABLE EVENTS
+sub change { }
 
-These events are emitted on the L<AnyEvent::XMPP::Extendable> object
-that an L<AnyEvent::XMPP::Ext::Presence> instance extends:
+sub subscription_request { }
 
-=over 4
+sub subscribed { }
+
+sub unsubscribed { }
 
 =back
 

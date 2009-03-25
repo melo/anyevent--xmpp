@@ -28,13 +28,13 @@ AnyEvent::XMPP::Test::start (sub {
 
       $pres_ext = $pres;
 
-      $im->reg_cb (
-         ext_presence_self => sub {
-            my ($im, $resjid, $jid, $old, $new) = @_;
+      $pres->reg_cb (
+         self => sub {
+            my ($pres, $resjid, $jid, $old, $new) = @_;
             $pres{$resjid} = [$jid => $new];
          },
-         ext_presence_change => sub {
-            my ($im, $resjid, $jid) = @_;
+         change => sub {
+            my ($pres, $resjid, $jid) = @_;
 
             if ($cnt-- <= 0) {
                $cv->send;
