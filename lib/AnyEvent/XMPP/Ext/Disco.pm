@@ -230,7 +230,9 @@ sub reply_with_disco_info {
          childs => [ @identities, @features ]
       });
 
-      $self->{extendable}->send (new_reply ($node, $r));
+      my $reply = new_reply ($node, $r);
+      $self->event (generated_info_reply => $reply);
+      $self->{extendable}->send ($reply);
       $self->{extendable}->stop_event;
    }
 }
@@ -258,7 +260,9 @@ sub reply_with_disco_items {
          } } @$items ],
       });
 
-      $self->{extendable}->send (new_reply ($node, $r));
+      my $reply = new_reply ($node, $r);
+      $self->event (generated_items_reply => $reply);
+      $self->{extendable}->send ($reply);
       $self->{extendable}->stop_event;
    }
 }
@@ -404,6 +408,14 @@ C<$items> is an array reference you can fill with this kind of entries:
 
 C<$name> and C<$node> are optional in such an entry and can be undef.
 About more details of the items mechanism consult XEP-0030.
+
+=item generated_info_reply => $iqnode
+
+=item generated_items_reply => $iqnode
+
+These events are emitted shortly before the C<$iqnode> disco info/items reply
+is sent out. You may use this event to add custom data to the
+reply, for example according to XEP-0128.
 
 =back
 
