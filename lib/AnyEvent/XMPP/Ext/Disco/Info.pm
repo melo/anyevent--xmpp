@@ -27,17 +27,6 @@ sub new {
    $self
 }
 
-=item B<xml_node ()>
-
-Returns the L<AnyEvent::XMPP::Node> object of the IQ query.
-
-=cut
-
-sub xml_node {
-   my ($self) = @_;
-   $self->{xmlnode}
-}
-
 =item B<jid ()>
 
 Returns the JID these items belong to.
@@ -48,7 +37,7 @@ sub jid { $_[0]->{jid} }
 
 =item B<node ()>
 
-Returns the node these items belong to (may be undef).
+Returns the node this info belong to (may be undef).
 
 =cut
 
@@ -59,18 +48,19 @@ sub init {
    my $node = $self->{xmlnode};
    return unless $node;
 
-   my (@ids) = $node->find_all ([qw/disco_info identity/]);
+   my ($query) = $node->find (disco_info => 'query');
+
+   my (@ids) = $query->find (disco_info => 'identity');
    for (@ids) {
       push @{$self->{identities}}, {
          category => $_->attr ('category'),
          type     => $_->attr ('type'),
          name     => $_->attr ('name'),
-         xml_node => $_,
       };
    }
 
-   my (@fs) = $node->find_all ([qw/disco_info feature/]);
-   $self->{features}->{$_->attr ('var')} = $_ for @fs;
+   my (@fs) = $query->find (disco_info => 'feature');
+   $self->{features}->{$_->attr ('var')} = 1 for @fs;
 
 }
 
@@ -78,12 +68,11 @@ sub init {
 
 Returns a list of hashrefs which contain following keys:
 
-   category, type, name, xml_node
+   category, type, name
 
 C<category> is the category of the identity. C<type> is the 
 type of the identity. C<name> is the human readable name of
-the identity and might be undef. C<xml_node> is the L<AnyEvent::XMPP::Node>
-object of the <identity/> node.
+the identity and might be undef. 
 
 C<category> and C<type> may be one of those defined on:
 
@@ -93,7 +82,7 @@ C<category> and C<type> may be one of those defined on:
 
 sub identities {
    my ($self) = @_;
-   @{$self->{identities}}
+   @{$self->{identities} || []}
 }
 
 =item B<features ()>
@@ -103,12 +92,17 @@ as listed on:
 
    http://www.xmpp.org/registrar/disco-features.html
 
-and the value is a L<AnyEvent::XMPP::Node> object for the <feature/> node.
-
 =cut
 
 sub features { $_[0]->{features} || {} }
 
+=item B<has_feature ($uri)>
+
+Returns true if this disco info has the feature C<$uri>.
+
+=cut
+
+sub has_feature { exists $_[0]->{features}->{$_[1]} }
 
 =item B<debug_dump ()>
 
@@ -125,7 +119,7 @@ sub debug_dump {
    for (sort keys %{$self->features}) {
       printf "   FEATURE: %s\n", $_;
    }
-   print "END ITEMS\n";
+   print "END INFO\n";
 
 }
 

@@ -27,29 +27,20 @@ sub new {
    $self
 }
 
-=item B<xml_node ()>
-
-Returns the L<AnyEvent::XMPP::Node> object of the IQ query.
-
-=cut
-
-sub xml_node {
-   my ($self) = @_;
-   $self->{xmlnode}
-}
-
 sub init {
    my ($self) = @_;
+
    my $node = $self->{xmlnode};
    return unless $node;
 
-   my (@items) = $node->find_all ([qw/disco_items item/]);
-   for (@items) {
+   my ($query) = $node->find (disco_items => 'query');
+   return unless $query;
+
+   for ($query->find (disco_items => 'item')) {
       push @{$self->{items}}, {
          jid  => $_->attr ('jid'),
          name => $_->attr ('name'),
          node => $_->attr ('node'),
-         xml_node => $_,
       };
    }
 }
@@ -74,19 +65,17 @@ sub node { $_[0]->{node} }
 
 Returns a list of hashreferences which contain following keys:
 
-  jid, name, node and xml_node
+  jid, name, node
 
 C<jid> contains the JID of the item.
 C<name> contains the name of the item and might be undef.
 C<node> contains the node id of the item and might be undef.
-C<xml_node> contains the L<AnyEvent::XMPP::Node> object of the item
-for further analyses.
 
 =cut
 
 sub items {
    my ($self) = @_;
-   @{$self->{items}}
+   @{$self->{items} || []}
 }
 
 =item B<debug_dump ()>

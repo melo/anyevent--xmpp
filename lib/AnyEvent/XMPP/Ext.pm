@@ -53,12 +53,6 @@ sub required_extensions { }
 
 sub disco_feature { }
 
-sub disco_feature_standard {
-   (
-      xmpp_ns ('data_form'),
-   )
-}
-
 =back
 
 =head1 Supportet extensions
