@@ -62,8 +62,6 @@ sub check {
 sub start {
    my ($cnt, $cb, @exts) = @_;
 
-   usleep (300); # some fugde time for some servers...
-
    if (ref $cnt) {
       unshift @exts, $cb if defined $cb;
       $cb = $cnt;

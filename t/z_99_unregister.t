@@ -21,7 +21,10 @@ $im->reg_cb (
    connected => sub {
       my ($self, $jid) = @_;
       my $reg =
-         AnyEvent::XMPP::Ext::Registration->new (delivery => $self->get_connection ($jid));
+         AnyEvent::XMPP::Ext::Registration->new (
+            delivery => $self->get_connection ($jid),
+            ($jid =~ /jabberd.*145a|jabberd14/ ? (jabberd14_workaround => 1) : ()),
+         );
       $reg->send_unregistration_request (sub {
          my ($reg, $ok, $error, $form) = @_;
          $n++;

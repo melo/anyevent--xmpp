@@ -189,7 +189,12 @@ please look in the description of the C<submit_form> method below.
 sub send_unregistration_request {
    my ($self, $cb) = @_;
 
-   $self->{delivery}->send (new_iq (set => create => {
+   my @add;
+   if ($self->{jabberd14_workaround}) {
+      push @add, (to => $self->{delivery}->{server_jid});
+   }
+
+   $self->{delivery}->send (new_iq (set => @add, create => {
       node => { dns => 'register', name => 'query', childs => [ { name => 'remove' } ] }
    }, cb => sub {
       my ($node, $error) = @_;
