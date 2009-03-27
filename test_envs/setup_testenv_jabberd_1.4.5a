@@ -1,2 +1,2 @@
-export ANYEVENT_XMPP_TEST_COMPONENT="jabberd_145a.test:xmpp-component=5000:test.jabberd_145a.test:LOL342"
-export ANYEVENT_XMPP_TEST_CLIENT="test_1@jabberd_145a.test:test_2@jabberd_145a.test:lolfe123"
+export ANYEVENT_XMPP_TEST_COMPONENT="jabberd-145a.test:xmpp-component=5000:test.jabberd-145a.test:LOL342"
+export ANYEVENT_XMPP_TEST_CLIENT="test_1@jabberd-145a.test:test_2@jabberd-145a.test:lolfe123"

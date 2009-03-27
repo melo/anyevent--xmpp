@@ -1,0 +1,2 @@
+export ANYEVENT_XMPP_TEST_COMPONENT="jabberd14-1611.test:xmpp-component=5000:test.jabberd14-1611.test:lofel23"
+export ANYEVENT_XMPP_TEST_CLIENT="test_1@jabberd14-1611.test:test_2@jabberd14-1611.test:lolfe123"
