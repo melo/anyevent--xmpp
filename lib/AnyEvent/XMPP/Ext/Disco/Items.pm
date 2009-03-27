@@ -1,6 +1,7 @@
 package AnyEvent::XMPP::Ext::Disco::Items;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use strict;
+no warnings;
 
 =head1 NAME
 

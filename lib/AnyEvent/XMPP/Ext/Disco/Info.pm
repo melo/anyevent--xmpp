@@ -1,7 +1,10 @@
 package AnyEvent::XMPP::Ext::Disco::Info;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Ext::DataForm;
+use Encode;
+use Digest::SHA1 qw/sha1_base64/;
 use strict;
+no warnings;
 
 =head1 NAME
 
@@ -65,10 +68,10 @@ sub init {
    }
 
    my (@fs) = $query->find (disco_info => 'feature');
-   $self->{features}->{$_->attr ('var')} = 1 for @fs;
+   $self->{features}->{$_->attr ('var')}++ for @fs;
 
    for my $dnode ($query->find (data_form => 'x')) {
-      push @{$self->{extended}}, AnyEvent::XMPP::Ext::DataForm->from_node ($dnode);
+      push @{$self->{extended}}, AnyEvent::XMPP::Ext::DataForm->new->from_node ($dnode);
    }
 }
 
@@ -168,9 +171,33 @@ sub as_verification_string {
       sprintf "%s/%s/%s/%s<", $_->{category}, $_->{type}, $_->{lang}, $_->{name}
    } @identities;
 
-   my @features = sort { $a cmp $b } keys %{$self->features};
+   my @features =
+      map {
+         my $f = $_;
+         my @f;
+         # Yes, we do this, because some clients send duplicated
+         # <feature/> elements and even calculate their hash based on that
+         # However, it seems to be fixed in tkabber:
+         # 27 11:40:42 <teo> elmex: fixed in svn
+         push @f, $f for 1..$self->features->{$f};
+         @f
+      } sort { $a cmp $b } keys %{$self->features};
+
    $s .= $_ for map { "$_<" } @features;
 
+   for my $ext (sort { $a->form_type cmp $b->form_type } $self->extensions) {
+      $s .= $ext->as_verification_string;
+   }
+
+   $s
+}
+
+sub as_verification_hash {
+   my ($self) = @_;
+
+   my $str = $self->as_verification_string;
+   $str = encode ('utf-8', $str);
+   sha1_base64 ($str) . '='
 }
 
 =back

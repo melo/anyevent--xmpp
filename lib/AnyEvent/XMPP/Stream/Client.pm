@@ -171,12 +171,6 @@ default.
 
 See also C<disable_old_jabber_authentication> below.
 
-=item anal_iq_auth => $bool
-
-This enables the anal iq auth mechanism that will first look in the stream
-features before trying to start iq authentication. Yes, servers don't always
-advertise what they can. I only implemented this option for my test suite.
-
 =item disable_old_jabber_authentication => $bool
 
 If C<$bool> is a true value, then the B<VERY> old style authentication method

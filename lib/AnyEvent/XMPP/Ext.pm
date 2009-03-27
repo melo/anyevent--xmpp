@@ -59,6 +59,13 @@ sub disco_feature { }
 
 This is the list of supported XMPP extensions:
 
+B<NOTE>: Not all modules in the L<AnyEvent::XMPP::Ext::> namespace actually
+implement the L<AnyEvent::XMPP::Ext> interface and can't be used to extend
+L<AnyEvent::XMPP::Extendable> objects directly.  Like for example
+L<AnyEvent::XMPP::Ext::DataForm> which just handles data forms according to
+XEP-0004, which is not a direct protocol extension, but a module to make it
+easier to handle data forms.
+
 =over 4
 
 =item XEP-0004 - Data Forms (Version 2.8)
@@ -84,6 +91,11 @@ This extension allows to receive and send out of band data URLs
 and provides helper functions to handle jabber:x:oob data.
 See also L<AnyEvent::XMPP::Ext::OOB>.
 
+=item XEP-0068 - Field Standardization for Data Forms (Version 1.1)
+
+Handling of the special hidden FORM_TYPE field in Data Forms,
+see also L<AnyEvent::XMPP::Ext::DataForm>.
+
 =item XEP-0077 - In-Band Registration (Version 2.2)
 
 This extension lets you register new accounts "in-band".
@@ -98,11 +110,8 @@ in fact the only server that worked was openfire and psyced.org.
 So I de-analyzed the iq auth and now it just barfs the IQ set out
 on the stream with the username and the password.
 
-If you insist on XEP-0078 behaviour enable the C<anal_iq_auth> option
-when creating the stream.
-
 You can also completely disable iq auth, well, just see the documentation
-of L<AnyEvent::XMPP::Connection>
+of L<AnyEvent::XMPP::Stream::Client>
 
 =item XEP-0082 - XMPP Date and Time Profiles (Version 1.0)
 
@@ -141,7 +150,7 @@ C<samples/simple_component>.
 
 =item XEP-0153 - vCard-Based Avatars (Version 1.0)
 
-This extension allows to store and retrive avatars from vcards.
+This extension allows to store and retrieve avatars from vcards.
 On top of that it will also signal others that you support avatars and
 that they might have changed. See L<AnyEvent::XMPP::Ext::VCard>.
 

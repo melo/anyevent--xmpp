@@ -1,5 +1,6 @@
 package AnyEvent::XMPP::Ext::DataForm;
 use strict;
+no warnings;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 
 =head1 NAME
@@ -11,6 +12,7 @@ AnyEvent::XMPP::Ext::DataForm - XEP-0004 DataForm
 =head1 DESCRIPTION
 
 This module represents a Data Form as specified in XEP-0004.
+It also handles the special C<FORM_TYPE> hidden field according to XEP-0068.
 
 =head1 METHODS
 
@@ -34,6 +36,7 @@ sub init {
    $self->{field_var} = {};
    $self->{items}     = [];
    $self->{reported}  = [];
+   delete $self->{form_type};
    delete $self->{type};
    delete $self->{title};
    delete $self->{instructions};
@@ -43,6 +46,10 @@ sub init {
 
 This method appends a field to the form.
 C<$field> must have the structure as described in L<FIELD STRUCTURE> below.
+
+B<NOTE>: If you append a hidden field called 'FORM_TYPE' _and_ specified a
+form type by the C<set_form_type> method, the value set by the C<set_form_type>
+will shadow the appended field.
 
 =cut
 
@@ -112,6 +119,12 @@ sub from_node {
 
    for my $field ($node->find_all ([qw/data_form field/])) {
       my $fo = _extract_field ($field);
+
+      if ($fo->{type} eq 'hidden' && $fo->{var} eq 'FORM_TYPE') {
+         $self->{form_type} = $fo->{values}->[0];
+         next;
+      }
+
       $self->append_field ($fo);
    }
 
@@ -135,12 +148,14 @@ sub from_node {
       }
       push @{$self->{items}}, $flds;
    }
+
+   $self
 }
 
 =item B<make_answer_form ($request_form)>
 
 This method initializes this form with default answers and
-other neccessary fields from C<$request_form>, which must be
+other necessary fields from C<$request_form>, which must be
 of type L<AnyEvent::XMPP::Ext::DataForm> or compatible.
 
 The result will be a form with a copy of all fields which are not of
@@ -150,7 +165,7 @@ The form type will be set to C<submit>.
 
 The idea is: this creates a template answer form from C<$request_form>.
 
-To strip out the unneccessary fields later you don't need call the
+To strip out the unnecessary fields later you don't need call the
 C<clear_empty_fields> method.
 
 =cut
@@ -158,7 +173,7 @@ C<clear_empty_fields> method.
 sub make_answer_form {
    my ($self, $reqform) = @_;
 
-   $self->set_form_type ('submit');
+   $self->set_type ('submit');
 
    for my $field ($reqform->get_fields) {
       next if $field->{type} eq 'fixed';
@@ -211,7 +226,7 @@ sub remove_field {
    }
 }
 
-=item B<set_form_type ($type)>
+=item B<set_type ($type)>
 
 This method sets the type of the form, which must be one of:
 
@@ -219,20 +234,43 @@ This method sets the type of the form, which must be one of:
 
 =cut
 
-sub set_form_type {
+sub set_type {
    my ($self, $type) = @_;
    $self->{type} = $type;
 }
 
-=item B<form_type>
+=item B<type>
 
 This method returns the type of the form, which is one of the
-options described in C<set_form_type> above or undef if no type
+options described in C<set_type> above or undef if no type
 was yet set.
 
 =cut
 
-sub form_type { return $_[0]->{type} }
+sub type { return $_[0]->{type} }
+
+=item B<set_form_type ($form_type)>
+
+This sets the FORM_TYPE standardization field according
+to XEP-0068.
+
+Please also see C<append_field> about what happens if the hidden FORM_TYPE
+field already exists.
+
+=cut
+
+sub set_form_type {
+   my ($self, $type) = @_;
+   $self->{form_type} = $type;
+}
+
+=item B<form_type>
+
+Returns the value of the hidden FORM_TYPE field (see also XEP-0068).
+
+=cut
+
+sub form_type { return $_[0]->{form_type} }
 
 =item B<get_reported_fields>
 
@@ -330,7 +368,7 @@ function which is documented in L<AnyEvent::XMPP::Util>.
 Example call might be:
 
    my $node = $form->to_simxml;
-   simxml ($w, defns => $node->{ns}, node => $node);
+   simxml (defns => $node->{ns}, node => $node);
 
 B<NOTE:> The returned simxml node has the C<dns> field set
 so that no prefixes are generated for the namespace it is in.
@@ -400,7 +438,19 @@ sub to_simxml {
       }
    }
 
+   if (defined $self->{form_type}) {
+      push @$fields, _field_to_simxml ({
+         type => 'hidden',
+         var => 'FORM_TYPE', 
+         values => [ $self->{form_type} ]
+      });
+   }
+
    for my $f ($self->get_fields) {
+      next if
+          defined ($self->{form_type})
+          && $f->{type} eq 'hidden'
+          && $f->{var} eq 'FORM_TYPE';
       push @$fields, _field_to_simxml ($f);
    }
 
@@ -478,6 +528,22 @@ sub as_debug_string {
    }
 
    $str
+}
+
+sub as_verification_string {
+   my ($self) = @_;
+
+   $self->form_type . '<' . join ('',
+      map {
+        my $f = $_;
+        $f->{var} . '<' . join ('',
+           map { $_ . '<' }
+              sort { $a cmp $b }
+                 @{$f->{values} || []}
+        )
+      } sort { $a->{var} cmp $b->{var} }
+         $self->get_fields
+   )
 }
 
 =back
