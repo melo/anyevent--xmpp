@@ -451,6 +451,7 @@ sub _int_handle_subscription {
       $self->subscription_request ($resjid, bare_jid ($from), $status);
 
    } elsif ($type eq 'subscribed') {
+      # FIXME: send subscription acknowledgement!
       $self->subscribed ($resjid, bare_jid ($from), $status);
 
    } elsif ($type eq 'unsubscribed') {
@@ -517,6 +518,7 @@ sub handle_subscription_request {
          $self->{extendable}->send (new_presence (
             subscribe => undef, $comment, undef, src => $resjid, to => $jid));
       }
+
    } else {
       $self->{extendable}->send (new_presence (
          unsubscribed => undef, $comment, undef, src => $resjid, to => $jid));

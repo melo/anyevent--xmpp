@@ -268,11 +268,11 @@ sub has_roster_for {
 
 sub fetched { }
 
-=item changed => $jid, $item_jid, $old_item, $new_item
+=item change => $jid, $item_jid, $old_item, $new_item
 
 =cut
 
-sub changed { }
+sub change { }
 
 =item gone => $jid
 

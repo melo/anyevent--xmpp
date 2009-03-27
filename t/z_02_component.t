@@ -29,6 +29,11 @@ $stream->reg_cb (
          $stream->{secret} = $SECRET;
          $stream->connect ($HOST, $PORT);
 
+      } elsif ($SERVICE =~ /tigase/) {
+         print "ok 1 - disconnected due to wrong password (tigase way)\n";
+         $stream->{secret} = $SECRET;
+         $stream->connect ($HOST, $PORT);
+
       } else {
          print "not ok 1 - disconnected from $h:$p ($reas)\n";
          $cv->send;

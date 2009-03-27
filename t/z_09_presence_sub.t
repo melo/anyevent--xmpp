@@ -28,11 +28,6 @@ my $ctx = pred_ctx {
    pred_decl 'start';
 
    pred_action start => sub {
-      $IM->send (new_iq (get => src => $FJID1,
-                         create => { node => { name => "query", dns => "roster" } }));
-      $IM->send (new_iq (get => src => $FJID2,
-                         create => { node => { name => "query", dns => "roster" } }));
-
       $tout = AnyEvent->timer (after => 10, cb => sub {
          my $cnt = 0;
          $IM->get_connection ($FJID1)->reg_cb (send_buffer_empty => sub {
@@ -80,7 +75,7 @@ my $ctx = pred_ctx {
 
 
 AnyEvent::XMPP::Test::start (sub {
-   my ($im, $cv, $pres) = @_;
+   my ($im, $cv, $pres, $roster) = @_;
 
    $IM   = $im;
    $PRES = $pres;
@@ -126,7 +121,10 @@ AnyEvent::XMPP::Test::start (sub {
 
    pred_set ($ctx, 'start');
 
-}, 'AnyEvent::XMPP::Ext::Presence');
+}, 'AnyEvent::XMPP::Ext::Presence', 'AnyEvent::XMPP::Ext::Roster', sub {
+   my ($im, $cv, $pres, $roster) = @_;
+   $roster->auto_fetch;
+});
 
 undef $tout;
 
