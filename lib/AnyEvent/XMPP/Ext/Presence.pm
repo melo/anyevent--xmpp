@@ -66,7 +66,7 @@ AnyEvent::XMPP::Ext::Presence - RFC 3921 Presence handling
    $pres->send_subscription_request (
       $my_jid, $your_jid, 1, "Hi! I would love to have a mutual subscription!");
 
-   my @pres_reqs = $pres->pending_subscription_requests;
+   my @pres_reqs = $pres->pending_subscription_requests ($my_jid);
 
    $pres->handle_subscription_request (
       $my_jid, $pres_reqs[-1], 1, 1, "Ok, I want to subscribe to you too!");
@@ -458,7 +458,6 @@ sub _int_handle_subscription {
       $self->subscription_request ($resjid, bare_jid ($from), $status);
 
    } elsif ($type eq 'subscribed') {
-      # FIXME: send subscription acknowledgement!
       $self->subscribed ($resjid, bare_jid ($from), $status);
 
    } elsif ($type eq 'unsubscribed') {
