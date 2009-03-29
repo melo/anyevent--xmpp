@@ -107,7 +107,7 @@ sub add_extension {
 
    for (@required) {
       unless ($self->{_ext_ids}->{$_}) {
-         croak "Extension $pkg required extension with id $_!\n"
+         croak "Extension $pkg requires extension with id $_!\n"
       }
    }
 

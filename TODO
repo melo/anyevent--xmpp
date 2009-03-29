@@ -1,5 +1,11 @@
 'x' means: is done!
 
+- write tests for Ext::MUC
+- write Ext::Delay
+  - write tests for it!
+- write Ext::ChatTracker
+  - write tests for it!
+
 - document new_* functions in Util
    - rewrite documentation about add() and simxml().
 - cleanup IM w.r.t. jid/account handling

@@ -225,7 +225,6 @@ sub analyze_presence {
    }
 }
 
-
 =back
 
 =head1 AUTHOR

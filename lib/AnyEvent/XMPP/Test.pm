@@ -133,14 +133,14 @@ sub start {
                      if ($one_to_2 && $two_to_1) {
                         $im->unreg_me;
 
-                        $cb->($im, $cv, @aexts);
                         $TOUT = AnyEvent->timer (after => 20, cb => sub { $cv->send });
+                        $cb->($im, $cv, @aexts);
                      }
                   }
                );
             } else {
-               $cb->($im, $cv, @aexts);
                $TOUT = AnyEvent->timer (after => 20, cb => sub { $cv->send });
+               $cb->($im, $cv, @aexts);
             }
          }
       },

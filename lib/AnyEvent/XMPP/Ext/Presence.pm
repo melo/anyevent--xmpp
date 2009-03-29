@@ -2,7 +2,7 @@ package AnyEvent::XMPP::Ext::Presence;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Util qw/stringprep_jid new_iq new_reply new_presence cmp_jid
                             cmp_bare_jid res_jid prep_bare_jid prep_res_jid
-                            bare_jid node_jid res_jid/;
+                            extract_lang_element bare_jid node_jid res_jid/;
 use Scalar::Util qw/weaken/;
 no warnings;
 use strict;
@@ -164,7 +164,7 @@ sub _analyze_stanza {
 
 # $jid needs to be stringprepped
 sub _build_own_presence {
-   my ($self, $jid) = @_;
+   my ($self, $jid, $to) = @_;
 
    my ($show, $status, $prio) = @{
       $self->{set}->{$jid}
@@ -175,6 +175,9 @@ sub _build_own_presence {
    $show = undef if $show eq 'available';
 
    my $node = new_presence (available => $show, $status, $prio, src => $jid);
+   if (defined $to) {
+      $node->attr ('to', $to);
+   }
    $self->generated_presence ($node);
    $node
 }
@@ -218,7 +221,7 @@ sub _to_pres_struct {
          ? $show[0]->text
          : ($node->attr ('type') eq 'unavailable' ? 'unavailable' : 'available');
    $struct->{priority} = @prio ? $prio[0]->text : 0;
-   _extract_status ($node, $struct);
+   extract_lang_element ($node, 'status', $struct);
 
    $struct
 }
@@ -328,8 +331,7 @@ sub set_presence {
 sub send_directed {
    my ($self, $resjid, $jid) = @_;
 
-   my $node = $self->_build_own_presence (stringprep_jid $resjid);
-   $node->attr ('to', $jid);
+   my $node = $self->_build_own_presence (stringprep_jid ($resjid), $jid);
    $self->{extendable}->send ($node);
 
    # TODO: Think about storing the state of sent directed presences
@@ -419,6 +421,11 @@ sub highest_prio_presence {
 
       return @p;
    }
+}
+
+sub clear_contact_presences {
+   my ($self, $jid, $bjid) = @_;
+   delete $self->{p}->{stringprep_jid $jid}->{prep_bare_jid $bjid};
 }
 
 =back

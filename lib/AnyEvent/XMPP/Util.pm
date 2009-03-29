@@ -17,7 +17,7 @@ our @EXPORT_OK = qw/resourceprep nodeprep prep_join_jid join_jid
                     xmpp_datetime_as_timestamp
                     filter_xml_chars filter_xml_attr_hash_chars xml_escape
                     new_iq new_reply new_error new_presence new_message
-                    xml_unescape
+                    xml_unescape extract_lang_element
                     /;
 our @ISA = qw/Exporter/;
 
@@ -761,6 +761,35 @@ sub new_error {
          ]
       }
    )
+}
+
+=item extract_lang_element ($node, $elementname, $struct)
+
+=cut
+
+sub extract_lang_element {
+   my ($node, $elname, $struct) = @_;
+
+   my (@element) = $node->find (stanza => $elname);
+
+   my $def_element;
+
+   for my $s (@element) {
+      if (defined (my $lang = $s->attr_ns (xml => 'lang'))) {
+         if ($lang eq $node->meta->{lang}) {
+            $def_element = $s->text;
+         }
+
+         $struct->{'all_' . $elname}->{$lang} = $s->text;
+      } else {
+         $struct->{'all_' . $elname}->{''} = $s->text;
+      }
+   }
+
+   $def_element = $struct->{'all_' . $elname}->{''} unless defined $def_element;
+   $def_element = $element[-1]->text if ((not defined $def_element) && @element);
+
+   $struct->{$elname} = $def_element;
 }
 
 =back
