@@ -1,8 +1,9 @@
 package AnyEvent::XMPP::Ext::MUC;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
-use AnyEvent::XMPP::Util qw/stringprep_jid new_iq new_reply join_jid split_jid
+use AnyEvent::XMPP::Util qw/stringprep_jid new_iq new_reply join_jid split_jid res_jid
                             extract_lang_element prep_bare_jid new_presence cmp_jid/;
 use Scalar::Util qw/weaken/;
+use AnyEvent::XMPP::Error::Presence;
 use AnyEvent::XMPP::Ext::DataForm;
 use strict;
 no warnings;
@@ -46,6 +47,11 @@ sub init {
    my ($self) = @_;
 
    $self->{pres} = $self->{extendable}->get_ext ('Presence');
+
+   $self->{nickcollision_cb} ||= sub {
+      my $nick = shift;
+      $nick . '_'
+   };
 
    $self->{iq_guard} =
       $self->{extendable}->reg_cb (
@@ -111,7 +117,7 @@ sub init {
 
                } else {
                   $self->send_part ($resjid, $mucjid);
-                  $self->event (error => $resjid, $mucjid, 'room creation', $e);
+                  $self->event (error => $resjid, $mucjid, 'creation', $e);
                }
             }
          ));
@@ -182,6 +188,7 @@ sub join {
 
    $self->{rooms}->{$resjid}->{prep_bare_jid $mucjid} = {
       my_jid => stringprep_jid ($myjid),
+      join_args => [$password, $history],
       add_generated => { node => { dns => 'muc', name => 'x', childs => [ @chlds ] } }
    };
 
@@ -205,6 +212,19 @@ sub handle_presence {
    my $room = $self->{rooms}->{$resjid}->{$mucjid}
       or return;
 
+   if (my $error = $node->meta->{error}) {
+
+      if ($error->condition eq 'conflict') {
+         my $nick = res_jid $room->{my_jid};
+         $nick = $self->{nickcollision_cb}->($nick);
+         $self->join ($resjid, $mucjid, $nick, @{$room->{join_args} || []});
+         return;
+      }
+
+      $self->event (error => $resjid, $mucjid, 'presence', $error);
+      return;
+   }
+
    if (my ($x) = $node->find (muc_user => 'x')) {
       my %status_codes;
 
@@ -218,9 +238,8 @@ sub handle_presence {
 
       if ($status_codes{210}) {
          $room->{my_jid} = $from;
-      }
 
-      if ($status_codes{201}) {
+      } elsif ($status_codes{201}) {
          $self->event (created => $resjid, $mucjid);
 
       } elsif ($status_codes{303}) {
@@ -271,7 +290,11 @@ sub handle_message {
 
    my $from = stringprep_jid $node->attr ('from');
 
-   if ($node->attr ('type') eq 'groupchat') {
+   if ($node->meta->{error}) {
+      my $muc_error = AnyEvent::XMPP::Error::Message->new (node => $node);
+      $self->event (error => $resjid, $mucjid, 'message', $muc_error);
+
+   } elsif ($node->attr ('type') eq 'groupchat') {
       my $msg_struct = {};
       extract_lang_element ($node, 'subject', $msg_struct);
 

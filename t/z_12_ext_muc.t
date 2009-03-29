@@ -74,8 +74,8 @@ AnyEvent::XMPP::Test::start (sub {
             print "INROOM: " . $_->{jid} . "\n";
          }
 
-         #$IM->send (new_message (
-         #   groupchat => "Hi there!", src => $resjid, to => $mucjid));
+         $IM->send (new_message (
+            groupchat => undef, subject => "TEST2233", src => $resjid, to => $mucjid));
       },
       joined => sub {
          my ($self, $resjid, $mucjid, $occjid) = @_;
@@ -97,6 +97,10 @@ AnyEvent::XMPP::Test::start (sub {
       left => sub {
          my ($self, $resjid, $mucjid) = @_;
          warn "on $resjid left $mucjid\n";
+      },
+      error => sub {
+         my ($self, $resjid, $mucjid, $where, $error) = @_;
+         warn "on $resjid ERROR $mucjid ($where): " . $error->string . "\n";
       },
    );
 

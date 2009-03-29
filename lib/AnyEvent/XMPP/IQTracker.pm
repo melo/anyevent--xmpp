@@ -108,9 +108,8 @@ sub handle_stanza {
    if ($node->attr ('type') eq 'result') {
       $track->[0]->($node);
 
-   } elsif ($node->attr ('type') eq 'error') {
-      my $error = AnyEvent::XMPP::Error::IQ->new (node => $node);
-      $track->[0]->(undef, $error);
+   } elsif ($node->meta->{error}) {
+      $track->[0]->(undef, $node->meta->{error});
    }
 }
 

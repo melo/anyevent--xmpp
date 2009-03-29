@@ -1,6 +1,7 @@
 package AnyEvent::XMPP::Meta;
 use strict;
 no warnings;
+use Scalar::Util qw/weaken/;
 use AnyEvent::XMPP::Util qw/cmp_jid cmp_bare_jid stringprep_jid/;
 
 =head1 NAME
@@ -49,9 +50,11 @@ sub analyze {
 
    } elsif ($node->eq (stanza => 'iq')) {
       $type = 'iq';
+      $self->analyze_iq ($node);
 
    } elsif ($node->eq (stanza => 'message')) {
       $type = 'message';
+      $self->analyze_message ($node);
 
    } elsif ($node->eq (stream => 'features')) {
       $type = 'features';
@@ -208,6 +211,12 @@ received at. This means that some resource changed it's presence status.
 If this is not undef this stanza contains real presence information
 and not just a subscription related request.
 
+=item error => $error
+
+If this meta attribute is set this stanza is an error stanza and C<$error>
+contains the L<AnyEvent::XMPP::Error::Presence> object which describes
+the error.
+
 =back
 
 =cut
@@ -222,8 +231,60 @@ sub analyze_presence {
 
    if ((not defined $node->attr ('type')) || $node->attr ('type') eq 'unavailable') {
       $self->{presence} = $node->attr ('type') || 'available';
+
+   } elsif ($node->attr ('type') eq 'error') {
+      weaken $node;
+      $self->{error} = AnyEvent::XMPP::Error::Presence->new (node => $node);
    }
 }
+
+=item B<message>
+
+=over 4
+
+=item error => $error
+
+If this meta attribute is set this stanza is an error stanza and C<$error>
+contains the L<AnyEvent::XMPP::Error::Message> object which describes
+the error.
+
+=back
+
+=cut
+
+sub analyze_message {
+   my ($self, $node) = @_;
+
+   if ($node->attr ('type') eq 'error') {
+      weaken $node;
+      $self->{error} = AnyEvent::XMPP::Error::Message->new (node => $node);
+   }
+}
+
+=item B<iq>
+
+=over 4
+
+=item error => $error
+
+If this meta attribute is set this stanza is an error stanza and C<$error>
+contains the L<AnyEvent::XMPP::Error::IQ> object which describes
+the error.
+
+=back
+
+=cut
+
+sub analyze_iq {
+   my ($self, $node) = @_;
+
+   if ($node->attr ('type') eq 'error') {
+      weaken $node;
+      $self->{error} = AnyEvent::XMPP::Error::IQ->new (node => $node);
+   }
+}
+
+
 
 =back
 

@@ -73,7 +73,6 @@ lib/AnyEvent/XMPP/Ext.pm
 lib/AnyEvent/XMPP/Error/SASL.pm
 lib/AnyEvent/XMPP/Error/IQ.pm
 lib/AnyEvent/XMPP/Error/IQAuth.pm
-lib/AnyEvent/XMPP/Error/MUC.pm
 lib/AnyEvent/XMPP/Error/Register.pm
 lib/AnyEvent/XMPP/Error/Exception.pm
 lib/AnyEvent/XMPP/Error/Stanza.pm
@@ -82,10 +81,6 @@ lib/AnyEvent/XMPP/Error/Parser.pm
 lib/AnyEvent/XMPP/Error/Presence.pm
 lib/AnyEvent/XMPP/Error/Message.pm
 lib/AnyEvent/XMPP/Ext/MUC.pm
-lib/AnyEvent/XMPP/Ext/MUC/Message.pm
-lib/AnyEvent/XMPP/Ext/MUC/Room.pm
-lib/AnyEvent/XMPP/Ext/MUC/RoomInfo.pm
-lib/AnyEvent/XMPP/Ext/MUC/User.pm
 lib/AnyEvent/XMPP/Client.pm
 lib/AnyEvent/XMPP/SimpleConnection.pm
 lib/AnyEvent/XMPP/Extendable.pm
