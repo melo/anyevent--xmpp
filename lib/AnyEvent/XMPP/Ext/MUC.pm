@@ -53,8 +53,28 @@ sub init {
       $nick . '_'
    };
 
+   my $old_presence_holder;
+
    $self->{iq_guard} =
       $self->{extendable}->reg_cb (
+         recv_presence => -5  => sub {
+            my ($ext, $node) = @_;
+
+            my $resjid = $node->meta->{dest};
+            my $from   = prep_bare_jid ($node->attr ('from'));
+
+            if (exists $self->{rooms}->{$resjid}
+                && exists $self->{rooms}->{$resjid}->{$from}) {
+
+               if (not ($node->meta->{error})
+                   && $node->meta->{presence}) {
+
+                  # we need this to differenciate a join from a presence change
+                  ($old_presence_holder) =
+                     $self->{pres}->presences ($resjid, $node->attr ('from'));
+               }
+            }
+         },
          recv_presence => -20 => sub {
             my ($ext, $node) = @_;
 
@@ -64,7 +84,8 @@ sub init {
             if (exists $self->{rooms}->{$resjid}
                 && exists $self->{rooms}->{$resjid}->{$from}) {
 
-               $self->handle_presence ($resjid, $from, $node);
+               $self->handle_presence ($resjid, $from, $node, $old_presence_holder);
+               undef $old_presence_holder;
 
                $ext->stop_event;
             }
@@ -84,9 +105,11 @@ sub init {
          source_unavailable => -20 => sub {
             my ($ext, $resjid) = @_;
 
-            delete $self->{rooms}->{$resjid};
+            for (keys %{$self->{rooms}->{$resjid} || {}}) {
+               $self->event (left => $resjid, $_);
+            }
 
-            # TODO/FIXME: generate leave events?
+            delete $self->{rooms}->{$resjid};
          }
       );
 
@@ -207,7 +230,7 @@ sub part {
 }
 
 sub handle_presence {
-   my ($self, $resjid, $mucjid, $node) = @_;
+   my ($self, $resjid, $mucjid, $node, $old_pres) = @_;
 
    my $room = $self->{rooms}->{$resjid}->{$mucjid}
       or return;
@@ -244,11 +267,14 @@ sub handle_presence {
 
       } elsif ($status_codes{303}) {
          if (my ($item) = $x->find (muc_user => 'item')) {
+
             my $nick = $item->attr ('nick');
+
             if (defined $nick) {
                my $newjid = stringprep_jid _join_jid_nick ($mucjid, $nick);
-               $room->{nick_changes}->{$newjid};
+               $room->{nick_changes}->{$newjid} = 1;
                $self->event (nick_changed => $resjid, $mucjid, $from, $newjid);
+
             } else {
                warn "nick change without new nick: " . $node->raw_string;
             }
@@ -267,7 +293,9 @@ sub handle_presence {
             delete $self->{rooms}->{$resjid}->{$mucjid};
 
          } else {
-            $self->event (entered => $resjid, $mucjid);
+            if (not (defined $old_pres) || $old_pres->{show} eq 'unavailable') {
+               $self->event (entered => $resjid, $mucjid);
+            }
          }
 
       } elsif ($room->{joined}) {
@@ -276,7 +304,9 @@ sub handle_presence {
             $self->event (parted => $resjid, $mucjid, $from);
 
          } else {
-            $self->event (joined => $resjid, $mucjid, $from);
+            if (not (defined $old_pres) || $old_pres->{show} eq 'unavailable') {
+               $self->event (joined => $resjid, $mucjid, $from);
+            }
          }
       }
    }
