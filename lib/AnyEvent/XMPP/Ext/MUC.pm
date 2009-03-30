@@ -322,6 +322,39 @@ sub handle_message {
    $self->{extendable}->stop_event;
 }
 
+sub get_rooms {
+   my ($self, $resjid) = @_;
+
+   $resjid = stringprep_jid $resjid;
+
+   grep {
+      $self->{rooms}->{$resjid}->{$_}->{joined} 
+   } keys %{$self->{rooms}->{$resjid} || {}}
+}
+
+sub joined_room {
+   my ($self, $resjid, $mucjid) = @_;
+
+   $resjid = stringprep_jid $resjid;
+   $mucjid = prep_bare_jid $mucjid;
+
+   exists $self->{rooms}->{$resjid} or return;
+   exists $self->{rooms}->{$resjid}->{$mucjid} or return;
+   $self->{rooms}->{$resjid}->{$mucjid}->{joined}
+}
+
+sub get_my_jid {
+   my ($self, $resjid, $mucjid) = @_;
+
+   $resjid = stringprep_jid $resjid;
+   $mucjid = prep_bare_jid $mucjid;
+
+   exists $self->{rooms}->{$resjid} or return;
+   exists $self->{rooms}->{$resjid}->{$mucjid} or return;
+
+   $self->{rooms}->{$resjid}->{$mucjid}->{my_jid}
+}
+
 =back
 
 =head1 EVENTS

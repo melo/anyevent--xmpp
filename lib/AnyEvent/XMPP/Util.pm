@@ -789,7 +789,7 @@ sub extract_lang_element {
    $def_element = $struct->{'all_' . $elname}->{''} unless defined $def_element;
    $def_element = $element[-1]->text if ((not defined $def_element) && @element);
 
-   $struct->{$elname} = $def_element;
+   $struct->{$elname} = $def_element if defined $def_element;
 }
 
 =back
