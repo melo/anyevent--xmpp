@@ -1,6 +1,6 @@
 package AnyEvent::XMPP::Ext::Roster;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
-use AnyEvent::XMPP::Util qw/stringprep_jid new_iq new_reply cmp_bare_jid/;
+use AnyEvent::XMPP::Util qw/stringprep_jid new_iq new_reply cmp_bare_jid node_jid/;
 use Scalar::Util qw/weaken/;
 use strict;
 no warnings;

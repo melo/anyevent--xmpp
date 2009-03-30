@@ -142,6 +142,8 @@ sub _analyze_stanza {
    my $meta   = $node->meta;
    my $resjid = $meta->{dest};
 
+   return if $meta->{error};
+
    my $from   = stringprep_jid $node->attr ('from');
    my $to     = stringprep_jid $node->attr ('to');
 

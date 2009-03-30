@@ -117,11 +117,12 @@ sub set_accounts {
    my ($self, %accs) = @_;
 
    $self->{accs} = {};
-   $self->update_connections;
 
    for my $jid (keys %accs) {
       $self->add_account ($jid, $accs{$jid});
    }
+
+   $self->update_connections;
 }
 
 sub _install_retry {
