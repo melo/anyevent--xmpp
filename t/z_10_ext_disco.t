@@ -75,17 +75,10 @@ $ctx = pred_ctx {
                    . "ok 5 - identity category of server\n");
             print (($info->has_feature (xmpp_ns ('version')) ? '' : 'not ')
                    . "ok 6 - version feature on server\n");
-
-            if ($FJID1 =~ /jabberd2/) {
-               print "ok 7 # skip due to buggy server\n";
-               print "ok 8 # skip due to buggy server\n";
-
-            } else {
-               print (($info->has_feature (xmpp_ns ('disco_info')) ? '' : 'not ')
-                      . "ok 7 - disco info feature on server\n");
-               print (($info->has_feature (xmpp_ns ('disco_items')) ? '' : 'not ')
-                      . "ok 8 - disco items feature on server\n");
-            }
+            print (($info->has_feature (xmpp_ns ('disco_info')) ? '' : 'not ')
+                   . "ok 7 - disco info feature on server\n");
+            print (($info->has_feature (xmpp_ns ('disco_items')) ? '' : 'not ')
+                   . "ok 8 - disco items feature on server\n");
          }
 
          pred_set ($ctx, 'got_server_info');
