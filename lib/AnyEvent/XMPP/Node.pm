@@ -280,6 +280,18 @@ sub meta {
       )
 }
 
+=item B<refresh_meta>
+
+If you modify the stanza structure and you want the meta information to be update
+call this method. It will recalculate the meta information for the node non-destructively.
+
+=cut
+
+sub refresh_meta {
+   my ($self) = @_;
+   $self->meta->analyze ($self);
+}
+
 =item B<eq ($namespace_or_alias, $name) or eq ($node)>
 
 Returns true whether the current element matches the tag name C<$name>
@@ -552,6 +564,9 @@ sub as_string {
 
          delete $subdecls->{$_};
       }
+
+      # prevent duplicates.
+      next if grep { $_->[0] eq $decl_pref && $_->[1] eq $decl_ns } @attrs;
 
       push @attrs, [$decl_pref, $decl_ns, 'xmlns'];
       $subdecls->{$decl_ns} = $decl_pref;

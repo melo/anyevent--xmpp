@@ -51,6 +51,8 @@ sub new {
 
 sub required_extensions { }
 
+sub autoload_extensions { }
+
 sub disco_feature { }
 
 =back

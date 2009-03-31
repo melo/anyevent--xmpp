@@ -98,9 +98,18 @@ sub add_ext {
 
 sub add_extension {
    my ($self, $pkg) = @_;
+
+   return $self->{_ext_ids}->{$pkg} if $self->{_ext_ids}->{$pkg};
+
    eval "require $pkg";
    if ($@) {
       croak "Failed to load extension '$pkg': $@\n";
+   }
+
+   my @autoload = $pkg->autoload_extensions;
+
+   for (@autoload) {
+      $self->add_extension ($_) unless $self->{_ext_ids}->{$_};
    }
 
    my @required = $pkg->required_extensions;

@@ -166,9 +166,10 @@ sub spawn_connection {
          $self->error ($con->jid, $error);
          $con->stop_event;
       },
-      recv => sub {
+      recv => -1 => sub {
          my ($con, $node) = @_;
          $self->recv ($node); # $node is already tagged with 'from' attr.
+         $con->stop_event;
       },
       disconnected => sub {
          my ($con, $h, $p, $reason) = @_;

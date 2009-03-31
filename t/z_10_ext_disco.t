@@ -64,7 +64,7 @@ $ctx = pred_ctx {
 
          my $mi = (grep { $_->{category} eq 'server' } $info->identities ())[0];
 
-         if ($FJID1 =~ /jabberd_145a/) {
+         if ($FJID1 =~ /jabberd-145a/) {
             print "ok 5 # skipped due to legacy server\n";
             print "ok 6 # skipped due to legacy server\n";
             print "ok 7 # skipped due to legacy server\n";

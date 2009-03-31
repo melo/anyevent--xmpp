@@ -553,6 +553,27 @@ sub new_iq {
 
 =cut
 
+sub _add_language_element {
+   my ($node, $elementname, $arg) = @_;
+
+   if (ref ($arg)) {
+      $arg = { @$arg }
+      if ref ($arg) eq 'ARRAY';
+   } else {
+      $arg = { '' => $arg };
+   }
+
+   for my $lang (keys %$arg) {
+      next unless $arg->{$lang} ne '';
+
+      $node->add ({ defns => 'stanza', node => {
+         name => $elementname,
+         ($lang ne '' ? (attrs => [ [xml => 'lang'] => $lang ]) : ()),
+         childs => [ $arg->{$lang} ]
+      }});
+   }
+}
+
 sub new_message {
    my ($type, $body, %args) = @_;
 
@@ -560,11 +581,11 @@ sub new_message {
    $node->attr ('type', $type || 'chat');
 
    if (defined $body) {
-      $node->add ({ defns => 'stanza', node => { name => 'body', childs => [ $body ] } });
+      _add_language_element ($node, 'body', $body);
    }
 
    if (my $subject = delete $args{subject}) {
-      $node->add ({ defns => 'stanza', node => { name => 'subject', childs => [ $body ] } });
+      _add_language_element ($node, 'subject', $subject);
    }
 
    if (my $thread = delete $args{thread}) {
@@ -665,23 +686,7 @@ sub new_presence {
    }
 
    if (defined $status) {
-
-      if (ref ($status)) {
-         $status = { @$status }
-            if ref ($status) eq 'ARRAY';
-      } else {
-         $status = { '' => $status };
-      }
-
-      for my $lang (keys %$status) {
-         next unless $status->{$lang} ne '';
-
-         $node->add ({ defns => 'stanza', node => {
-            name => 'status',
-            ($lang ne '' ? (attrs => [ [xml => 'lang'] => $lang ]) : ()),
-            childs => [ $status->{$lang} ]
-         }});
-      }
+      _add_language_element ($node, 'status', $status);
    }
 
    if (defined $show) {

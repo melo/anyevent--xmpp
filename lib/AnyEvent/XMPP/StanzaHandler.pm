@@ -89,7 +89,7 @@ sub init {
             }
          }
       },
-      recv => sub {
+      recv => -100 => sub {
          my ($delivery, $node) = @_;
          my $t = $node->meta->{type};
 
@@ -113,14 +113,18 @@ sub init {
       ext_after_recv_iq => sub {
          my ($delivery, $node) = @_;
 
-         $delivery->send (new_reply (
+         my $errnode = new_reply (
             $node,
             [ 
                map { $_->add_decl_prefix ($_->namespace, ''); $_ } $node->nodes,
                new_error ($node, 'service-unavailable')
             ],
             type => 'error'
-         ));
+         );
+
+         $errnode->refresh_meta;
+
+         $delivery->send ($errnode);
       }
    );
 }

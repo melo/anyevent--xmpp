@@ -74,6 +74,7 @@ sub start {
    my @aexts;
    my $two_accs = $cnt > 1;
    my $has_presence;
+   my $has_langextract;
 
    for my $e (@exts) {
       if (ref ($e) eq 'CODE') {

@@ -91,6 +91,16 @@ SUBSCRIPTION METHODS. This is just for documentation purposes.
 See also below in the EVENTS sections about the events that are emitted
 on the L<AnyEvent::XMPP::Extendable> object that this extension extends.
 
+=head1 DEPENDENCIES
+
+This extension autoloads and requires the L<AnyEvent::XMPP::Ext::LangExtract>
+extension.
+
+=cut
+
+sub required_extensions { 'AnyEvent::XMPP::Ext::LangExtract' } 
+sub autoload_extensions { 'AnyEvent::XMPP::Ext::LangExtract' }
+
 =head1 PRESENCE METHODS
 
 =over 4
@@ -184,31 +194,6 @@ sub _build_own_presence {
    $node
 }
 
-sub _extract_status {
-   my ($node, $struct) = @_;
-
-   my (@status) = $node->find_all ([qw/stanza status/]);
-
-   my $def_status;
-
-   for my $s (@status) {
-      if (defined (my $lang = $s->attr_ns (xml => 'lang'))) {
-         if ($lang eq $node->meta->{lang}) {
-            $def_status = $s->text;
-         }
-
-         $struct->{all_status}->{$lang} = $s->text;
-      } else {
-         $struct->{all_status}->{''} = $s->text;
-      }
-   }
-
-   $def_status = $struct->{all_status}->{''} unless defined $def_status;
-   $def_status = $status[-1]->text if ((not defined $def_status) && @status);
-
-   $struct->{status} = $def_status;
-}
-
 sub _to_pres_struct {
    my ($node, $jid) = @_;
 
@@ -222,8 +207,15 @@ sub _to_pres_struct {
       @show
          ? $show[0]->text
          : ($node->attr ('type') eq 'unavailable' ? 'unavailable' : 'available');
-   $struct->{priority} = @prio ? $prio[0]->text : 0;
-   extract_lang_element ($node, 'status', $struct);
+   $struct->{priority}   = @prio ? $prio[0]->text : 0;
+
+   # in case we sent this stanza:
+   if (not (defined ($node->meta->{status})) && $node->find (stanza => 'status')) {
+      extract_lang_element ($node, 'status', $node->meta);
+   }
+
+   $struct->{status}     = $node->meta->{status};
+   $struct->{all_status} = $node->meta->{all_status};
 
    $struct
 }
@@ -442,8 +434,10 @@ sub _int_handle_subscription {
    my ($self, $resjid, $from, $node) = @_;
 
    my $type   = $node->attr ('type');
-   my $status = { };
-   _extract_status ($node, $status);
+   my $status = {
+      status     => $node->meta->{status},
+      all_status => $node->meta->{all_status}
+   };
 
    if ($type eq 'subscribe') {
       $self->{subsc_reqs}->{$resjid}->{bare_jid $from} = {

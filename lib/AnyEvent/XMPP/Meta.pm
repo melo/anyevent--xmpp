@@ -232,7 +232,7 @@ sub analyze_presence {
    if ((not defined $node->attr ('type')) || $node->attr ('type') eq 'unavailable') {
       $self->{presence} = $node->attr ('type') || 'available';
 
-   } elsif ($node->attr ('type') eq 'error') {
+   } elsif ($node->attr ('type') eq 'error' && $node->find (stanza => 'error')) {
       weaken $node;
       $self->{error} = AnyEvent::XMPP::Error::Presence->new (node => $node);
    }
@@ -255,7 +255,7 @@ the error.
 sub analyze_message {
    my ($self, $node) = @_;
 
-   if ($node->attr ('type') eq 'error') {
+   if ($node->attr ('type') eq 'error' && $node->find (stanza => 'error')) {
       weaken $node;
       $self->{error} = AnyEvent::XMPP::Error::Message->new (node => $node);
    }
@@ -278,13 +278,11 @@ the error.
 sub analyze_iq {
    my ($self, $node) = @_;
 
-   if ($node->attr ('type') eq 'error') {
+   if ($node->attr ('type') eq 'error' && $node->find (stanza => 'error')) {
       weaken $node;
       $self->{error} = AnyEvent::XMPP::Error::IQ->new (node => $node);
    }
 }
-
-
 
 =back
 

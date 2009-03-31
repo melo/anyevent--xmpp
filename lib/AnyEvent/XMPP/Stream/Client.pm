@@ -12,10 +12,23 @@ use AnyEvent::XMPP::Error;
 use AnyEvent::XMPP::ResourceManager;
 use Carp qw/croak/;
 
-use base qw/AnyEvent::XMPP::Stream/;
+use base qw/
+   AnyEvent::XMPP::Stream
+   AnyEvent::XMPP::StanzaHandler
+   AnyEvent::XMPP::Extendable
+/;
 
-__PACKAGE__->inherit_event_methods_from (qw/AnyEvent::XMPP::Stream/);
-__PACKAGE__->hand_event_methods_down_from (qw/AnyEvent::XMPP::Stream/);
+__PACKAGE__->inherit_event_methods_from (qw/
+   AnyEvent::XMPP::Stream
+   AnyEvent::XMPP::StanzaHandler
+   AnyEvent::XMPP::Extendable
+/);
+
+__PACKAGE__->hand_event_methods_down_from (qw/
+   AnyEvent::XMPP::Stream
+   AnyEvent::XMPP::StanzaHandler
+   AnyEvent::XMPP::Extendable
+/);
 
 our $DEBUG = 1;
 
@@ -45,6 +58,10 @@ It implements the L<AnyEvent::XMPP::Delivery> interface for stanza delivery.
 It's a subclass of L<AnyEvent::XMPP::Stream> and it inherits the event
 interface of L<Object::Event>. Please see L<Object::Event> for further
 information about registering event callbacks.
+
+This class also implements the L<AnyEvent::XMPP::StanzaHandler> interface and
+the L<AnyEvent::XMPP::Extendable> interface, which makes it possible to add
+L<AnyEvent::XMPP::Ext> extensions.
 
 This module only handles basic XMPP stream connecting, authentication and
 resource binding and not advanced stuff like roster management, presence
@@ -362,6 +379,9 @@ sub new {
          }
       }
    );
+
+   AnyEvent::XMPP::StanzaHandler::init ($self);
+   AnyEvent::XMPP::Extendable::init ($self);
 
    return $self;
 }
