@@ -5,6 +5,10 @@
   - write tests for it!
 - write Ext::ChatTracker
   - write tests for it!
+- make removal of subscription states automatically un-share presence
+  information => at least think about it.
+- remove subscribed/unsubscribed/unsubscribe events from Ext::Presence interface
+  due to unreliability => suggest using roster pushes to stay up to date.
 
 - document new_* functions in Util
    - rewrite documentation about add() and simxml().

@@ -81,28 +81,30 @@ AnyEvent::XMPP::Test::start (sub {
    $PRES = $pres;
    $CV   = $cv;
 
+   $roster->reg_cb (
+      change => sub {
+         my ($roster, $jid, $item_jid, $old_item, $new_item) = @_;
+
+         if (cmp_jid ($jid, $FJID2) && $new_item->{subscription} eq 'both') {
+            $flags->{subscribed}++;
+            pred_check ($ctx);
+
+         } elsif (cmp_jid ($jid, $FJID2)
+                  && pred ($ctx, 'subscribed_1')
+                  && $new_item->{subscription} eq 'none') {
+
+            $flags->{unsubscribed}++;
+            pred_check ($ctx);
+         }
+      }
+   );
+
    $pres->reg_cb (
       subscription_request => sub {
          my ($pres, $resjid, $jid, $req) = @_;
 
          if (cmp_jid ($resjid, $FJID2) && $req->{status} =~ /friends/) {
             $flags->{subsc_recv}++;
-            pred_check ($ctx);
-         }
-      },
-      subscribed => sub {
-         my ($pres, $resjid, $jid) = @_;
-
-         if (cmp_jid ($resjid, $FJID2)) {
-            $flags->{subscribed}++;
-            pred_check ($ctx);
-         }
-      },
-      unsubscribed => sub {
-         my ($pres, $resjid, $jid) = @_;
-
-         if (cmp_jid ($resjid, $FJID2) && pred ($ctx, 'subscribed_1')) {
-            $flags->{unsubscribed}++;
             pred_check ($ctx);
          }
       },
