@@ -125,7 +125,10 @@ sub _recv_fetch {
 
    my $roster = $self->{r}->{$jid} = { };
 
-   for my $item (map _item2struct ($_), $node->find (roster => 'item')) {
+   my ($q) = $node->find (roster => 'query')
+      or return;
+
+   for my $item (map _item2struct ($_), $q->find (roster => 'item')) {
       $roster->{stringprep_jid $item->{jid}} = $item;
    }
 
