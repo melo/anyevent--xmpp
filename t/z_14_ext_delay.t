@@ -23,6 +23,8 @@ my $stream2 = AnyEvent::XMPP::Stream::Client->new (
    password => $PASS,
 );
 
+my $cnt = 2;
+
 $stream->add_ext ('Presence');
 $stream2->add_ext ('Presence');
 my $delay = $stream2->add_ext ('Delay');
@@ -42,6 +44,8 @@ $stream2->reg_cb (
       print (($ts == $node->meta->{delay}->{unix_timestamp}
                 ? '' : 'not ') . "ok 5 - received delayed message with unix timestamp\n");
 
+      $stream->send_end;
+      $stream2->send_end;
       $cv->send;
    },
    error => sub {
@@ -55,8 +59,7 @@ $stream2->reg_cb (
    },
    disconnected => sub {
       my ($stream2, $h, $p) = @_;
-      warn "disconnected [@_]\n";
-      $cv->send;
+      $cv->send if --$cnt <= 2;
    }
 );
 
@@ -75,24 +78,13 @@ $stream->reg_cb (
          new_message (
             chat => 'ABC DEF 123',
             to => $JID2,
-         )
-      );
-
-      $stream->send (
-         new_message (
-            chat => 'ABC DEF 123',
-            to => $JID2,
-            sent_cb => sub {
-               $t = AnyEvent->timer (
-                       after => 0.5, cb => sub { $stream2->connect; undef $t });
-            }
+            sent_cb => sub { $stream2->connect }
          )
       );
    },
    disconnected => sub {
       my ($stream, $h, $p) = @_;
-      warn "disconnected [@_]\n";
-      $cv->send;
+      $cv->send if --$cnt <= 2;
    }
 );
 
