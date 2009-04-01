@@ -61,16 +61,8 @@ my $ctx = pred_ctx {
    };
    pred_action unsubscribed_1 => sub {
       print "ok 3 - successfully unsubscribedd\n";
-   };
-
-   pred_decl first_presence_unav => sub {
-      pred ('unsubscribed_1') && $jid2_pres_jid1->{show} eq 'unavailable'
-   };
-   pred_action first_presence_unav => sub {
-      print "ok 4 - new presence is unavailable\n";
       $CV->send;
    };
-
 };
 
 

@@ -59,8 +59,6 @@ AnyEvent::XMPP::Ext::Presence - RFC 3921 Presence handling
 
    $ext->reg_cb (
       subscription_request => sub { },
-      subscribed           => sub { },
-      unsubscribed         => sub { },
    );
 
    $pres->send_subscription_request (
@@ -452,18 +450,6 @@ sub _int_handle_subscription {
       }
 
       $self->subscription_request ($resjid, bare_jid ($from), $status);
-
-   } elsif ($type eq 'subscribed') {
-      $self->subscribed ($resjid, bare_jid ($from), $status);
-
-   } elsif ($type eq 'unsubscribed') {
-      $self->unsubscribed ($resjid, bare_jid ($from), $status);
-
-      # it's hilarious... but servers (Openfire) don't always send
-      # a unavailable presence when you are unsubscribed... so we fake it here:
-      for my $p ($self->presences ($resjid, bare_jid $from)) {
-         $self->_int_upd_presence ($resjid, $p->{jid}, 0, undef);
-      }
    }
 }
 
