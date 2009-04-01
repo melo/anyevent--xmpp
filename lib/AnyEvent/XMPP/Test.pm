@@ -159,7 +159,9 @@ sub start {
       disconnected => sub {
          my ($self, $jid, $ph, $pp, $reaso) = @_;
 
-         if ($reaso eq 'done' || $reaso =~ /recevied expected stream end/) {
+         if ($reaso eq 'done'
+             || $reaso =~ /recevied expected stream end/
+             || ($jid =~ /jabberd14|jabberd-14/ && $reaso =~ /EOF/)) {
             $cv->send if --$dis_cnt <= 0;
 
          } else {

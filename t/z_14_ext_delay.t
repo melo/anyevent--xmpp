@@ -78,7 +78,9 @@ $stream->reg_cb (
          new_message (
             chat => 'ABC DEF 123',
             to => $JID2,
-            sent_cb => sub { $stream2->connect }
+            sent_cb => sub {
+               $t = AnyEvent->timer (after => 2, cb => sub { $stream2->connect })
+            }
          )
       );
    },

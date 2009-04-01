@@ -138,6 +138,7 @@ $ctx = pred_ctx {
       );
 
       clean (sub {
+         pred_check $ctx;
          AnyEvent::XMPP::Test::end ($IM);
          pred_check $ctx;
       });
@@ -205,5 +206,7 @@ AnyEvent::XMPP::Test::start (sub {
 });
 
 undef $tout;
+
+pred_check ($ctx);
 
 # print JSON->new->convert_blessed->pretty->encode ($pres_ext->{p}) . "\n";
