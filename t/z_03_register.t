@@ -73,7 +73,7 @@ $stream->reg_cb (
    stream_ready => sub {
       my ($stream) = @_;
       $logged_in = 1;
-      $cv->send;
+      $stream->send_end;
    },
    disconnected => sub {
       my ($stream, $h, $p) = @_;

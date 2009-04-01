@@ -58,11 +58,11 @@ sub init {
    my ($self) = @_;
 
    $self->{iq_guard} = $self->{extendable}->reg_cb (
-      recv_presence => 50 => sub {
+      ext_before_recv_presence => sub {
          my ($ext, $node) = @_;
          extract_lang_element ($node, 'status', $node->meta);
       },
-      recv_message => 50 => sub {
+      ext_before_recv_message => sub {
          my ($ext, $node) = @_;
 
          extract_lang_element ($node, 'subject', $node->meta);

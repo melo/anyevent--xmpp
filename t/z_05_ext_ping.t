@@ -70,7 +70,7 @@ AnyEvent::XMPP::Test::start (sub {
                print ((cmp_jid ($jid, $FJID1) ? "" : "not ")
                       . "ok 3 - received ping timeout\n");
 
-               $cv->send;
+               AnyEvent::XMPP::Test::end ($im);
             }
          );
       });

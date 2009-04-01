@@ -49,6 +49,7 @@ sub send_first {
       send_second ($im, $cv);
    }));
 }
+
 sub send_second {
    my ($im, $cv) = @_;
 
@@ -77,6 +78,6 @@ sub send_second {
          print "not ok 6 - got reply!\n";
       }
 
-      $cv->send;
+      AnyEvent::XMPP::Test::end ($im);
    }));
 }

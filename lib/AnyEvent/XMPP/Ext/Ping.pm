@@ -69,11 +69,11 @@ sub auto_timeout {
 
    $self->{auto_tout_guard} =
       $self->{extendable}->reg_cb (
-         source_available => sub {
+         ext_before_source_available => sub {
             my ($self, $jid) = @_;
             $self->enable_timeout ($jid, \$self->{autotimeout});
          },
-         source_unavailable => sub {
+         ext_before_source_unavailable => sub {
             my ($self, $jid) = @_;
             $self->disable_timeout ($jid);
          }
@@ -144,7 +144,7 @@ sub init {
    weaken $self;
 
    $self->{iq_guard} = $self->{extendable}->reg_cb (
-      recv_iq => sub {
+      ext_before_recv_iq => sub {
          my ($ext, $node) = @_;
 
          if ($self->handle_ping ($node)) {

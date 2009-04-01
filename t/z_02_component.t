@@ -17,13 +17,18 @@ my $stream =
    );
 
 my $try = 1;
+my $end = 0;
 $stream->reg_cb (
    stream_ready => sub {
       print "ok 2 - connected and stream ready\n";
-      $cv->send;
+      $end = 1;
+      $stream->send_end;
    },
    disconnected => sub {
       my ($stream, $h, $p, $reas) = @_;
+
+      do { $cv->send; return } if $end;
+
       if ($reas =~ /handshake|not-author/i && $try-- > 0) {
          print "ok 1 - disconnected due to wrong password\n";
          $stream->{secret} = $SECRET;

@@ -57,7 +57,7 @@ sub init {
 
    $self->{iq_guard} =
       $self->{extendable}->reg_cb (
-         recv_presence => -5  => sub {
+         recv_presence => 550 => sub {
             my ($ext, $node) = @_;
 
             my $resjid = $node->meta->{dest};
@@ -75,7 +75,7 @@ sub init {
                }
             }
          },
-         recv_presence => -20 => sub {
+         recv_presence => 450 => sub {
             my ($ext, $node) = @_;
 
             my $resjid = $node->meta->{dest};
@@ -90,7 +90,7 @@ sub init {
                $ext->stop_event;
             }
          },
-         recv_message => 20 => sub {
+         recv_message => 450 => sub {
             my ($ext, $node) = @_;
 
             my $resjid = $node->meta->{dest};
@@ -102,7 +102,7 @@ sub init {
                $self->handle_message ($resjid, $from, $node);
             }
          },
-         source_unavailable => -20 => sub {
+         source_unavailable => 450 => sub {
             my ($ext, $resjid) = @_;
 
             for (keys %{$self->{rooms}->{$resjid} || {}}) {

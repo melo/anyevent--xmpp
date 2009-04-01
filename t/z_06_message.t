@@ -40,7 +40,7 @@ AnyEvent::XMPP::Test::start (sub {
             print "not ok 2 - received bogus message\n";
          }
 
-         $cv->send;
+         AnyEvent::XMPP::Test::end ($im);
       }
    );
 

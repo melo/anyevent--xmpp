@@ -69,12 +69,13 @@ sub start {
    }
 
    my $cv = AnyEvent->condvar;
-   my $im = AnyEvent::XMPP::IM->new;
+   my $im = AnyEvent::XMPP::IM->new (initial_reconnect_interval => 180);
 
    my @aexts;
    my $two_accs = $cnt > 1;
    my $has_presence;
    my $has_langextract;
+   my $dis_cnt = $two_accs ? 2 : 1;
 
    for my $e (@exts) {
       if (ref ($e) eq 'CODE') {
@@ -158,7 +159,10 @@ sub start {
       disconnected => sub {
          my ($self, $jid, $ph, $pp, $reaso) = @_;
 
-         if ($reaso ne 'done') {
+         if ($reaso eq 'done' || $reaso =~ /recevied expected stream end/) {
+            $cv->send if --$dis_cnt <= 0;
+
+         } else {
             print "# disconnected $jid,$ph:$pp: $reaso\n";
             $cv->send;
          }
@@ -178,6 +182,13 @@ sub start {
    $im->update_connections;
 
    $cv->recv;
+}
+
+sub end {
+   my ($im) = @_;
+   $im->get_connection ($FJID1)->send_end;
+   my $nd_con = $im->get_connection ($FJID2);
+   $nd_con->send_end if $nd_con;
 }
 
 =back

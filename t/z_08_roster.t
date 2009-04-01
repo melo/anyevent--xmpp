@@ -138,8 +138,7 @@ $ctx = pred_ctx {
       );
 
       clean (sub {
-         $IM->get_connection ($FJID1)->disconnect ("done");
-         $IM->get_connection ($FJID2)->disconnect ("done");
+         AnyEvent::XMPP::Test::end ($IM);
          pred_check $ctx;
       });
    };
@@ -155,7 +154,6 @@ $ctx = pred_ctx {
       print "ok 6 - first roster empty\n";
       print "ok 7 - second roster empty\n";
       print "ok 8 - cleanup okay\n";
-      $CV->send;
    };
 };
 

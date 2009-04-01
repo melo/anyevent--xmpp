@@ -33,7 +33,8 @@ $im->reg_cb (
          } else {
             print "not ok $n - unregistered ($jid): " . $error->string . "\n";
          }
-         $reg->{delivery}->disconnect ("done");
+
+         $reg->{delivery}->send_end;
       });
    },
    error => sub {
@@ -43,7 +44,7 @@ $im->reg_cb (
    },
    disconnected => sub {
       my ($self, $jid, $ph, $pp, $reaso) = @_;
-      print "# disconnected $jid: $reaso\n";
+      print "# disconnected $jid: $reaso\n" unless $reaso =~ /expected/;
       $cv->send if --$cnt <= 0;
    }
 );

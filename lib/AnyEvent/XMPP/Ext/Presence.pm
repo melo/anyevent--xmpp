@@ -113,7 +113,7 @@ sub init {
    weaken $self;
 
    $self->{guard} = $self->{extendable}->reg_cb (
-      source_available => -10 => sub {
+      source_available => 490 => sub {
          my ($ext, $jid) = @_;
 
          $self->{p}->{$jid}          = { };
@@ -122,7 +122,7 @@ sub init {
 
          $self->update ($jid);
       },
-      source_unavailable => -10 => sub {
+      source_unavailable => 490 => sub {
          my ($ext, $jid) = @_;
 
          for my $pres ($self->my_presences ($jid)) {
@@ -137,7 +137,7 @@ sub init {
          delete $self->{p}->{$jid};
          delete $self->{subsc_reqs}->{$jid};
       },
-      recv_presence => -10 => sub {
+      recv_presence => 490 => sub {
          my ($ext, $node) = @_;
          $self->_analyze_stanza ($node);
       }

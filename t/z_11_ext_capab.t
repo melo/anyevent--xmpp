@@ -129,7 +129,7 @@ my $ctx;
 $ctx = pred_ctx {
    pred_decl 'start';
    pred_action start => sub {
-      $IM->reg_cb (recv_iq => 10 => sub {
+      $IM->reg_cb (before_recv_iq => sub {
          my ($IM, $node) = @_;
 
          if (my ($Q) = $node->find (disco_info => 'query')) {
@@ -146,7 +146,7 @@ $ctx = pred_ctx {
       });
 
       my $gcv = AnyEvent->condvar;
-      $gcv->begin (sub { $CV->send });
+      $gcv->begin (sub { AnyEvent::XMPP::Test::end ($IM) });
 
       my $cnt = 0;
       for (keys %TEST_CAPA) {

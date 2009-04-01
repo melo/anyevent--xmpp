@@ -5,7 +5,7 @@ use AnyEvent::XMPP::Util qw/from_xmpp_datetime to_xmpp_datetime to_xmpp_time
                            xmpp_datetime_as_timestamp/;
 
 # to conversion
-is (to_xmpp_time (1, 2, 3)          , '03:02:01'      , "basic to_xmpp_time");
+is (to_xmpp_time (1, 2, 3)          , '03:02:01Z'     , "basic to_xmpp_time");
 is (to_xmpp_time (1, 2, 3, "Z")     , '03:02:01Z'     , "utc to_xmpp_time");
 is (to_xmpp_time (1, 2, 3, "+01:10"), '03:02:01+01:10', "+01:10 to_xmpp_time");
 is (to_xmpp_time (1, 2, 3, "+01:10", 0.123),

@@ -15,7 +15,7 @@ use JSON -convert_blessed_universally;
 
 AnyEvent::XMPP::Test::check ('client');
 
-print "1..4\n";
+print "1..3\n";
 
 my $CV;
 my $PRES;
@@ -31,10 +31,10 @@ my $ctx = pred_ctx {
       $tout = AnyEvent->timer (after => 10, cb => sub {
          my $cnt = 0;
          $IM->get_connection ($FJID1)->reg_cb (send_buffer_empty => sub {
-            if (++$cnt >= 2) { $CV->send }
+            if (++$cnt >= 2) { AnyEvent::XMPP::Test::end ($IM) }
          });
          $IM->get_connection ($FJID2)->reg_cb (send_buffer_empty => sub {
-            if (++$cnt >= 2) { $CV->send }
+            if (++$cnt >= 2) { AnyEvent::XMPP::Test::end ($IM) }
          });
          $PRES->send_unsubscription ($FJID1, bare_jid ($FJID2), 1, "Nope! NONE ANYMROE!");
          $PRES->send_unsubscription ($FJID2, bare_jid ($FJID1), 1, "Nope! NONE ANYMROE!");

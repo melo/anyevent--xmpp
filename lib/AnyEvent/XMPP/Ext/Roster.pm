@@ -74,13 +74,13 @@ sub init {
    my ($self) = @_;
 
    $self->{iq_guard} = $self->{extendable}->reg_cb (
-      source_available => -5 => sub {
+      ext_before_source_available => sub {
          my ($ext, $jid) = @_;
          $self->{online}->{$jid} = 1;
          $self->fetch ($jid)
             if $self->{auto_fetch};
       },
-      source_unavailable => -5 => sub {
+      ext_before_source_unavailable => sub {
          my ($ext, $jid) = @_;
 
          if (exists $self->{r}->{$jid}) {
@@ -90,7 +90,7 @@ sub init {
          delete $self->{r}->{$jid};
          delete $self->{online}->{$jid};
       },
-      recv_iq => -5 => sub {
+      ext_before_recv_iq => sub {
          my ($ext, $node) = @_;
 
          if ($node->find (roster => 'query')

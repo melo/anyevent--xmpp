@@ -49,7 +49,7 @@ sub init {
    weaken $self->{extendable};
 
    $self->{_guard1} = $self->{extendable}->reg_cb (
-      recv_iq => sub {
+      ext_before_recv_iq => sub {
          my ($extdbl, $node) = @_;
 
          if ($node->attr ('type') eq 'get'

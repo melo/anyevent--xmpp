@@ -278,7 +278,7 @@ This function transforms a time to the XMPP date time format.
 The meanings and value ranges of C<$sec>, ..., C<$hour> are explained
 in the perldoc of Perl's builtin C<localtime>.
 
-C<$tz> has to be either C<"UTC"> or of the form C<[+-]hh:mm>, it can be undefined
+C<$tz> has to be either C<"Z"> (for UTC) or of the form C<[+-]hh:mm>, it can be undefined
 and wont occur in the time string then.
 
 C<$secfrac> are optional and can be the fractions of the second.
@@ -294,10 +294,10 @@ sub to_xmpp_time {
    sprintf "%02d:%02d:%02d%s%s",
       $hour, $min, $sec,
       (defined $secfrac ? $frac : ""),
-      (defined $tz ? $tz : "")
+      (defined $tz ? $tz : "Z")
 }
 
-=item B<to_xmpp_datetime ($sec,$min,$hour,$mday,$mon,$year,$tz, $secfrac)>
+=item B<to_xmpp_datetime ($sec,$min,$hour,$mday,$mon,$year,$tz,$secfrac)>
 
 This function transforms a time to the XMPP date time format.
 The meanings of C<$sec>, ..., C<$year> are explained in the perldoc
@@ -370,9 +370,10 @@ sub xmpp_datetime_as_timestamp {
    my ($string) = @_;
    require POSIX;
    my ($s, $m, $h, $md, $mon, $year, $tz) = from_xmpp_datetime ($string);
+   return 0 unless defined $h;
 
    my $otz = $ENV{TZ};
-   $ENV{TZ} = ($tz =~ /^([+-])(\d{2}):(\d{2})$/ ? "UTC $tz" : "");
+   $ENV{TZ} = ($tz =~ /^([+-])(\d{2}):(\d{2})$/ ? "UTC$tz" : "UTC+0:00");
    POSIX::tzset ();
 
    my $ts = POSIX::mktime ($s, $m, $h, $md, $mon, $year);

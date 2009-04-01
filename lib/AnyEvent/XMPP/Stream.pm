@@ -648,7 +648,7 @@ __PACKAGE__->hand_event_methods_down (qw/disconnected/);
 sub disconnected {
    my ($self, $ph, $pp, $reas) = @_;
 
-   if ($DEBUG) {
+   if ($DEBUG && $reas !~ /expected stream end/) {
       warn "disconnected from $ph:$pp: $reas\n";
    }
 }

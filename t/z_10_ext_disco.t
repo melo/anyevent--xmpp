@@ -123,7 +123,7 @@ $ctx = pred_ctx {
          print ((($items->items)[1]->{node} eq 'subnode' ? '' : 'not ')
                 . "ok 16 - second item node\n");
 
-         $CV->send;
+         AnyEvent::XMPP::Test::end ($IM);
       });
    };
 };

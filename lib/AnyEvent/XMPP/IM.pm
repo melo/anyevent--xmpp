@@ -292,7 +292,7 @@ C<$reconnect_timeout> seconds.
 sub disconnected {
    my ($self, $jid, $ph, $pp, $reason, $recontout) = @_;
 
-   if ($DEBUG) {
+   if ($DEBUG && $reason !~ /expected stream end/) {
       print "$jid: disconnected from $ph:$pp: $reason,"
            ." reconnecting in $recontout seconds\n";
    }

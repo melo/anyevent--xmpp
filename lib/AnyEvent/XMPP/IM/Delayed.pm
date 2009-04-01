@@ -80,7 +80,7 @@ sub delay_from {
 This method returns the timestamp in XMPP format which can be fed
 to the C<from_xmpp_datetime> function documented in L<AnyEvent::XMPP::Util>.
 
-(Please note that this might be a newstyle XEP-0087 timestamp or
+(Please note that this might be a newstyle XEP-0082 timestamp or
 old style legacy timestamp)
 
 If the stanza was not delayed this method returns undef.

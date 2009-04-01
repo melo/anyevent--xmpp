@@ -45,7 +45,7 @@ AnyEvent::XMPP::Test::start (1, sub {
                    . "ok 3 - own name ok\n");
          }
 
-         $cv->send;
+         AnyEvent::XMPP::Test::end ($im);
       });
    });
 });
