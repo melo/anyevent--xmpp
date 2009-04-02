@@ -273,6 +273,11 @@ sub handle_presence {
             if (defined $nick) {
                my $newjid = stringprep_jid _join_jid_nick ($mucjid, $nick);
                $room->{nick_changes}->{$newjid} = 1;
+
+               if (cmp_jid ($room->{my_jid}, $from)) {
+                  $room->{my_jid} = $from;
+               }
+
                $self->event (nick_changed => $resjid, $mucjid, $from, $newjid);
 
             } else {
