@@ -5,6 +5,8 @@ X write Ext::Delay
   X write tests for it!
 X write Ext::MsgTracker
   - write tests for it!
+- document new extensions
+- find solution for sorting out which presence belong to MUC
 
 - document new_* functions in Util
    - rewrite documentation about add() and simxml().
