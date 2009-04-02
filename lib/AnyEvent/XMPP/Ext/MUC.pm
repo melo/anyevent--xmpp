@@ -275,7 +275,7 @@ sub handle_presence {
                $room->{nick_changes}->{$newjid} = 1;
 
                if (cmp_jid ($room->{my_jid}, $from)) {
-                  $room->{my_jid} = $from;
+                  $room->{my_jid} = $newjid;
                }
 
                $self->event (nick_changed => $resjid, $mucjid, $from, $newjid);
