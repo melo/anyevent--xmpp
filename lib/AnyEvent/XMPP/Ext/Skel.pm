@@ -15,6 +15,16 @@ AnyEvent::XMPP::Ext::Skel - Skeleton extension
 
 =head1 DESCRIPTION
 
+=head1 DEPENDENCIES
+
+This extension autoloads and requires the L<AnyEvent::XMPP::Ext::LangExtract>
+extension.
+
+=cut
+
+sub required_extensions { 'AnyEvent::XMPP::Ext::LangExtract' } 
+sub autoload_extensions { 'AnyEvent::XMPP::Ext::LangExtract' }
+
 =head1 METHODS
 
 =over 4

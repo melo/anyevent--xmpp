@@ -28,7 +28,7 @@ my $cnt = 2;
 $stream->add_ext ('Presence');
 $stream2->add_ext ('Presence');
 my $delay = $stream2->add_ext ('Delay');
-$delay->enable_unix_timetamp;
+$delay->enable_unix_timestamp;
 
 $stream2->reg_cb (
    recv_message => sub {

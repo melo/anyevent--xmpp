@@ -33,7 +33,7 @@ AnyEvent::XMPP::Ext::Delay - XEP-0203 & XEP-0091: Extract delay information
       }
    );
 
-   $delay->enable_unix_timetamp; # for enabling automatic xmpp_datetime_as_timestamp
+   $delay->enable_unix_timestamp; # for enabling automatic xmpp_datetime_as_timestamp
 
 =head1 DESCRIPTION
 
@@ -56,7 +56,7 @@ XEP-0082 timestamp format. You can use the C<from_xmpp_datetime> function of
 L<AnyEvent::XMPP::Util> to extract further information from these timestamps.
 
 In case you enable automatic unix timestamp extraction with the
-C<enable_unix_timetamp> method there will be an additional key in the C<delay>
+C<enable_unix_timestamp> method there will be an additional key in the C<delay>
 hash: C<unix_timestamp> which will contain the result of the
 C<xmpp_datetime_as_timestamp> function of L<AnyEvent::XMPP::Util> (which
 requires the L<POSIX> module).
@@ -105,7 +105,7 @@ sub analyze_delay {
    }
 }
 
-=item $delay->enable_unix_timetamp
+=item $delay->enable_unix_timestamp
 
 Enables automatic extraction of the unix timestamp (see also
 C<xmpp_datetime_as_timestamp> function of L<AnyEvent::XMPP::Util>) and storage
@@ -113,7 +113,7 @@ in the delay key C<unix_timestamp>.
 
 =cut
 
-sub enable_unix_timetamp {
+sub enable_unix_timestamp {
    my ($self) = @_;
    $self->{unix_timestamp} = 1;
 }
