@@ -107,7 +107,7 @@ X make the MUC extension not be tied to a specific connection.
    - 7.6 Converting a One-to-One Chat Into a Conference
 
 - write a tutorial for simxml
-- improve the SSL/TLS handling
+X improve the SSL/TLS handling
 - make more tests
    - oob
    - data forms
@@ -115,22 +115,23 @@ X make the MUC extension not be tied to a specific connection.
 - fix the inaviodable memoryleaks with the callbacks
   the circular object structs.
 - put some serious stuff in the synopsises
-- look at attribute namespace preservation! (if they got
+X look at attribute namespace preservation! (if they got
   prefixes, how to parse this with expat?
   see also http://www.w3.org/TR/REC-xml-names/#scoping-defaulting )
-- fix problem that xml::writer writes after <stream/> ahs been written
-  - reproduce by conflicting resources!
-- test the xml parse error object somehow!
+X fix problem that xml::writer writes after <stream/> ahs been written
+  X reproduce by conflicting resources!
+X test the xml parse error object somehow!
 - add context field to IQ error for all the places origin from IQ errors
   (bind_error, session_error, ...)
-- AnyEvent::XMPP::Client
-  - find a way to distinguish presences from JIDs that
+X AnyEvent::XMPP::Client
+  X find a way to distinguish presences from JIDs that
     are in multiple account's roster.
 - AnyEvent::XMPP missing functionality to be RFC 3920 conform:
    - improve error handling for SASL to
      support retries as specified in RFC 3920.
      (eg. by supporting a method sasl_retry() which takes
       the changed credentials)
+   - IDNA domain name stuff
    x SRV record lookup
       - weight handling!
 - AnyEvent::XMPP::IM missing functionality to be RFC 3921 conform:
@@ -146,12 +147,12 @@ x Implement XEP-0030: Service Discovery
 long term?
 ==========
 
-x Implement XEP-0082: XMPP Date and Time Profiles
-   - provide maybe _to functions for the old format,
-     it's still in use out there
-- make dns resolution async!
 - Maybe implement XEP-0146: Remote Controlling Clients
-x keep an eye on:
-   - TLS: implemented, just do some extensive testing WRT blocking,
+X Implement XEP-0082: XMPP Date and Time Profiles
+   W provide maybe _to functions for the old format,
+     it's still in use out there
+X make dns resolution async!
+X keep an eye on:
+   X TLS: implemented, just do some extensive testing WRT blocking,
           i don't trust the current way the watchers are handled,
           i'm in fear of deadlocks...
