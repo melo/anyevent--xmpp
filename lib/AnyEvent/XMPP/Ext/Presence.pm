@@ -2,7 +2,8 @@ package AnyEvent::XMPP::Ext::Presence;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Util qw/stringprep_jid new_iq new_reply new_presence cmp_jid
                             cmp_bare_jid res_jid prep_bare_jid prep_res_jid
-                            extract_lang_element bare_jid node_jid res_jid/;
+                            extract_lang_element bare_jid node_jid res_jid
+                            is_bare_jid/;
 use Scalar::Util qw/weaken/;
 no warnings;
 use strict;
@@ -243,6 +244,8 @@ sub _eq_pres {
 # $resjid and $jid needs to be stringprepped
 sub _int_upd_presence {
    my ($self, $resjid, $jid, $is_own, $new) = @_;
+
+   return if is_bare_jid ($jid);
 
    my ($key, $ev) =
       $is_own
