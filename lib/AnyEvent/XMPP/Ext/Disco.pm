@@ -133,12 +133,18 @@ sub set_identity {
 =item $disco->unset_identity ($category, $type)
 
 This function removes the identity C<$category> and C<$type>.
+If C<$type> is not defined the whole C<$category> is unset.
 
 =cut
 
 sub unset_identity {
    my ($self, $category, $type) = @_;
-   delete $self->{iden}->{$category}->{$type};
+
+   if (defined $type) {
+      delete $self->{iden}->{$category}->{$type};
+   } else {
+      delete $self->{iden}->{$category};
+   }
 }
 
 =item $disco->enable_feature ($uri, $uri2, ...)

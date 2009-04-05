@@ -7,9 +7,23 @@ use AnyEvent::XMPP::Node qw/simxml/;
 use Digest::SHA1 qw/sha1_hex/;
 use Encode;
 
-use base qw/AnyEvent::XMPP::Stream/;
-__PACKAGE__->inherit_event_methods_from (qw/AnyEvent::XMPP::Stream/);
-__PACKAGE__->hand_event_methods_down_from (qw/AnyEvent::XMPP::Stream/);
+use base qw/
+   AnyEvent::XMPP::Stream
+   AnyEvent::XMPP::StanzaHandler
+   AnyEvent::XMPP::Extendable
+/;
+
+__PACKAGE__->inherit_event_methods_from (qw/
+   AnyEvent::XMPP::Stream
+   AnyEvent::XMPP::StanzaHandler
+   AnyEvent::XMPP::Extendable
+/);
+
+__PACKAGE__->hand_event_methods_down_from (qw/
+   AnyEvent::XMPP::Stream
+   AnyEvent::XMPP::StanzaHandler
+   AnyEvent::XMPP::Extendable
+/);
 
 =head1 NAME
 
@@ -42,11 +56,18 @@ and events. For example C<reg_cb> and the stanza sending routines.
 
 For additional events that can be registered to look below in the EVENTS section.
 
-This component implements the L<AnyEvent::XMPP::Delivery> interface.
+This component implements the L<AnyEvent::XMPP::Delivery> interface, along with
+the L<AnyEvent::XMPP::StanzaHandler> and L<AnyEvent::XMPP::Extendable>
+interfaces. This means it's ready to be extended by from L<AnyEvent::XMPP::Ext>
+derived extensions. B<But> please note that B<not all> extensions are usable by
+components as they usually implement client side semantics. So please look into
+the extension's code before you use them and find out if it does what you want. 
+For example the L<AnyEvent::XMPP::Ext::Disco> extension should be usable
+without problems in components, but the L<AnyEvent::XMPP::Ext::Presence>
+extension is probably not very useful.
 
-Also note that the support for some XEPs in L<AnyEvent::XMPP::Ext> is just thought
-for client side usage, if you miss any functionality don't hesitate to ask the
-author or send him a patch! (See L<AnyEvent::XMPP> for contact information).
+If you miss any functionality or find a bug: Don't hesitate to ask the author
+and/or send him a patch! (See L<AnyEvent::XMPP> for contact information).
 
 =head1 METHODS
 
@@ -116,6 +137,19 @@ sub new {
          },
       );
    }
+
+   AnyEvent::XMPP::StanzaHandler::init ($self);
+   AnyEvent::XMPP::Extendable::init ($self);
+
+   $self->reg_cb (
+      send => -400 => sub {
+         my ($self, $node) = @_;
+
+         unless (defined $node->attr ('from')) {
+            $node->attr (from => $self->jid);
+         }
+      }
+   );
 
    $self
 }

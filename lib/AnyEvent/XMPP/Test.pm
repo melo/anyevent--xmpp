@@ -10,7 +10,8 @@ use Time::HiRes qw/usleep/;
 require Exporter;
 our @ISA = qw/Exporter/;
 
-our @EXPORT = qw/$HOST $PORT $SECRET $SERVICE $JID1 $JID2 $FJID1 $FJID2 $PASS/;
+our @EXPORT = qw/$HOST $PORT $SECRET $SERVICE $JID1 $JID2 $FJID1 $FJID2 $PASS
+                 @DEF_HANDLERS/;
 
 =head1 NAME
 
@@ -31,6 +32,34 @@ our ($JID1, $JID2, $PASS);
 our ($FJID1, $FJID2);
 
 our $TOUT;
+
+our @DEF_HANDLERS = (
+   disconnected => sub {
+      my ($s, $h, $p, $reaso) = @_;
+      if ($reaso eq 'done'
+          || $reaso =~ /recevied expected stream end/
+          || (($s->jid =~ /jabberd14|jabberd-14/
+               || ref ($s) =~ /Component/)
+              && $reaso =~ /EOF/)) {
+         $s->event (test_end => 'end', $reaso);
+      } else {
+         print "# disconnected ".$s->jid.",$h:$p: $reaso\n";
+         $s->event (test_end => 'disconnected', $reaso);
+      }
+   },
+   connect_error => sub {
+      my ($s, $reason) = @_;
+      print "# connect error ".$s->jid.": $reason\n";
+      $s->event ('test_end' => 'connect_error', $reason);
+   },
+   error => sub {
+      my ($s, $error) = @_;
+      print "# error " . $s->jid. ": " . $error->string . "\n";
+      $s->event ('test_end' => 'error', $error->string);
+      $s->stop_event;
+   },
+);
+
 
 sub check {
    my ($what) = @_;
