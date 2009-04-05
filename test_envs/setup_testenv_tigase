@@ -3,5 +3,5 @@
 #export NET_XMPP2_TEST="test1_netxm2@ejabberd.ta-sa.org/x:lolfe123"
 #export NET_XMPP2_TEST_MUC="conference.ejabberd.ta-sa.org"
 #export NET_XMPP2_TEST_DEBUG=1
-export ANYEVENT_XMPP_TEST_COMPONENT="tigase.test:xmpp-component=5000:test@test.tigase.test:KOK34"
+export ANYEVENT_XMPP_TEST_COMPONENT="tigase.test:xmpp-component=5000:test.tigase.test:KOK34"
 export ANYEVENT_XMPP_TEST_CLIENT="test_1@tigase.test:test_2@tigase.test:lolfe123"

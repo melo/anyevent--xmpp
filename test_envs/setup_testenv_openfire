@@ -1,4 +1,4 @@
 #!/bin/bash
 
-export ANYEVENT_XMPP_TEST_COMPONENT="openfire.test:xmpp-component=5000:test@openfire.test:abc123"
+export ANYEVENT_XMPP_TEST_COMPONENT="openfire.test:xmpp-component=5000:test.openfire.test:abc123"
 export ANYEVENT_XMPP_TEST_CLIENT="test_1@openfire.test:test_2@openfire.test:lolfe123"

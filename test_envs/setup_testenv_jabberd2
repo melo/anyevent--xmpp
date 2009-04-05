@@ -4,5 +4,5 @@
 #export NET_XMPP2_TEST_MUC="conference.openfire.ta-sa.org"
 #export NET_XMPP2_TEST_DEBUG=1
 
-export ANYEVENT_XMPP_TEST_COMPONENT="jabberd2.test:xmpp-component=5000:test@jabberd2.test:abc321"
+export ANYEVENT_XMPP_TEST_COMPONENT="jabberd2.test:xmpp-component=5000:test.jabberd2.test:abc321"
 export ANYEVENT_XMPP_TEST_CLIENT="test_1@jabberd2.test:test_2@jabberd2.test:lolfe123"

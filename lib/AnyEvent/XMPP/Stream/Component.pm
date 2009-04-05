@@ -145,6 +145,8 @@ sub new {
       send => -400 => sub {
          my ($self, $node) = @_;
 
+         return if $node->eq (stream => 'stream');
+
          unless (defined $node->attr ('from')) {
             $node->attr (from => $self->jid);
          }
