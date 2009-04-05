@@ -50,7 +50,9 @@ This class is designed to be a super class for anything that:
 
 =item 2. Provides the L<AnyEvent::XMPP::StanzaHandler> interface.
 
-=item 3. Wants to be extendable by L<AnyEvent::XMPP::Ext> extensions.
+=item 3. Provides IQ tracking similar to L<AnyEvent::XMPP::IQTracker>.
+
+=item 4. Wants to be extendable by L<AnyEvent::XMPP::Ext> extensions.
 
 (Note: Those extensions are mainly client side currently)
 

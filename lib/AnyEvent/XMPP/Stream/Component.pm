@@ -1,7 +1,8 @@
 package AnyEvent::XMPP::Stream::Component;
 use strict;
+use AnyEvent::XMPP::IQTracker;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
-use AnyEvent::XMPP::Util qw/xml_escape/;
+use AnyEvent::XMPP::Util qw/xml_escape stringprep_jid/;
 use AnyEvent::XMPP::Node qw/simxml/;
 use Digest::SHA1 qw/sha1_hex/;
 use Encode;
@@ -16,7 +17,7 @@ AnyEvent::XMPP::Stream::Component - "XML" stream that implements the XEP-0114
 
 =head1 SYNOPSIS
 
-   use AnyEvent::XMPP::Stream:;Component;
+   use AnyEvent::XMPP::Stream::Component;
 
    my $comp = AnyEvent::XMPP::Stream::Component->new (
                  domain => 'chat.jabber.org'
@@ -40,6 +41,8 @@ This module is a subclass of C<AnyEvent::XMPP::Stream> and inherits all methods
 and events. For example C<reg_cb> and the stanza sending routines.
 
 For additional events that can be registered to look below in the EVENTS section.
+
+This component implements the L<AnyEvent::XMPP::Delivery> interface.
 
 Also note that the support for some XEPs in L<AnyEvent::XMPP::Ext> is just thought
 for client side usage, if you miss any functionality don't hesitate to ask the
@@ -69,6 +72,20 @@ The domain or service name of the component itself.
 
 C<$secret> is the secret that will be used for authentication with the server.
 
+=item disable_iq_tracker => $bool
+
+By default this component will use L<AnyEvent::XMPP::IQTracker> to track
+outgoing IQ requests for you. If you don't want that and want your own IQ
+tracking, just pass a true value as C<$bool> to C<disable_iq_tracker>.
+
+=item default_iq_timeout => $seconds
+
+This will set the default IQ timeout for IQs that are sent
+over this connection. If this argument is not given the default for C<$seconds>
+will be as specified in the L<AnyEvent::XMPP::IQTracker> module.
+
+B<NOTE>: Will only be effective if you didn't C<disable_iq_tracker>
+
 =back
 
 =cut
@@ -80,6 +97,25 @@ sub new {
       default_stream_namespace => 'component',
       @_
    );
+
+   unless ($self->{disable_tracker}) {
+      $self->{tracker} =
+         AnyEvent::XMPP::IQTracker->new (
+            (defined $self->{default_iq_timeout}
+               ? (default_iq_timeout => $self->{default_iq_timeout})
+               : ()));
+
+      $self->reg_cb (
+         send => sub {
+            my ($self, $node) = @_;
+            $self->{tracker}->register ($node);
+         },
+         recv => sub {
+            my ($self, $node) = @_;
+            $self->{tracker}->handle_stanza ($node);
+         },
+      );
+   }
 
    $self
 }
@@ -104,6 +140,20 @@ sub stream_start {
    ));
 }
 
+=item $comp->jid
+
+Returns the component's JID. (This is basically the value you passed as
+C<domain> to the constructor.
+
+=cut
+
+sub jid {
+   my ($self) = @_;
+   $self->{domain}
+}
+
+
+__PACKAGE__->hand_event_methods_down (qw/recv/);
 sub recv {
    my ($self, $node) = @_;
 
@@ -114,6 +164,10 @@ sub recv {
          $self->{authenticated} = 1;
          $self->stream_ready;
       }
+   }
+
+   if (defined $self->{jid}) {
+      $node->meta->{dest} = stringprep_jid $self->{jid};
    }
 }
 
@@ -136,7 +190,26 @@ and can now be used to transmit stanzas.
 =cut
 
 __PACKAGE__->hand_event_methods_down (qw/stream_ready/);
-sub stream_ready { }
+sub stream_ready {
+   my ($self) = @_;
+
+   $self->source_available (stringprep_jid $self->{jid});
+}
+
+__PACKAGE__->hand_event_methods_down (qw/disconnected/);
+sub disconnected {
+   my ($self) = @_;
+
+   $self->source_unavailable (stringprep_jid $self->{jid});
+}
+
+__PACKAGE__->hand_event_methods_down (qw/source_available/);
+sub source_available {
+}
+
+__PACKAGE__->hand_event_methods_down (qw/source_unavailable/);
+sub source_unavailable {
+}
 
 =back
 

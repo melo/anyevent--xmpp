@@ -617,6 +617,7 @@ it are defaulted to the server JID (C<src>) and your full JID (C<dest>).
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/recv/);
 sub recv {
    my ($self, $node) = @_;
 
