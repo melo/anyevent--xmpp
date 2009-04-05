@@ -137,6 +137,7 @@ sub init {
          delete $self->{own_p}->{$jid};
          delete $self->{p}->{$jid};
          delete $self->{subsc_reqs}->{$jid};
+         delete $self->{direct}->{$jid};
       },
       recv_presence => 490 => sub {
          my ($ext, $node) = @_;
@@ -324,12 +325,14 @@ sub set_presence {
 }
 
 sub send_directed {
-   my ($self, $resjid, $jid) = @_;
+   my ($self, $resjid, $jid, $auto_update) = @_;
 
    my $node = $self->_build_own_presence (stringprep_jid ($resjid), $jid);
    $self->{extendable}->send ($node);
 
-   # TODO: Think about storing the state of sent directed presences
+   if ($auto_update) {
+      $self->{direct}->{stringprep_jid ($resjid)}->{stringprep_jid ($jid)} = 1;
+   }
 }
 
 sub update {
@@ -344,6 +347,11 @@ sub update {
 
    my $node = $self->_build_own_presence ($jid);
    $self->{extendable}->send ($node);
+
+   for my $directed_jid (keys %{$self->{direct}->{$jid} || {}}) {
+      my $direct_node = $self->_build_own_presence ($jid, $directed_jid);
+      $self->{extendable}->send ($direct_node);
+   }
 
    # non-bis behavior:
    $self->_int_upd_presence ($jid, $jid, 1, _to_pres_struct ($node, $jid));

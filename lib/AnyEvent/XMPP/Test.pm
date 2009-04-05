@@ -102,22 +102,6 @@ sub start {
             )) unless $has_presence;
 
             if ($two_accs) {
-               # sending directed presence for IQ exchange:
-
-               if ($has_presence) {
-                  $has_presence->send_directed ($FJID1, $FJID2);
-                  $has_presence->send_directed ($FJID2, $FJID1);
-
-               } else {
-                  $im->send (new_presence (
-                     available => undef, undef, undef, src => $FJID2
-                  ));
-                  $im->send (new_presence (
-                     available => undef, undef, undef, src => $FJID1, to => $FJID2));
-                  $im->send (new_presence (
-                     available => undef, undef, undef, src => $FJID2, to => $FJID1));
-               }
-
                my $one_to_2 = 0;
                my $two_to_1 = 0;
 
@@ -140,6 +124,23 @@ sub start {
                      }
                   }
                );
+
+               # sending directed presence for IQ exchange:
+
+               if ($has_presence) {
+                  $has_presence->send_directed ($FJID1, $FJID2);
+                  $has_presence->send_directed ($FJID2, $FJID1);
+
+               } else {
+                  $im->send (new_presence (
+                     available => undef, undef, undef, src => $FJID2
+                  ));
+                  $im->send (new_presence (
+                     available => undef, undef, undef, src => $FJID1, to => $FJID2));
+                  $im->send (new_presence (
+                     available => undef, undef, undef, src => $FJID2, to => $FJID1));
+               }
+
             } else {
                $TOUT = AnyEvent->timer (after => 20, cb => sub { $cv->send });
                $cb->($im, $cv, @aexts);

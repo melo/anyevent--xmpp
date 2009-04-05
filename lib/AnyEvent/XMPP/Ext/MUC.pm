@@ -215,7 +215,7 @@ sub join {
       add_generated => { node => { dns => 'muc', name => 'x', childs => [ @chlds ] } }
    };
 
-   $self->{pres}->send_directed ($resjid, $myjid);
+   $self->{pres}->send_directed ($resjid, $myjid, 1);
 }
 
 sub part {
