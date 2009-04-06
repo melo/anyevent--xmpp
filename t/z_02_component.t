@@ -58,7 +58,7 @@ $stream->reg_cb (
    },
 );
 
-$stream->connect ($HOST, $PORT);
+$stream->connect ($COMP_HOST, $COMP_PORT);
 
 print "1..2\n";
 

@@ -77,7 +77,7 @@ $cl->reg_cb (
 
 $comp->reg_cb (
    stream_ready => sub {
-      $cl->connect;
+      $cl->connect ($HOST, $PORT);
    },
    recv_message => sub {
       my ($comp, $node) = @_;
@@ -91,7 +91,7 @@ $comp->reg_cb (
    @DEF_HANDLERS,
 );
 
-$comp->connect ($HOST, $PORT);
+$comp->connect ($COMP_HOST, $COMP_PORT);
 
 print "1..3\n";
 

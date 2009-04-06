@@ -10,8 +10,8 @@ use Time::HiRes qw/usleep/;
 require Exporter;
 our @ISA = qw/Exporter/;
 
-our @EXPORT = qw/$HOST $PORT $SECRET $SERVICE $JID1 $JID2 $FJID1 $FJID2 $PASS
-                 @DEF_HANDLERS/;
+our @EXPORT = qw/$COMP_HOST $COMP_PORT $HOST $PORT $SECRET $SERVICE $JID1
+                 $JID2 $FJID1 $FJID2 $PASS @DEF_HANDLERS/;
 
 =head1 NAME
 
@@ -27,7 +27,7 @@ AnyEvent::XMPP::Test - desc
 
 =cut
 
-our ($HOST, $PORT, $SECRET, $SERVICE);
+our ($COMP_HOST, $COMP_PORT, $HOST, $PORT, $SECRET, $SERVICE);
 our ($JID1, $JID2, $PASS);
 our ($FJID1, $FJID2);
 
@@ -74,7 +74,7 @@ sub check {
          exit 0;
       }
 
-      ($HOST, $PORT, $SERVICE, $SECRET) =
+      ($COMP_HOST, $COMP_PORT, $SERVICE, $SECRET) =
          split /:/, $ENV{ANYEVENT_XMPP_TEST_COMPONENT};
 
    } elsif ($what eq 'client') {
