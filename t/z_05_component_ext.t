@@ -20,6 +20,8 @@ my $comp =
 my $cl = AnyEvent::XMPP::Stream::Client->new (
    jid      => $JID1,
    password => $PASS,
+   host => $HOST,
+   port => $PORT
 );
 
 my $disco = $comp->add_ext ('Disco');
@@ -77,7 +79,7 @@ $cl->reg_cb (
 
 $comp->reg_cb (
    stream_ready => sub {
-      $cl->connect ($HOST, $PORT);
+      $cl->connect;
    },
    recv_message => sub {
       my ($comp, $node) = @_;
