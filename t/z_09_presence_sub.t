@@ -75,7 +75,7 @@ AnyEvent::XMPP::Test::start (sub {
 
    $roster->reg_cb (
       change => sub {
-         my ($roster, $jid, $item_jid, $old_item, $new_item) = @_;
+         my ($roster, $jid, $bjid, $old_item, $new_item) = @_;
 
          if (cmp_jid ($jid, $FJID2) && $new_item->{subscription} eq 'both') {
             $flags->{subscribed}++;

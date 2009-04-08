@@ -29,13 +29,13 @@ AnyEvent::XMPP::Ext::Presence - RFC 3921 Presence handling
 
    $ext->reg_cb (
       self => sub {
-         my ($ext, $resjid, $jid, $old_presence_struct, $presence_struct) = @_;
+         my ($ext, $resjid, $bare_jid, $old_presence_struct, $presence_struct) = @_;
 
          # called when the presence for one of
          # our own resources changes.
       },
       change => sub {
-         my ($ext, $resjid, $jid, $old_presence_struct, $presence_struct) = @_;
+         my ($ext, $resjid, $bare_jid, $old_presence_struct, $presence_struct) = @_;
 
          # called when presence of some contact or other
          # XMPP entity changed.
@@ -246,8 +246,6 @@ sub _eq_pres {
 sub _int_upd_presence {
    my ($self, $resjid, $jid, $is_own, $new) = @_;
 
-   return if is_bare_jid ($jid);
-
    my ($key, $ev) =
       $is_own
          ? (own_p => 'self')
@@ -255,10 +253,12 @@ sub _int_upd_presence {
 
    my $bjid = prep_bare_jid ($jid);
    my $res  = prep_res_jid ($jid);
+   $res = "$res"; # stringify, undef becomes '' (empty resource)
 
    my $respres = $self->{$key}->{$resjid};
    my $prev    =
-      exists ($respres->{$bjid}) && exists ($respres->{$bjid}->{$res})
+      exists ($respres->{$bjid})
+      && exists ($respres->{$bjid}->{$res})
         ? $respres->{$bjid}->{$res}
         : {
             priority   => 0,
@@ -281,8 +281,21 @@ sub _int_upd_presence {
       };
    }
 
+   if (($res eq '' && $new->{show} eq 'unavailable')
+       || not (grep { $_->{show} ne 'unavailable' }
+                 values %{$self->{$key}->{$resjid}->{$bjid}})) {
+
+      # no available resources anymore, set the 'last received' unavailable
+      # presence (which has been received now) on the empty resource:
+
+      # (in case we got an unavailable presence from a bare jid we assume
+      #  there is no available presence anymore!)
+
+      $self->{$key}->{$resjid}->{$bjid} = { '' => $new };
+   }
+
    unless (_eq_pres ($prev, $new)) {
-      $self->event ($ev => $resjid, $jid, $prev, $new);
+      $self->event ($ev => $resjid, bare_jid ($jid), $prev, $new);
    }
 }
 
@@ -409,8 +422,20 @@ sub highest_prio_presence {
 
    if (defined $bjid) {
       my @p = $self->presences ($jid, bare_jid $bjid);
-      @p = sort { $b->{priority} <=> $a->{priority} } @p;
-      return @p ? $p[0] : undef;
+
+      use sort 'stable';
+
+      @p = sort {
+         ($a->{show} eq 'unavailable') <=> ($b->{show} eq 'unavailable')
+      } sort {
+         $b->{priority} <=> $a->{priority}
+      } @p;
+
+      #d# warn "PRESENCES:\n------------------\n"
+      #d#      . join (",\n", map { "$_->{show} <<< $_->{priority} <<< $_->{jid}" } @p)
+      #d#      . "\n-----------------\n";
+
+      return @p ? $p[0] : ();
 
    } else {
       $jid = stringprep_jid $jid;
@@ -418,7 +443,7 @@ sub highest_prio_presence {
 
       my @p;
       for my $bjid (keys %{$self->{p}->{$jid}}) {
-         my $p = $self->highest_prio_presence ($jid, $bjid);
+         my ($p) = $self->highest_prio_presence ($jid, $bjid);
          push @p, $p if defined $p;
       }
 

@@ -219,10 +219,23 @@ sub join {
 }
 
 sub part {
-   my ($self, $resjid, $mucjid) = @_;
+   my ($self, $resjid, $mucjid, $timeout) = @_;
+
+   $resjid = stringprep_jid $resjid;
+   $mucjid = prep_bare_jid $mucjid;
 
    my $room = $self->{rooms}->{$resjid}->{$mucjid}
       or return;
+
+   if (defined $timeout) {
+      $self->{rooms}->{$resjid}->{$mucjid}->{part_timer} =
+         AnyEvent->timer (after => $timeout, cb => sub {
+            $self->event (left => $resjid, $mucjid);
+            delete $self->{rooms}->{$resjid}->{$mucjid};
+         });
+   }
+
+   $self->{rooms}->{$resjid}->{$mucjid}->{sent_part} = 1;
 
    my $pres = new_presence (
       unavailable => undef, undef, undef, src => $resjid, to => $room->{my_jid});
@@ -293,7 +306,13 @@ sub handle_presence {
 
       } elsif (cmp_jid ($room->{my_jid}, $from)) {
 
-         if ($node->attr ('type') eq 'unavailable') {
+         if ($room->{sent_part} # security check, so that if we part/join a heavily
+                                # lagged room, so that the part timeout triggers,
+                                # the lagged unavailable presence doesn't trigger
+                                # a 'left' event before we got the 'entered' event.
+                                # (this is so complicated that it will probably blow
+                                # up on me...).
+             && $node->attr ('type') eq 'unavailable') {
             $self->event (left => $resjid, $mucjid);
             delete $self->{rooms}->{$resjid}->{$mucjid};
 

@@ -75,7 +75,7 @@ sub check_test {
    my $n = 1;
    for my $jid ($FJID1, $FJID2) {
       my $g = _tostr ($pres{$jid});
-      my $e = "$jid|10|available|I'm playing stuff|I'm playing stuff|にほんじん|Ich spiele sachen", "first's presence info correct";
+      my $e = bare_jid ($jid) . "|10|available|I'm playing stuff|I'm playing stuff|にほんじん|Ich spiele sachen", "first's presence info correct";
 
       if ($g eq $e) { print "ok $n - $jid\n" }
       else {

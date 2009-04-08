@@ -1,10 +1,14 @@
 'x' means: is done!
 
 - write tests for Ext::MUC
+  - muc should timeout the parts
+    and remove internal things. or BS should do that...
+  - check that the part timeout works!
 X write Ext::Delay
   X write tests for it!
 X write Ext::MsgTracker
   - write tests for it!
+- finish test: t/z_09_pres_prio.t
 - document new extensions
 - find solution for sorting out which presence belong to MUC
 

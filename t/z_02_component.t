@@ -32,12 +32,12 @@ $stream->reg_cb (
       if ($reas =~ /handshake|not-author/i && $try-- > 0) {
          print "ok 1 - disconnected due to wrong password\n";
          $stream->{secret} = $SECRET;
-         $stream->connect ($HOST, $PORT);
+         $stream->connect ($COMP_HOST, $COMP_PORT);
 
       } elsif ($SERVICE =~ /tigase/) {
          print "ok 1 - disconnected due to wrong password (tigase way)\n";
          $stream->{secret} = $SECRET;
-         $stream->connect ($HOST, $PORT);
+         $stream->connect ($COMP_HOST, $COMP_PORT);
 
       } else {
          print "not ok 1 - disconnected from $h:$p ($reas)\n";
