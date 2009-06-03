@@ -270,7 +270,7 @@ sub handle_presence {
 
       my $from = stringprep_jid $node->attr ('from');
 
-      warn "STATI: " . join (',', keys %status_codes) . "\n";
+      #d# warn "STATI: " . join (',', keys %status_codes) . "\n";
 
       if ($status_codes{210}) {
          $room->{my_jid} = $from;
