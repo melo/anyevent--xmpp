@@ -119,6 +119,8 @@ sub new {
       @_
    );
 
+   $self->{jid} = $self->{domain};
+
    unless ($self->{disable_tracker}) {
       $self->{tracker} =
          AnyEvent::XMPP::IQTracker->new (
@@ -185,9 +187,8 @@ C<domain> to the constructor.
 
 sub jid {
    my ($self) = @_;
-   $self->{domain}
+   $self->{jid}
 }
-
 
 __PACKAGE__->hand_event_methods_down (qw/recv/);
 sub recv {

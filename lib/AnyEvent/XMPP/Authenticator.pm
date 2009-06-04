@@ -23,7 +23,7 @@ AnyEvent::XMPP::Authenticator - Authenticator helper module
 =head2 DESCRIPTION
 
 This is a helper module for L<AnyEvent::XMPP::Stream>, it
-handles all the tiny bigs of client authentication.
+handles all the tiny bits of client authentication.
 
 =head2 METHODS
 
@@ -291,9 +291,7 @@ sub auth { }
 
 This event is emitted when an authentication failure occurred.
 The C<$error> object will either be a L<AnyEvent::XMPP::Error::IQ>
-object or ...
-
-FIXME TODO
+object or an L<AnyEvent::XMPP::Error::SASL> object (see below).
 
 =cut
 

@@ -24,6 +24,9 @@ will be a hash reference which you have to access directly to get the
 meta information (like the type of the stanza, or whether the features
 stanza came with the bind feature, ...).
 
+Meta information is also crucial for internal routing in L<AnyEvent::XMPP>.
+The C<src> and C<dest> meta keys are used for this. See below.
+
 Defined keys are given in the B<META TYPE> and B<TYPES> section below.
 
 =cut
@@ -118,7 +121,16 @@ and doesn't match the outgoing stream default language.
 
 =head1 SOURCE & DESTINATION
 
-TODO: Document C<src> and C<dest>. Which are both stringprep normalized JIDs.
+The two meta keys C<src> and C<dest> are used for internal routing and for
+assigning each stanza with a source.
+
+In case we receive a stanza the C<dest> field is set to the resources JID the
+stanza was received by. Such a resource can be a client resource or even the
+JID of a component.
+
+The key C<src> is used for stanzas that are ought to be routed outside
+of the application. It is used for instance by L<AnyEvent::XMPP::IM> to
+figure out which client resource/connection to use to send the stanza.
 
 =head1 META TYPE
 

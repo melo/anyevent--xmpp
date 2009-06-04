@@ -641,7 +641,6 @@ sub recv {
    # XXX: I've disabled to-validation. It trips on too many differences
    # between servers...
 
-
    if (defined $self->{jid}) {
       $node->meta->{dest} = stringprep_jid $self->{jid};
 
