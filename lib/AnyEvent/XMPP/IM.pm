@@ -119,7 +119,8 @@ sub set_accounts {
    $self->{accs} = {};
 
    for my $jid (keys %accs) {
-      $self->add_account ($jid, $accs{$jid});
+      my ($pw, $args) = ref $accs{$jid} ? @{$accs{$jid}} : ($accs{$jid}, {});
+      $self->add_account ($jid, $pw, %$args);
    }
 
    $self->update_connections;
