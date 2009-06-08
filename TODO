@@ -1,5 +1,7 @@
 'x' means: is done!
 
+- make ::XMPP::Node store the prefixes of the namespaces and
+  have them accessible.
 - write tests for Ext::MUC
   - muc should timeout the parts
     and remove internal things. or BS should do that...
