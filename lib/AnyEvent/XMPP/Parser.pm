@@ -414,8 +414,11 @@ sub parse_tokens {
 
          my %attrs;
          for my $nsattrname (keys %nsattrs) {
-            my ($ns, $attrname) = _strip_ns ($nsattrname, $curdecl, \$self->{unknown_ns_cnt}, 1);
-            $attrs{(defined ($ns) ? ($ns . '|') : '') . $attrname} = $nsattrs{$nsattrname};
+            my ($ns, $attrname) = _strip_ns ($nsattrname, $curdecl,
+                                             \$self->{unknown_ns_cnt}, 1);
+
+            $attrs{(defined ($ns) ? ($ns . '|') : '') . $attrname}
+               = $nsattrs{$nsattrname};
          }
 
          my $ns;
