@@ -27,6 +27,7 @@ xyz"/>
    >
 
    <sex><![CDATA[BLAIFIEJFEIFEIfei fe <><> .>>,> <><> &gt;&lt;]]></sex>
+   <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://....">...</SOAP-ENV:Envelope>
    </s:stream>
 INPUT
 
@@ -37,6 +38,7 @@ my @stanzas = (
    "<bÄÄäääooooeeeeÖÖöö xmlns:ns1=\"üüü:üüü\" fefe=\"balblal\" ns1:fefe=\"feofe\">\012   äääPPä\012   </bÄÄäääooooeeeeÖÖöö>",
    "<message to=\"elmex\@jabber.org\"><body xml:lang=\"de\">Hallo da!</body></message>",
    "<sex>BLAIFIEJFEIFEIfei fe &lt;&gt;&lt;&gt; .&gt;&gt;,&gt; &lt;&gt;&lt;&gt; &amp;gt;&amp;lt;</sex>",
+   '<ns1:Envelope xmlns:ns1="http://....">...</ns1:Envelope>'
 );
 
 my (@ss, @se, @st);
