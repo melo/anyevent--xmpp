@@ -105,13 +105,6 @@ will be transmitted over the stream. The default will be 'en'.
 
 Please look in RFC 3066 how C<$lang> should look like.
 
-=item namespace_prefixes => $namespace_prefix_map
-
-This will let you specify XML namespace prefixes which are used for
-XML serialization. C<$namespace_prefix_map> must be a hash reference
-with the namespaces as keys and the prefixes as values. Please only
-use this if you know what you are doing!
-
 =item stream_end_timeout => $seconds
 
 This is the timeout that is used for closing the connection from our
