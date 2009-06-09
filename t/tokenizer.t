@@ -8,7 +8,7 @@ use Encode;
 
 my $str = encode ('utf-8', <<INPUT);
    <s:stream xmlns:s="fefe" xmlns="jabber:client">
-   <m><fe><foo/><fb/></fe><body> feofoefo ef </body></m>
+   <m><fe xmlns="FEFE"><foo/><fb/></fe><body> feofoefo ef </body></m>
    <foo>&gt;\015&lt;\015\012</foo>
    <bar a="&#xd;&#xd;A&#xa;&#xa;B&#xd;&#xa;" b="
 
@@ -32,13 +32,13 @@ xyz"/>
 INPUT
 
 my @stanzas = (
-   "<m><fe><foo/><fb/></fe><body> feofoefo ef </body></m>",
+   '<m><fe xmlns="FEFE"><foo/><fb/></fe><body> feofoefo ef </body></m>',
    "<foo>&gt;\012&lt;\012</foo>",
    "<bar a=\"\015\015A\012\012B\015\012\" b=\"\x20\x20xyz\"/>",
-   "<bÄÄäääooooeeeeÖÖöö xmlns:ns1=\"üüü:üüü\" fefe=\"balblal\" ns1:fefe=\"feofe\">\012   äääPPä\012   </bÄÄäääooooeeeeÖÖöö>",
+   "<bÄÄäääooooeeeeÖÖöö xmlns:ää=\"üüü:üüü\" fefe=\"balblal\" ää:fefe=\"feofe\">\012   äääPPä\012   </bÄÄäääooooeeeeÖÖöö>",
    "<message to=\"elmex\@jabber.org\"><body xml:lang=\"de\">Hallo da!</body></message>",
    "<sex>BLAIFIEJFEIFEIfei fe &lt;&gt;&lt;&gt; .&gt;&gt;,&gt; &lt;&gt;&lt;&gt; &amp;gt;&amp;lt;</sex>",
-   '<ns1:Envelope xmlns:ns1="http://....">...</ns1:Envelope>'
+   '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://....">...</SOAP-ENV:Envelope>'
 );
 
 my (@ss, @se, @st);
@@ -74,8 +74,13 @@ my $str2     = $str;
    is (scalar (@ss), 1, "one stream start");
    is (scalar (@se), 1, "one stream end");
    is (scalar (@st), scalar (@stanzas), "stanza count correct");
-   is ($ss[0]->as_string, "<ns1:stream xmlns:ns1=\"fefe\">", "stream start as expected");
-   is ($se[0]->as_string, "</ns1:stream>", "stream end as expected");
+   is ($ss[0]->as_string (0, {
+          STREAM_NS => 'jabber:client',
+          'http://www.w3.org/XML/1998/namespace' => 'xml'
+       }),
+       "<s:stream xmlns=\"jabber:client\" xmlns:s=\"fefe\">", "stream start as expected");
+   is ($se[0]->as_string (0, { 'http://www.w3.org/XML/1998/namespace' => 'xml' }),
+       "</s:stream>", "stream end as expected");
 
    while (@stanzas) {
       my $s = shift @stanzas;
@@ -84,7 +89,8 @@ my $str2     = $str;
       my $ser = $o->as_string (0, {
          'http://www.w3.org/XML/1998/namespace' => 'xml',
          'jabber:client' => '',
-         STREAM_NS => 'jabber:client'
+         STREAM_NS => 'jabber:client',
+         map { $ss[0]->prefixes->{$_} => $_ } keys %{$ss[0]->prefixes}
       });
 
       if ($ser eq $s) {
@@ -112,8 +118,13 @@ my $str2     = $str;
    is (scalar (@ss), 1, "one stream start");
    is (scalar (@se), 1, "one stream end");
    is (scalar (@st), scalar (@stanzas2), "stanza count correct");
-   is ($ss[0]->as_string, "<ns1:stream xmlns:ns1=\"fefe\">", "stream start as expected");
-   is ($se[0]->as_string, "</ns1:stream>", "stream end as expected");
+   is ($ss[0]->as_string (0, {
+          'http://www.w3.org/XML/1998/namespace' => 'xml',
+          STREAM_NS => 'jabber:client',
+       }),
+       "<s:stream xmlns=\"jabber:client\" xmlns:s=\"fefe\">", "stream start as expected");
+   is ($se[0]->as_string (0, { 'http://www.w3.org/XML/1998/namespace' => 'xml' }),
+       "</s:stream>", "stream end as expected");
 
    while (@stanzas2) {
       my $s = shift @stanzas2;
@@ -122,7 +133,8 @@ my $str2     = $str;
       my $ser = $o->as_string (0, {
          'http://www.w3.org/XML/1998/namespace' => 'xml',
          'jabber:client' => '',
-         STREAM_NS => 'jabber:client'
+         STREAM_NS => 'jabber:client',
+         map { $ss[0]->prefixes->{$_} => $_ } keys %{$ss[0]->prefixes}
       });
 
       if ($ser eq $s) {

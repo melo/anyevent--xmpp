@@ -423,7 +423,7 @@ sub parse_tokens {
 
          my $ns;
          ($ns, $name) = _strip_ns ($name, $curdecl, \$self->{unknown_ns_cnt});
-         $cur = AnyEvent::XMPP::Node->new ($ns, $name, \%attrs);
+         $cur = AnyEvent::XMPP::Node->new ($ns, $name, $curdecl, \%attrs);
          $cur->append_parsed ($parsed);
 
          if (@$nstack) {

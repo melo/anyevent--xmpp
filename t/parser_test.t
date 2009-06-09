@@ -6,6 +6,7 @@ use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Node qw/simxml/;
 
 my %def = (
+   xmpp_ns ('xml') => 'xml',
    xmpp_ns ('stream') => 'stream',
    xmpp_ns ('component') => ''
 );
@@ -41,7 +42,7 @@ my @input = (
 my @expected_output = (
    '<stream:stream>',
    '<message to="elmex@jabber.org"><body>Hi!</body></message>',
-   '<iq type="set"><ns1:query xmlns:ns1="jabber:iq:roster"><immed><ns1:test/></immed><ns1:test2/></ns1:query></iq>',
+   '<iq type="set"><query xmlns="jabber:iq:roster"><ns1:immed xmlns:ns1="jabber:component:accept"><test/></ns1:immed><test2/></query></iq>',
 );
 
 plan tests => scalar @input;

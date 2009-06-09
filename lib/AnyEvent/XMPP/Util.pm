@@ -721,7 +721,7 @@ sub new_presence {
 
 sub new_reply {
    my ($node, $child, %attrs) = @_;
-   my $nnode = AnyEvent::XMPP::Node->new ($node->namespace, $node->name, \%attrs);
+   my $nnode = AnyEvent::XMPP::Node->new ($node->namespace, $node->name, undef, \%attrs);
 
    $nnode->meta->{src}  = $node->meta->{dest} if defined $node->meta->{dest};
    $nnode->meta->{dest} = $node->meta->{src}  if defined $node->meta->{src};

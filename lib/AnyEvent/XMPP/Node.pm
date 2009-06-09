@@ -9,13 +9,14 @@ our @EXPORT_OK = qw/simxml/;
 our @ISA = qw/Exporter/;
 
 use constant {
-   NS      => 0,
-   NAME    => 1,
-   ATTRS   => 2,
-   NODES   => 3,
-   META    => 4,
-   NSDECLS => 5,
-   FLAGS   => 6
+   NS       => 0,
+   NAME     => 1,
+   ATTRS    => 2,
+   NODES    => 3,
+   META     => 4,
+   NSDECLS  => 5,
+   PREFIXES => 6,
+   FLAGS    => 7
 };
 
 use constant {
@@ -148,7 +149,8 @@ sub simxml {
       $ns    = $ns          ? $ns          : $desc{fb_ns};
       $ns    = xmpp_ns_maybe ($ns);
 
-      my $nnode = AnyEvent::XMPP::Node->new ($ns, $node->{name}, $node->{attrs} || []);
+      my $nnode =
+         AnyEvent::XMPP::Node->new ($ns, $node->{name}, undef, $node->{attrs} || []);
       
       my $fb_ns = $desc{fb_ns};
 
@@ -175,7 +177,7 @@ sub simxml {
 
 =over 4
 
-=item B<new ($ns, $el, $attrs)>
+=item B<new ($ns, $el, $prefixes, $attrs)>
 
 Creates a new AnyEvent::XMPP::Node object with the node tag name C<$el> in the
 namespace URI C<$ns> and the attributes C<$attrs>.
@@ -189,6 +191,7 @@ sub new {
    $self->[NS]    = shift;
    $self->[NAME]  = shift;
    $self->[NODES] = [];
+   $self->[PREFIXES] = { %{shift || {}} };
 
    my @a;
    if (ref $_[0] eq 'ARRAY') {
@@ -220,7 +223,7 @@ sub new {
 
 sub shallow_clone {
    my ($self) = @_;
-   $self->new ($self->[NS], $self->[NAME], $self->[ATTRS]);
+   $self->new ($self->[NS], $self->[NAME], $self->[PREFIXES], $self->[ATTRS]);
 }
 
 =item B<name>
@@ -257,6 +260,16 @@ sub namespace {
       return $self->[NS]
    }
 }
+
+=item B<prefixes>
+
+Returns a hash reference which contains all namespace prefixes that had been
+declared in the original XML document in this element (including the
+declarations in the element itself).
+
+=cut
+
+sub prefixes { $_[0]->[PREFIXES] || {} }
 
 =item B<meta>
 
@@ -547,10 +560,24 @@ sub as_string {
    my $stream_ns = xmpp_ns_maybe ($subdecls->{'STREAM_NS'});
    $subdecls = { %{$subdecls || {}} };
    my @attrs;
-
+   
    #d# warn "MAKE $name ($ns)[$stream_ns] " . join (', ', map { "$_:$subdecls->{$_}" } keys %$subdecls) . "\n";
 
-   for my $nsdecl (sort { $a->[1] cmp $b->[1] } @{$self->[NSDECLS] || []}) {
+   # add the available namespace prefixes and force declaration if neccessary
+   my @force_decls;
+   for my $pref (keys %{$self->[PREFIXES] || {}}) {
+      my $ns = $self->[PREFIXES]->{$pref};
+
+      $ns = $stream_ns if defined $stream_ns && ($ns eq xmpp_ns ('stanza'));
+
+      unless (exists ($subdecls->{$ns}) && $subdecls->{$ns} eq $pref) {
+         push @force_decls, [$ns, $pref];
+      }
+   }
+
+   # produce forced namespace declarations:
+   push @force_decls, @{$self->[NSDECLS] || []};
+   for my $nsdecl (sort { $a->[1] cmp $b->[1] } @force_decls) {
       my ($decl_ns, $decl_pref) = @$nsdecl;
 
       # just a safety...
@@ -572,6 +599,7 @@ sub as_string {
       $subdecls->{$decl_ns} = $decl_pref;
    }
 
+   # take care of the namespace of this element:
    if (defined ($ns)) {
       # mostly a hack around XMPP's crazy default namespacing:
       # replace 'ae:xmpp:stream:default_ns':
@@ -584,6 +612,7 @@ sub as_string {
       $elem_name = $subdecls->{$ns} eq '' ? $name : "$subdecls->{$ns}:$name";
    }
 
+   # take care of the attributes and their namespaces:
    for my $ak (sort keys %{$self->[ATTRS] || {}}) {
       my ($ans, $name) = split /\|/, $ak;
       my $pref;
