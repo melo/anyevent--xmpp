@@ -41,8 +41,9 @@ sub send_first {
                 . "ok 4 - error condition correct.\n");
          print (($error->node->find_all ([qw/abc:def query/]) ? '' : 'not ')
                 . "ok 5 - error contained query node.\n");
-         print (($error->node->raw_string =~ /<query xmlns="abc:def"\/?>/ ? '' : 'not ')
+         print (($error->node->raw_string =~ /<query xmlns=["']abc:def["']\/?>/ ? '' : 'not ')
                 . "ok 6 - error contained query node with correct ns decls.\n");
+         #d# warn sprintf "FE[%s]\n", $error->node->raw_string;
 
       } else {
          print "not ok 1 - got reply!\n";
