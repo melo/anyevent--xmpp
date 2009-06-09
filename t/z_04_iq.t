@@ -11,7 +11,7 @@ use AnyEvent::XMPP::StanzaHandler;
 
 AnyEvent::XMPP::Test::check ('client');
 
-print "1..10\n";
+print "1..11\n";
 
 my $hdl;
 AnyEvent::XMPP::Test::start (1, sub {
@@ -41,6 +41,8 @@ sub send_first {
                 . "ok 4 - error condition correct.\n");
          print (($error->node->find_all ([qw/abc:def query/]) ? '' : 'not ')
                 . "ok 5 - error contained query node.\n");
+         print (($error->node->raw_string =~ /<query xmlns="abc:def"\/?>/ ? '' : 'not ')
+                . "ok 6 - error contained query node with correct ns decls.\n");
 
       } else {
          print "not ok 1 - got reply!\n";
@@ -63,19 +65,19 @@ sub send_second {
       my ($node, $error) = @_;
 
       if ($error) {
-         print "ok 6 - got error reply: ".$error->string."\n";
+         print "ok 7 - got error reply: ".$error->string."\n";
          print (($error->code == 503 ? '' : 'not ')
-                . "ok 7 - error code correct.\n");
+                . "ok 8 - error code correct.\n");
          print (($error->type eq 'cancel' ? '' : 'not ')
-                . "ok 8 - error type correct.\n");
+                . "ok 9 - error type correct.\n");
          print (($error->condition eq 'service-unavailable' ? '' : 'not ')
-                . "ok 9 - error condition correct.\n");
+                . "ok 10 - error condition correct.\n");
          print (($error->node && $error->node->find_all ([qw/stanza query/])
                    ? '' : 'not ')
-                . "ok 10 - error contained query node.\n");
+                . "ok 11 - error contained query node.\n");
 
       } else {
-         print "not ok 6 - got reply!\n";
+         print "not ok 7 - got reply!\n";
       }
 
       AnyEvent::XMPP::Test::end ($im);

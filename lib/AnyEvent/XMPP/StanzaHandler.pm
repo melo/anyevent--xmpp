@@ -116,7 +116,7 @@ sub init {
          my $errnode = new_reply (
             $node,
             [ 
-               map { $_->add_decl_prefix ($_->namespace, ''); $_ } $node->nodes,
+               $node->nodes,
                new_error ($node, 'service-unavailable')
             ],
             type => 'error'
