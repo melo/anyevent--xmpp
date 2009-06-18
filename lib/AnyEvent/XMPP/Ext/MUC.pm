@@ -80,7 +80,7 @@ sub init {
 
             my $resjid = $node->meta->{dest};
             my $from   = prep_bare_jid ($node->attr ('from'));
-            
+
             if (exists $self->{rooms}->{$resjid}
                 && exists $self->{rooms}->{$resjid}->{$from}) {
 
@@ -95,7 +95,7 @@ sub init {
 
             my $resjid = $node->meta->{dest};
             my $from   = prep_bare_jid ($node->attr ('from'));
-            
+
             if (exists $self->{rooms}->{$resjid}
                 && exists $self->{rooms}->{$resjid}->{$from}) {
 
@@ -313,11 +313,15 @@ sub handle_presence {
                                 # (this is so complicated that it will probably blow
                                 # up on me...).
              && $node->attr ('type') eq 'unavailable') {
+
+            $self->{rooms}->{$resjid}->{$mucjid}->{occs} = {};
             $self->event (left => $resjid, $mucjid);
             delete $self->{rooms}->{$resjid}->{$mucjid};
 
          } else {
             if (not (defined $old_pres) || $old_pres->{show} eq 'unavailable') {
+               $self->{rooms}->{$resjid}->{$mucjid}->{occs}->{res_jid ($room->{my_jid})}
+                  = {};
                $self->event (entered => $resjid, $mucjid);
             }
          }
@@ -325,13 +329,18 @@ sub handle_presence {
       } elsif ($room->{joined}) {
 
          if ($node->attr ('type') eq 'unavailable') {
+            delete $self->{rooms}->{$resjid}->{$mucjid}->{occs}->{res_jid ($from)};
             $self->event (parted => $resjid, $mucjid, $from);
 
          } else {
             if (not (defined $old_pres) || $old_pres->{show} eq 'unavailable') {
+               $self->{rooms}->{$resjid}->{$mucjid}->{occs}->{res_jid ($from)}
+                  = {};
                $self->event (joined => $resjid, $mucjid, $from);
             }
          }
+      } else {
+         $self->{rooms}->{$resjid}->{$mucjid}->{occs}->{res_jid ($from)} = {};
       }
    }
 }
@@ -384,6 +393,14 @@ sub get_rooms {
    grep {
       $self->{rooms}->{$resjid}->{$_}->{joined} 
    } keys %{$self->{rooms}->{$resjid} || {}}
+}
+
+sub get_occupants {
+   my ($self, $resjid, $mucjid) = @_;
+
+   return unless exists $self->{rooms}->{$resjid};
+   return unless exists $self->{rooms}->{$resjid}->{$mucjid};
+   $self->{rooms}->{$resjid}->{$mucjid}->{occs}
 }
 
 sub joined_room {
