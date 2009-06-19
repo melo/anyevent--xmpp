@@ -11,7 +11,7 @@ __PACKAGE__->inherit_event_methods_from (qw/
    AnyEvent::XMPP::Extendable
 /);
 
-our $DEBUG = 1;
+our $DEBUG = 0;
 
 =head1 NAME
 
@@ -157,9 +157,9 @@ sub spawn_connection {
       },
       connect_error => sub {
          my ($con, $msg) = @_;
-         
+
          _install_retry ($conhdl);
-         
+
          $self->connect_error ($jid, $msg, $conhdl->{timeout});
       },
       error => sub {
