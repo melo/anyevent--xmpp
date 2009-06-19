@@ -30,7 +30,7 @@ __PACKAGE__->hand_event_methods_down_from (qw/
    AnyEvent::XMPP::Extendable
 /);
 
-our $DEBUG = 1;
+our $DEBUG = 0;
 
 =head1 NAME
 
