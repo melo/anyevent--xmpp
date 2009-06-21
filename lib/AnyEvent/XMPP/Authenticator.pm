@@ -18,18 +18,19 @@ AnyEvent::XMPP::Authenticator - Authenticator helper module
 
 =head1 SYNOPSIS
 
-   use AnyEvent::XMPP::Authenticator qw/start_auth/;
+   # See Stream/Client.pm for example of usage.
 
 =head2 DESCRIPTION
 
-This is a helper module for L<AnyEvent::XMPP::Stream>, it
-handles all the tiny bits of client authentication.
+This is a helper module for L<AnyEvent::XMPP::Stream::Client>, it
+handles all the tiny bits of client authentication. As it is only
+supposed to be a helper module no further documentation is provided.
 
 =head2 METHODS
 
 =over 4
 
-=item new (connection => $con)
+=item AnyEvent::XMPP::Authenticator->new (connection => $con)
 
 Creates a new authenticator object for the L<AnyEvent::XMPP::Stream>
 C<$con>.
@@ -70,7 +71,7 @@ sub construct_sasl_auth {
    my ($self, $mechs, $user, $hostname, $pass) = @_;
 
    my $data;
-    
+
    my $found_mech = 0;
    while (!$found_mech) {
       my $sasl = Authen::SASL->new (
@@ -161,7 +162,7 @@ sub request_iq_fields {
 
       if ($err) {
          $cb->();
-         
+
       } else {
          my (@query) = $node->find_all ([qw/auth query/]);
 
@@ -236,6 +237,20 @@ sub send_iq_auth {
    ));
 }
 
+=item $auth->start ($feature_node)
+
+This method initiates authentication handshakes. C<$feature_node> is the
+L<AnyEvent::XMPP::Node> object of the C<features> XML element which contains
+the details of possible authentication mechanisms.
+
+The events C<auth> and C<auth_fail> signal success or failure of authentication.
+
+The C<disconnect> method should be used to disconnect the authenticator from
+the L<AnyEvent::XMPP::Stream::Client> object before removing the references to
+it. The authenticator object can only be used once at the moment.
+
+=cut
+
 sub start {
    my ($self, $node) = @_;
 
@@ -270,6 +285,20 @@ sub start {
    }
 }
 
+=item $auth->disconnect
+
+Removes all inner references to other objects. See also C<start> above.
+
+=cut
+
+sub disconnect {
+   my ($self) = @_;
+   $self->remove_all_callbacks;
+   $self->{connection}->unreg_cb ($self->{regid});
+   delete $self->{sasl};
+   delete $self->{connection};
+}
+
 =back
 
 =head2 EVENTS
@@ -297,21 +326,13 @@ object or an L<AnyEvent::XMPP::Error::SASL> object (see below).
 
 sub auth_fail { }
 
-sub disconnect {
-   my ($self) = @_;
-   $self->remove_all_callbacks;
-   $self->{connection}->unreg_cb ($self->{regid});
-   delete $self->{sasl};
-   delete $self->{connection};
-}
-
 =back
 
 =head1 AnyEvent::XMPP::Error::SASL
 
 AnyEvent::XMPP::Error::SASL - SASL authentication error
 
-Subclass of L<AnyEvent::XMPP::Error>
+Subclass of L<AnyEvent::XMPP::Error>.
 
 =cut
 
@@ -336,7 +357,7 @@ sub init {
 
 =over 4
 
-=item B<condition ()>
+=item $error->condition ()
 
 Returns the error condition, which might be one of:
 
@@ -368,6 +389,10 @@ sub string {
 Robin Redeker, C<< <elmex@ta-sa.org> >>
 
 =head1 SEE ALSO
+
+L<AnyEvent::XMPP::Stream::Client>
+
+RFC 3920 - Extensible Messaging and Presence Protocol (XMPP): Core
 
 =head1 COPYRIGHT & LICENSE
 
