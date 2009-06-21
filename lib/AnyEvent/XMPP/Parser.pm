@@ -228,6 +228,8 @@ text.
 sub feed {
    my ($self, $rbuf) = @_;
 
+   unless (ref $rbuf) { my $b = $rbuf; $rbuf = \$b }
+
    my $buf = decode ('utf-8', $$rbuf, Encode::FB_QUIET);
 
    $self->feed_text ($buf);
