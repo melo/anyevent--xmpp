@@ -141,7 +141,6 @@ sub new {
    }
 
    AnyEvent::XMPP::StanzaHandler::init ($self);
-   AnyEvent::XMPP::Extendable::init ($self);
 
    $self->reg_cb (
       send => -400 => sub {

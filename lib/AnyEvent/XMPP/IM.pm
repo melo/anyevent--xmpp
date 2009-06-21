@@ -58,7 +58,6 @@ sub new {
    );
 
    AnyEvent::XMPP::StanzaHandler::init ($self);
-   AnyEvent::XMPP::Extendable::init ($self);
 
    $self->reg_cb (
       ext_after_error => sub {

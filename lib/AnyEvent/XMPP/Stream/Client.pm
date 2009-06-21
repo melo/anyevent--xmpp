@@ -381,7 +381,6 @@ sub new {
    );
 
    AnyEvent::XMPP::StanzaHandler::init ($self);
-   AnyEvent::XMPP::Extendable::init ($self);
 
    return $self;
 }

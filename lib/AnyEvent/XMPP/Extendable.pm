@@ -28,7 +28,6 @@ AnyEvent::XMPP::Extendable - Superclass for extendable things.
       my $class = ref($this) || $this;
       my $self = $class->AnyEvent::XMPP::Stream::new (@_);
       AnyEvent::XMPP::StanzaHandler::init ($self);
-      AnyEvent::XMPP::Extendable::init ($self);
       $self
    }
 
@@ -54,7 +53,8 @@ This class is designed to be a super class for anything that:
 
 =item 4. Wants to be extendable by L<AnyEvent::XMPP::Ext> extensions.
 
-(Note: Those extensions are mainly client side currently)
+(Note: Those extensions are mainly client side currently, use with care for
+components!)
 
 =back
 
@@ -63,18 +63,9 @@ C<inherit_event_methods_from> package routine (see also L<Object::Event> for
 more information), and then call the C<init> function to prepare your object
 for acting as an extendable thing.
 
-=head1 FUNCTIONS
+=head1 METHODS
 
 =over 4
-
-=item AnyEvent::XMPP::Extendable::init ($self)
-
-=cut
-
-sub init {
-   my ($self) = @_;
-
-}
 
 =item $extendable->add_ext ($shortcut)
 
@@ -95,6 +86,17 @@ sub add_ext {
 }
 
 =item $extendable->add_extension ($full_classname)
+
+This method adds an extension to the C<$extendable> object.
+It does so by trying to load C<$full_classname> (with require).
+After that it loads the packages returned by the C<autoload_extensions>
+method of the C<$full_classname> package and checks for the presence of
+extensions returned by the C<required_extensions> method of the C<$full_classname>
+package.
+
+Then it constructs a new object instance of C<$full_classname> and adds it to the
+internal list of extensions. You can retrieve the extension object anytime
+with C<get_ext>/C<get_extension> (see below).
 
 =cut
 
@@ -130,7 +132,7 @@ sub add_extension {
 
 The same as:
 
-   $extendable->get_extension ('AnyEvent::XMPP::Ext::' . $shortcut)
+   my $extobj = $extendable->get_extension ('AnyEvent::XMPP::Ext::' . $shortcut)
 
 =cut
 
@@ -139,30 +141,22 @@ sub get_ext {
    $self->get_extension ('AnyEvent::XMPP::Ext::' . $ext)
 }
 
-=item $extendable->get_extension ($shortcut)
+=item $extendable->get_extension ($pkg)
+
+Returns the extension with the package name C<$pkg>:
+
+  my $extobj = $extendable->get_extension ('My::Custom::XMPP::Ext::Foo');
 
 =cut
 
 sub get_extension {
-   my ($self, $id) = @_;
-   unless ($self->{_ext_ids}->{$id}) {
-      croak "Runtime requirement for extension $id in object $self not met!\n";
+   my ($self, $pkg) = @_;
+   unless ($self->{_ext_ids}->{$pkg}) {
+      croak "Runtime requirement for extension $pkg in object $self not met!\n";
    }
 
-   $self->{_ext_ids}->{$id}
+   $self->{_ext_ids}->{$pkg}
 }
-
-=back
-
-=head1 METHODS
-
-=over 4
-
-=back
-
-=head1 EVENTS
-
-=over 4
 
 =back
 
@@ -171,6 +165,14 @@ sub get_extension {
 Robin Redeker, C<< <elmex@ta-sa.org> >>
 
 =head1 SEE ALSO
+
+L<AnyEvent::XMPP:Delivery>
+
+L<AnyEvent::XMPP::StanzaHandler>
+
+L<AnyEvent::XMPP::IQTracker>
+
+L<AnyEvent::XMPP::Ext>
 
 =head1 COPYRIGHT & LICENSE
 
