@@ -20,8 +20,8 @@ AnyEvent::XMPP::Error - Error class hierarchy for error reporting
 
 =head1 DESCRIPTION
 
-This module is a helper class for abstracting any kind
-of error that occurs in AnyEvent::XMPP.
+This module is a helper class for abstracting any kind of error that occurs in
+AnyEvent::XMPP.
 
 You receive instances of these objects by various events.
 
@@ -66,7 +66,7 @@ Robin Redeker, C<< <elmex at ta-sa.org> >>, JID: C<< <elmex at jabber.org> >>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2007, 2008 Robin Redeker, all rights reserved.
+Copyright 2007-2009 Robin Redeker, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.

@@ -33,6 +33,9 @@ This method should deliver the C<$node> as if it was 'sent'.  For
 L<AnyEvent::XMPP::Stream> this means that the C<$node> will be sent to
 the server.
 
+See also L<AnyEvent::XMPP::Meta> about the C<src> and C<dest> meta keys which
+can have influence on routing of stanzas.
+
 Other delivery objects might have other semantics w.r.t. sending a stanza.
 
 =back
@@ -85,6 +88,10 @@ that is related to that resource.
 Robin Redeker, C<< <elmex@ta-sa.org> >>
 
 =head1 SEE ALSO
+
+L<AnyEvent::XMPP::Meta>
+
+L<AnyEvent::XMPP::Stream>
 
 =head1 COPYRIGHT & LICENSE
 
