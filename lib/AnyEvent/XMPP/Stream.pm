@@ -198,12 +198,12 @@ sub new {
    );
 
    $self->set_exception_cb (sub {
-      my ($ex) = @_;
+      my ($ex, $ev) = @_;
 
       $self->error (
          AnyEvent::XMPP::Error::Exception->new (
             exception => $ex,
-            context   => 'stream event callback'
+            context   => 'stream event callback: ' . $ev
          )
       );
    });
