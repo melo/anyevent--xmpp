@@ -58,8 +58,7 @@ L<AnyEvent::XMPP::Util> to extract further information from these timestamps.
 In case you enable automatic unix timestamp extraction with the
 C<enable_unix_timestamp> method there will be an additional key in the C<delay>
 hash: C<unix_timestamp> which will contain the result of the
-C<xmpp_datetime_as_timestamp> function of L<AnyEvent::XMPP::Util> (which
-requires the L<POSIX> module).
+C<xmpp_datetime_as_timestamp> function of L<AnyEvent::XMPP::Util>.
 
 =head1 METHODS
 

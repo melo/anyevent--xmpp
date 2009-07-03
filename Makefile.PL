@@ -19,6 +19,7 @@ WriteMakefile(
         'Authen::SASL'       => 0,
         'Digest::SHA1'       => 0,
         'Object::Event'      => 0,
+        'Time::Local'        => 0,
     },
     dist                => {
        COMPRESS => 'gzip -9f',
