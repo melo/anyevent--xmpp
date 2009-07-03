@@ -1,6 +1,12 @@
 'x' means: is done!
 
 - replace Net::LibIDN with Unicode::Stringprep and Net::IDN::Encode possibly?
+  - maybe just use Unicode::Stringprep in case we have non-ascii JIDs.
+  => maybe write a test to test my implementation against Net::LibIDN over the
+     unicode range.
+  - implement ascii parts of IDNA myself and if it gets more complicated
+    ignore it for now. maybe even copy code from Net::IDN::Encode or
+    failover to Net::LibIDN.
 
 - update docs:
    - AnyEvent::XMPP         - rewrite after other docs are done.
