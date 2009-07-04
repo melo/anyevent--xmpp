@@ -1,5 +1,7 @@
 'x' means: is done!
 
+- make AnyEvent::XMPP::IM the promised short-cut solution.
+
 - replace Net::LibIDN with Unicode::Stringprep and Net::IDN::Encode possibly?
   - maybe just use Unicode::Stringprep in case we have non-ascii JIDs.
   => maybe write a test to test my implementation against Net::LibIDN over the

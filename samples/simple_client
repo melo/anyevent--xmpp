@@ -1,0 +1,79 @@
+#!/opt/perl/bin/perl
+
+use AnyEvent;
+use AnyEvent::XMPP::IM;
+use AnyEvent::XMPP::Util qw/new_message/;
+
+my ($JID, $PASSWORD, $DEBUG) = @ARGV;
+
+unless (@ARGV > 1) {
+   print "usage: simple_client <jid> <password> [<debug>]\n";
+   exit 1;
+}
+
+my $cv = AnyEvent->condvar;
+
+my $im = AnyEvent::XMPP::IM->new;
+
+$AnyEvent::XMPP::IM::DEBUG     = $DEBUG;
+$AnyEvent::XMPP::Stream::DEBUG = $DEBUG;
+
+$im->add_ext ('LangExtract');         # this extension is for body
+                                      # extraction from messages
+
+my $pres = $im->add_ext ('Presence'); # this extension is for dealing
+                                      # with presence in general (and neccessary
+                                      # for normal operations)
+
+# setting the default presence for all our connected resources:
+$pres->set_default ('available', "I'm just an AnyEvent::XMPP test script.", 1);
+
+$im->reg_cb (
+   connected => sub {
+      my ($im, $jid, $peer_host, $peer_port) = @_;
+      print "connected $jid to $peer_host:$peer_port\n";
+   },
+   connect_error => sub {
+      my ($im, $jid, $reason, $recon) = @_;
+      print "connect error at $jid: $reason, reconnection try "
+            . "in $recon seconds.\n";
+   },
+   error => sub {
+      my ($im, $jid, $error) = @_;
+      print "error on $jid: " . $error->string . "\n";
+   },
+   disconnected => sub {
+      my ($im, $jid, $peer_host, $peer_port, $reason, $recon) = @_;
+      print "disconnected $jid from $peer_host:$peer_port: "
+            . "$reason, reconnect in $recon seconds\n";
+   },
+   recv_message => sub {
+      my ($im, $node) = @_;
+
+      # $node->meta->{dest} contains the resource we got the message at:
+      print "received message from " . $node->attr ('from') . ", "
+            . "on account " . $node->meta->{dest} . ":\n";
+
+      # $node->meta->{body} was added by the LangExtract extension:
+      print $node->meta->{body} . "\n";
+
+      # when receiving a message we send him out our presence directly:
+      $pres->send_directed ($node->meta->{dest}, $node->attr ('from'));
+
+      # and be kind and reply:
+      $im->send (
+         new_message (
+            chat => "Hello there, got your message: " . $node->meta->{body},
+            src => $node->meta->{dest},   # src specifies the resource to
+                                          # send the message from.
+            to => $node->attr ('from'))); # to where to send the message to.
+   }
+);
+
+$im->add_account ($JID, $PASSWORD);
+print "added account $JID\n";
+
+# nessary to initiate the connection:
+$im->update_connections;
+
+$cv->recv; # see perldoc AnyEvent
