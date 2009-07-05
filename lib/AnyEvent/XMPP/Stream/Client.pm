@@ -226,7 +226,7 @@ sub new {
    my $class = ref($this) || $this;
    my $self = $class->SUPER::new (@_);
 
-   if ($self->{jid}) {
+   if (defined $self->{jid}) {
       my ($user, $host, $res) = split_jid (delete $self->{jid});
       $self->{username} = $user;
       $self->{domain}   = $host;
@@ -234,10 +234,10 @@ sub new {
    }
 
    unless (defined $self->{username}) {
-      croak "username or node part of JID required\n";
+      croak "username parameter or node part of JID required\n";
    }
 
-   unless (defined $self->{username}) {
+   unless (defined $self->{password}) {
       croak "password required\n";
    }
 
