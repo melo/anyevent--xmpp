@@ -310,7 +310,7 @@ sub connect {
          }
 
          $self->set_handle ($fh, $peer_host, $peer_port);
-         
+
       }, ($timeout ? sub { $timeout } : ());
 }
 
@@ -333,18 +333,22 @@ sub set_handle {
    binmode $fh, ":raw";
    $self->{handle} =
       AnyEvent::Handle->new (
-         fh => $fh,
+         fh       => $fh,
+ #        peername => $self->{host},
+ #        tls_ctx  => { verify => 1 , verify_peername => 'xmpp' },
+
          on_eof => sub {
             $self->disconnect (
                "EOF on connection to $self->{peer_host}:$self->{peer_port}"
                . ($self->{error} ? ": " . $self->{error}->string . "."
-                                 : ".")
-            );
+                                 : "."));
          },
          on_error => sub {
+            my ($hdl, $fatal, $msg) = @_;
+
             $self->disconnect (
-               "Error on connection to $self->{peer_host}:$self->{peer_port}: $!"
-            );
+               "Error on connection to "
+               . "$self->{peer_host}:$self->{peer_port}: $! ($msg)");
          },
          on_read => sub {
             my ($hdl) = @_;

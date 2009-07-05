@@ -1,5 +1,6 @@
 'x' means: is done!
 
+- make ssl verify switchable, remove ability to give context to starttls.
 - make AnyEvent::XMPP::IM the promised short-cut solution.
 
 - replace Net::LibIDN with Unicode::Stringprep and Net::IDN::Encode possibly?
