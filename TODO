@@ -3,10 +3,10 @@
 - make ssl verify switchable, remove ability to give context to starttls.
 - make AnyEvent::XMPP::IM the promised short-cut solution.
 
-- replace Net::LibIDN with Unicode::Stringprep and Net::IDN::Encode possibly?
-  - maybe just use Unicode::Stringprep in case we have non-ascii JIDs.
-  => maybe write a test to test my implementation against Net::LibIDN over the
-     unicode range.
+X replace Net::LibIDN with Unicode::Stringprep and Net::IDN::Encode possibly?
+  X maybe just use Unicode::Stringprep in case we have non-ascii JIDs.
+  X => maybe write a test to test my implementation against Net::LibIDN over the
+       unicode range.
   - implement ascii parts of IDNA myself and if it gets more complicated
     ignore it for now. maybe even copy code from Net::IDN::Encode or
     failover to Net::LibIDN.

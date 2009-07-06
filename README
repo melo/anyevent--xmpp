@@ -36,12 +36,9 @@ DESCRIPTION
     For a list of "Supported extensions" see below.
 
     There are also other modules in this distribution, for example:
-    AnyEvent::XMPP::Util, AnyEvent::XMPP::Writer, AnyEvent::XMPP::Parser and
-    those I forgot :-) Those modules might be helpful and/or required if you
-    want to use this framework for XMPP.
-
-    See also AnyEvent::XMPP::Writer for a discussion about the brokenness of
-    XML in the XMPP specification.
+    AnyEvent::XMPP::Util, AnyEvent::XMPP::Parser and those I forgot :-)
+    Those modules might be helpful and/or required if you want to use this
+    framework for XMPP.
 
     If you have any questions or seek for help look below under "SUPPORT".
 
@@ -57,20 +54,14 @@ REQUIREMENTS
         Object::Event module to provide a more generic way for more other
         modules to register and call event callbacks.
 
-    XML::Writer
-        For writing "XML".
-
-    XML::Parser::Expat
-        For parsing partial "XML" stuff.
-
     MIME::Base64
         For SASL authentication
 
     Authen::SASL
         For SASL authentication
 
-    Net::LibIDN
-        For stringprep profiles to handle JIDs.
+    Unicode::Stringprep
+        For stringprep profile handling for JIDs.
 
     Digest::SHA1
         For component authentication and old-style authentication.
@@ -275,7 +266,7 @@ BUGS
     send a patch, it would be best if you find out which code doesn't work
     and tell me why.
 
-    Please report any bugs or feature requests to "bug-net-xmpp2 at
+    Please report any bugs or feature requests to "bug-anyevent-xmpp at
     rt.cpan.org", or through the web interface at
     <http://rt.cpan.org/NoAuth/ReportBug.html?Queue=AnyEvent-XMPP>. I will
     be notified and then you'll automatically be notified of progress on
@@ -342,7 +333,7 @@ ACKNOWLEDGEMENTS
         AnyEvent::XMPP distribution.
 
 COPYRIGHT & LICENSE
-    Copyright 2007, 2008 Robin Redeker, all rights reserved.
+    Copyright 2007-2009 Robin Redeker, all rights reserved.
 
     This program is free software; you can redistribute it and/or modify it
     under the same terms as Perl itself.

@@ -1,45 +1,24 @@
 #!perl
-use Net::LibIDN ':all';
-use Unicode::Stringprep;
+use AnyEvent::XMPP::Util qw/resourceprep nodeprep/;
 use Encode;
+use Net::LibIDN ':all';
 
-my $nodeprof =
-   Unicode::Stringprep->new (
-      3.2,
-      [
-         \@Unicode::Stringprep::Mapping::B1,
-         \@Unicode::Stringprep::Mapping::B2
-      ],
-      'KC',
-      [
-         [0x22, 0x22],
-         [0x26, 0x27],
-         [0x2F, 0x2F],
-         [0x3A, 0x3A],
-         [0x3C, 0x3C],
-         [0x3E, 0x3E],
-         [0x40, 0x40],
-         \@Unicode::Stringprep::Prohibited::C11,
-         \@Unicode::Stringprep::Prohibited::C12,
-         \@Unicode::Stringprep::Prohibited::C21,
-         \@Unicode::Stringprep::Prohibited::C22,
-         \@Unicode::Stringprep::Prohibited::C3,
-         \@Unicode::Stringprep::Prohibited::C4,
-         \@Unicode::Stringprep::Prohibited::C5,
-         \@Unicode::Stringprep::Prohibited::C6,
-         \@Unicode::Stringprep::Prohibited::C7,
-         \@Unicode::Stringprep::Prohibited::C8,
-         \@Unicode::Stringprep::Prohibited::C9,
-      ],
-      0
-   );
+
 
 for (my $i = 0x0000; $i < 0xE0FFF; $i++) {
    my $c = chr ($i);
-   my $res  = idn_prep_node (encode ('utf-8', $c), 'utf-8');
-   $res = decode ('utf-8', $res) if defined $res;
-   my $res2 = eval { $nodeprof->($c) };
-   if ($@) { $res2 = undef }
+
+   my ($res, $res2);
+
+   if ($ARGV[0] eq 'node') {
+      $res  = idn_prep_node (encode ('utf-8', $c), 'utf-8');
+      $res  = decode ('utf-8', $res) if defined $res;
+      $res2 = nodeprep ($c);
+   } else {
+      $res  = idn_prep_resource (encode ('utf-8', $c), 'utf-8');
+      $res  = decode ('utf-8', $res) if defined $res;
+      $res2 = resourceprep ($c);
+   }
 
    if (not defined $res) {
       unless (not defined $res2) {

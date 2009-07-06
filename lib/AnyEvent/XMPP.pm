@@ -78,9 +78,9 @@ For SASL authentication
 
 For SASL authentication
 
-=item L<Net::LibIDN>
+=item L<Unicode::Stringprep>
 
-For stringprep profiles to handle JIDs.
+For stringprep profile handling for JIDs.
 
 =item L<Digest::SHA1>
 

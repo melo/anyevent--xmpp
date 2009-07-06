@@ -2,7 +2,7 @@ package AnyEvent::XMPP::Util;
 use strict;
 no warnings;
 use Encode;
-use Net::LibIDN qw/idn_prep_name idn_prep_resource idn_prep_node/;
+use Unicode::Stringprep;
 use AnyEvent::Socket;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns_maybe xmpp_ns/;
 use AnyEvent::XMPP::Error::Stanza;
@@ -37,28 +37,85 @@ These functions can be exported if you want:
 
 =over 4
 
+=cut
+
 =item B<resourceprep ($string)>
 
 This function applies the stringprep profile for resources to C<$string>
-and returns the result.
+and returns the result. In case prohibited characters are used undef
+is returned.
 
 =cut
 
+*resourceprep_impl =
+   Unicode::Stringprep->new (
+      3.2,
+      [
+         \@Unicode::Stringprep::Mapping::B1,
+      ],
+      'KC',
+      [
+         \@Unicode::Stringprep::Prohibited::C12,
+         \@Unicode::Stringprep::Prohibited::C21,
+         \@Unicode::Stringprep::Prohibited::C22,
+         \@Unicode::Stringprep::Prohibited::C3,
+         \@Unicode::Stringprep::Prohibited::C4,
+         \@Unicode::Stringprep::Prohibited::C5,
+         \@Unicode::Stringprep::Prohibited::C6,
+         \@Unicode::Stringprep::Prohibited::C7,
+         \@Unicode::Stringprep::Prohibited::C8,
+         \@Unicode::Stringprep::Prohibited::C9,
+      ],
+      1
+   );
+
 sub resourceprep {
-   my ($str) = @_;
-   decode_utf8 (idn_prep_resource (encode_utf8 ($str), 'UTF-8'))
+   my $r;
+   eval { $r = resourceprep_impl ($_[0]) };
 }
 
 =item B<nodeprep ($string)>
 
-This function applies the stringprep profile for nodes to C<$string>
-and returns the result.
+This function applies the stringprep profile for nodes to C<$string> and
+returns the result. In case prohibited characters were used undef is returned.
 
 =cut
 
+*nodeprep_impl =
+   Unicode::Stringprep->new (
+      3.2,
+      [
+         \@Unicode::Stringprep::Mapping::B1,
+         \@Unicode::Stringprep::Mapping::B2
+      ],
+      'KC',
+      [
+         [0x22, 0x22],
+         [0x26, 0x27],
+         [0x2F, 0x2F],
+         [0x3A, 0x3A],
+         [0x3C, 0x3C],
+         [0x3E, 0x3E],
+         [0x40, 0x40],
+         \@Unicode::Stringprep::Prohibited::C11,
+         \@Unicode::Stringprep::Prohibited::C12,
+         \@Unicode::Stringprep::Prohibited::C21,
+         \@Unicode::Stringprep::Prohibited::C22,
+         \@Unicode::Stringprep::Prohibited::C3,
+         \@Unicode::Stringprep::Prohibited::C4,
+         \@Unicode::Stringprep::Prohibited::C5,
+         \@Unicode::Stringprep::Prohibited::C6,
+         \@Unicode::Stringprep::Prohibited::C7,
+         \@Unicode::Stringprep::Prohibited::C8,
+         \@Unicode::Stringprep::Prohibited::C9,
+      ],
+      1
+   );
+
+
 sub nodeprep {
-   my ($str) = @_;
-   decode_utf8 (idn_prep_node (encode_utf8 ($str), 'UTF-8'))
+   my $r;
+   eval { $r = nodeprep_impl ($_[0]) };
 }
 
 =item B<prep_join_jid ($node, $domain, $resource)>

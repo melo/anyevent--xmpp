@@ -15,7 +15,7 @@ WriteMakefile(
         'AnyEvent::Handle'   => 0,
         'Scalar::Util'       => 0,
         'MIME::Base64'       => 0,
-        'Net::LibIDN'        => 0,
+        'Unicode::Stringprep'=> 0,
         'Authen::SASL'       => 0,
         'Digest::SHA1'       => 0,
         'Object::Event'      => 0,
