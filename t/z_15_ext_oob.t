@@ -17,45 +17,58 @@ AnyEvent::XMPP::Test::check ('client');
 
 print "1..6\n";
 
-AnyEvent::XMPP::Test::start (sub {
-   my ($im, $cv, $oob) = @_;
+my $connected = AnyEvent->condvar;
 
-   my $cv_request_done = AnyEvent->condvar;
-   my $cv_got_oob_req  = AnyEvent->condvar;
+AnyEvent::XMPP::Test::start ($connected, 'AnyEvent::XMPP::Ext::OOB');
 
-   $oob->reg_cb (oob_recv => sub {
-      my ($oob, $node, $oob_data) = @_;
-      $oob->unreg_me;
+my ($im, $oob) = $connected->recv;
 
-      tp (1, $node->meta->{dest} eq $FJID2,
-         "destination of oob send");
-      tp (2, $oob_data->{url}    eq "http://www.test.de/blabla",
-         "url");
-      tp (3, $oob_data->{desc}   eq "Have something...",
-         "description");
+my $cv_request_done = AnyEvent->condvar;
+my $cv_got_oob_req  = AnyEvent->condvar;
 
-      $oob->reply_success ($node);
-   });
+$oob->reg_cb (oob_recv => sub {
+   my ($oob, $node, $oob_data) = @_;
+   $oob->unreg_me;
 
-   $oob->send_url (
-      $FJID1, $FJID2, 'http://www.test.de/blabla', "Have something...", sub {
-         my ($error) = @_;
+   tp (1, $node->meta->{dest} eq $FJID2,
+      "destination of oob send");
+   tp (2, $oob_data->{url}    eq "http://www.test.de/blabla",
+      "url");
+   tp (3, $oob_data->{desc}   eq "Have something...",
+      "description");
 
-         tp (4, (not $error), "no error on reply");
+   $oob->reply_success ($node);
+});
 
-         $oob->reg_cb (oob_recv => sub {
-            my ($oob, $node, $oob_data) = @_;
+my $first_oob = AnyEvent->condvar;
 
-            tp (5, $oob_data->{url} eq 'http://err.eu', "got second request");
-            $oob->reply_failure ($node, 'reject');
-         });
+$oob->send_url (
+   $FJID1, $FJID2, 'http://www.test.de/blabla', "Have something...", sub {
+      my ($error) = @_;
 
-         $oob->send_url ($FJID2, $FJID1, "http://err.eu", "Nothing", sub {
-            my ($error) = @_;
+      tp (4, (not $error), "no error on reply");
 
-            tp (6, $error eq 'reject', "got failure response");
-            $cv->send;
-         });
-      });
+      $first_oob->send;
+   })
 
-}, 'AnyEvent::XMPP::Ext::OOB');
+$first_oob->recv;
+
+my $second_oob = AnyEvent->condvar;
+
+$oob->reg_cb (oob_recv => sub {
+   my ($oob, $node, $oob_data) = @_;
+
+   tp (5, $oob_data->{url} eq 'http://err.eu', "got second request");
+   $oob->reply_failure ($node, 'reject');
+});
+
+$oob->send_url ($FJID2, $FJID1, "http://err.eu", "Nothing", sub {
+   my ($error) = @_;
+
+   tp (6, $error eq 'reject', "got failure response");
+   $second_oob->send;
+});
+
+$second_oob->recv;
+
+AnyEvent::XMPP::Test::end ($im);
