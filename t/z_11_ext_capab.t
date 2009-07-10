@@ -11,16 +11,9 @@ use AnyEvent::XMPP::Util qw/split_jid cmp_bare_jid new_iq new_message new_reply
 use AnyEvent::XMPP::Node qw/simxml/;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::StanzaHandler;
-use Predicates;
 use JSON -convert_blessed_universally;
 
 AnyEvent::XMPP::Test::check ('client');
-
-my $CV;
-my $PRES;
-my $DISCO;
-my $VERSION;
-my $IM;
 
 my %TEST_CAPA = (
 xep_test => <<CAPA,
@@ -125,64 +118,57 @@ my %TEST_CAPA_HASH = (
 
 print "1.." . (scalar (keys %TEST_CAPA) * 2) . "\n";
 
-my $ctx;
-$ctx = pred_ctx {
-   pred_decl 'start';
-   pred_action start => sub {
-      $IM->reg_cb (before_recv_iq => sub {
-         my ($IM, $node) = @_;
+my $connected = AnyEvent->condvar;
+AnyEvent::XMPP::Test::start ($connected, 'AnyEvent::XMPP::Ext::Disco');
+my ($im, $disco) = $connected->recv;
 
-         if (my ($Q) = $node->find (disco_info => 'query')) {
-            my $rep = new_reply ($node, create => {
-               node => {
-                  name => 'query', dns => 'disco_info',
-                  attrs => [ node => $Q->attr ('node') ],
-                  childs => [ \$TEST_CAPA{$Q->attr ('node')} ]
-               }
-            });
-            $IM->send ($rep);
-            $IM->stop_event;
+$im->reg_cb (before_recv_iq => sub {
+   my ($im, $node) = @_;
+
+   if (my ($q) = $node->find (disco_info => 'query')) {
+      my $rep = new_reply ($node, create => {
+         node => {
+            name => 'query', dns => 'disco_info',
+            attrs => [ node => $q->attr ('node') ],
+            childs => [ \$TEST_CAPA{$q->attr ('node')} ]
          }
       });
 
-      my $gcv = AnyEvent->condvar;
-      $gcv->begin (sub { AnyEvent::XMPP::Test::end ($IM) });
+      $im->send ($rep);
+      $im->stop_event;
+   }
+});
 
-      my $cnt = 0;
-      for (keys %TEST_CAPA) {
-         my $capanode = $_;
-         $gcv->begin;
-         $DISCO->request_info ($FJID1, $FJID2, $capanode, sub {
-            my ($DISCO, $info, $error) = @_;
+my $gcv = AnyEvent->condvar;
+$gcv->begin ($gcv);
 
-            if ($error) {
-               print "# error getting disco info: " . $error->string . "\n";
-               $CV->send;
-               return;
-            }
+my $cnt = 0;
+for (keys %TEST_CAPA) {
+   my $capanode = $_;
+   $gcv->begin;
+   $disco->request_info ($FJID1, $FJID2, $capanode, sub {
+      my ($disco, $info, $error) = @_;
 
-            $cnt++;
-            print (($info->as_verification_string eq $TEST_CAPA_VERSTR{$capanode}
-                       ? '' : 'not ')
-                   . "ok $cnt - verification string matches ($capanode)\n");
-            $cnt++;
-            print (($info->as_verification_hash eq $TEST_CAPA_HASH{$capanode}
-                       ? '' : 'not ')
-                   . "ok $cnt - verification hash matches ($capanode)\n");
-            $gcv->end;
-         });
+      if ($error) {
+         print "# error getting disco info: " . $error->string . "\n";
+         $gcv->send;
+         return;
       }
 
+      $cnt++;
+      print (($info->as_verification_string eq $TEST_CAPA_VERSTR{$capanode}
+                 ? '' : 'not ')
+             . "ok $cnt - verification string matches ($capanode)\n");
+      $cnt++;
+      print (($info->as_verification_hash eq $TEST_CAPA_HASH{$capanode}
+                 ? '' : 'not ')
+             . "ok $cnt - verification hash matches ($capanode)\n");
       $gcv->end;
-   };
-};
+   });
+}
 
-AnyEvent::XMPP::Test::start (sub {
-   my ($im, $cv, $disco) = @_;
+$gcv->end;
 
-   $IM      = $im;
-   $DISCO   = $disco;
-   $CV      = $cv;
+$gcv->recv;
 
-   pred_set ($ctx, 'start');
-}, 'AnyEvent::XMPP::Ext::Disco');
+AnyEvent::XMPP::Test::end ($im);

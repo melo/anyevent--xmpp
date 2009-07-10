@@ -10,7 +10,6 @@ use AnyEvent::XMPP::Util qw/split_jid cmp_bare_jid new_iq new_message
                             new_presence bare_jid cmp_jid/;
 use AnyEvent::XMPP::Node qw/simxml/;
 use AnyEvent::XMPP::StanzaHandler;
-use Predicates;
 use JSON -convert_blessed_universally;
 
 AnyEvent::XMPP::Test::check ('client');
