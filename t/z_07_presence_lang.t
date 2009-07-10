@@ -11,51 +11,8 @@ use AnyEvent::XMPP::Node qw/simxml/;
 use AnyEvent::XMPP::StanzaHandler;
 use JSON -convert_blessed_universally;
 
-AnyEvent::XMPP::Test::check ('client');
-
 my %pres;
-my $cnt = 2;
 my $pres_ext;
-my $end;
-AnyEvent::XMPP::Test::start (sub {
-   my ($im, $cv, $pres) = @_;
-
-   $im->send (new_presence (
-      available => away => "Going out" => -10, src => $FJID1, to => $FJID2
-   ));
-
-}, 'AnyEvent::XMPP::Ext::Presence', sub {
-      my ($im, $cv, $pres) = @_;
-
-      $pres_ext = $pres;
-
-      $pres->reg_cb (
-         self => sub {
-            my ($pres, $resjid, $jid, $old, $new) = @_;
-            unless ($end) {
-               $pres{$resjid} = [$jid => $new];
-            }
-         },
-         change => sub {
-            my ($pres, $resjid, $jid) = @_;
-
-            if ($cnt-- <= 0) {
-               unless ($end) {
-                  check_test ();
-                  $end = 1;
-                  AnyEvent::XMPP::Test::end ($im);
-               }
-            }
-         }
-      );
-
-      $pres->set_default (available => {
-         en => "I'm playing stuff",
-         de => "Ich spiele sachen",
-         ja => "にほんじん",
-      }, 10);
-   }
-);
 
 sub _tostr {
    my ($t) = @_;
@@ -125,4 +82,54 @@ sub check_test {
    }, $ps5[-1], "highest of jid2");
 }
 
-# print JSON->new->convert_blessed->pretty->encode ($pres_ext->{p}) . "\n";
+
+AnyEvent::XMPP::Test::check ('client');
+
+my $cnt = 2;
+my $end;
+
+my $connected = AnyEvent->condvar;
+my $done      = AnyEvent->condvar;
+AnyEvent::XMPP::Test::start (
+   $connected,
+   'AnyEvent::XMPP::Ext::Presence', sub {
+      my ($im, $pres) = @_;
+
+      $pres_ext = $pres;
+
+      $pres->reg_cb (
+         self => sub {
+            my ($pres, $resjid, $jid, $old, $new) = @_;
+            unless ($end) {
+               $pres{$resjid} = [$jid => $new];
+            }
+         },
+         change => sub {
+            my ($pres, $resjid, $jid) = @_;
+
+            if ($cnt-- <= 0) {
+               unless ($end) {
+                  check_test ();
+                  $end = 1;
+                  $done->send;
+               }
+            }
+         }
+      );
+
+      $pres->set_default (available => {
+         en => "I'm playing stuff",
+         de => "Ich spiele sachen",
+         ja => "にほんじん",
+      }, 10);
+   }
+);
+
+my ($im, $pres) = $connected->recv;
+
+$im->send (new_presence (
+   available => away => "Going out" => -10, src => $FJID1, to => $FJID2
+));
+
+$done->recv;
+AnyEvent::XMPP::Test::end ($im);

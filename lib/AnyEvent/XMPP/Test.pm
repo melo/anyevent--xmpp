@@ -11,7 +11,7 @@ require Exporter;
 our @ISA = qw/Exporter/;
 
 our @EXPORT = qw/$COMP_HOST $COMP_PORT $HOST $PORT $SECRET $SERVICE $JID1
-                 $JID2 $FJID1 $FJID2 $PASS @DEF_HANDLERS/;
+                 $JID2 $FJID1 $FJID2 $PASS @DEF_HANDLERS &tp/;
 
 =head1 NAME
 
@@ -97,7 +97,6 @@ sub start {
       $cnt = 2;
    }
 
-   my $cv = AnyEvent->condvar;
    my $im = AnyEvent::XMPP::IM->new (initial_reconnect_interval => 180);
 
    my @aexts;
@@ -108,7 +107,7 @@ sub start {
 
    for my $e (@exts) {
       if (ref ($e) eq 'CODE') {
-         $e->($im, $cv, @aexts);
+         $e->($im, @aexts);
       } else {
          push @aexts, $im->add_extension ($e);
          $has_presence = $aexts[-1] if $e eq 'AnyEvent::XMPP::Ext::Presence';
@@ -148,8 +147,8 @@ sub start {
                      if ($one_to_2 && $two_to_1) {
                         $im->unreg_me;
 
-                        $TOUT = AnyEvent->timer (after => 20, cb => sub { $cv->send });
-                        $cb->($im, $cv, @aexts);
+                        $TOUT = AnyEvent->timer (after => 20, cb => sub { exit 1 });
+                        $cb->($im, @aexts);
                      }
                   }
                );
@@ -171,15 +170,15 @@ sub start {
                }
 
             } else {
-               $TOUT = AnyEvent->timer (after => 20, cb => sub { $cv->send });
-               $cb->($im, $cv, @aexts);
+               $TOUT = AnyEvent->timer (after => 20, cb => sub { exit 1 });
+               $cb->($im, @aexts);
             }
          }
       },
       connect_error => sub {
          my ($im, $jid, $reason, $recon_tout) = @_;
          print "# connect error $jid: $reason\n";
-         $cv->send;
+         exit 1;
       },
       error => sub {
          my ($im, $jid, $error) = @_;
@@ -192,11 +191,11 @@ sub start {
          if ($reaso eq 'done'
              || $reaso =~ /recevied expected stream end/
              || ($jid =~ /jabberd14|jabberd-14/ && $reaso =~ /EOF/)) {
-            $cv->send if --$dis_cnt <= 0;
+            exit (0) if --$dis_cnt <= 0;
 
          } else {
             print "# disconnected $jid,$ph:$pp: $reaso\n";
-            $cv->send;
+            exit 1;
          }
       },
    );
@@ -212,8 +211,6 @@ sub start {
    }
 
    $im->update_connections;
-
-   $cv->recv;
 }
 
 sub end {
@@ -221,6 +218,12 @@ sub end {
    $im->get_connection ($FJID1)->send_end;
    my $nd_con = $im->get_connection ($FJID2);
    $nd_con->send_end if $nd_con;
+   AnyEvent->condvar->recv;
+}
+
+sub tp {
+   my ($nr, $cond, $desc) = @_;
+   printf "%sok %d - %s\n", ($cond ? '' : 'not '), $nr, $desc;
 }
 
 =back
