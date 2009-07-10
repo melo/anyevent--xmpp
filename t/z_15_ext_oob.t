@@ -49,7 +49,7 @@ $oob->send_url (
       tp (4, (not $error), "no error on reply");
 
       $first_oob->send;
-   })
+   });
 
 $first_oob->recv;
 

@@ -215,7 +215,7 @@ sub start {
 
 sub end {
    my ($im) = @_;
-   $im->get_connection ($FJID1)->send_end;
+   $im->get_connection ($FJID1)->send_end if $im->get_connection ($FJID1);
    my $nd_con = $im->get_connection ($FJID2);
    $nd_con->send_end if $nd_con;
    AnyEvent->condvar->recv;
