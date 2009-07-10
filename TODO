@@ -17,7 +17,6 @@ X replace Net::LibIDN with Unicode::Stringprep and Net::IDN::Encode possibly?
    - AnyEvent::XMPP::Ext::* - skim over them after finished other docs.
 
 - fix extensions to new API:
-   - Ext::OOB
    - Ext::Pubsub
    - Ext::VCard
 

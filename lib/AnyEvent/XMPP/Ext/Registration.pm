@@ -48,6 +48,9 @@ This module handles all tasks of in band registration that are possible and
 specified by XEP-0077. It's mainly a helper class that eases some tasks such
 as submitting and retrieving a form.
 
+NOTE: This 'extension' is not derived from L<AnyEvent::XMPP::Ext>
+and is not meant to be added via C<add_ext> methods!
+
 =cut
 
 =head1 METHODS
