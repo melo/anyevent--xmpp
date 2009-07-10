@@ -29,7 +29,13 @@ AnyEvent::XMPP::Util - Utility functions for AnyEvent::XMPP
 =head1 SYNOPSIS
 
    use AnyEvent::XMPP::Util qw/split_jid/;
-   ...
+
+=head1 DESCRIPTION
+
+This module includes some useful/common utility functions which you might need
+if you want to deal with XMPP. Along with normalization functions you will also
+find functions to create common XMPP stanzas which can be sent via anything
+that implements the L<AnyEvent::XMPP::Delivery> interface.
 
 =head1 FUNCTIONS
 
@@ -39,7 +45,7 @@ These functions can be exported if you want:
 
 =cut
 
-=item B<resourceprep ($string)>
+=item $prepped_string = resourceprep ($string)
 
 This function applies the stringprep profile for resources to C<$string>
 and returns the result. In case prohibited characters are used undef
@@ -74,7 +80,7 @@ sub resourceprep {
    eval { $r = resourceprep_impl ($_[0]) };
 }
 
-=item B<nodeprep ($string)>
+=item $prepped_string = nodeprep ($string)
 
 This function applies the stringprep profile for nodes to C<$string> and
 returns the result. In case prohibited characters were used undef is returned.
@@ -118,7 +124,7 @@ sub nodeprep {
    eval { $r = nodeprep_impl ($_[0]) };
 }
 
-=item B<prep_join_jid ($node, $domain, $resource)>
+=item $prepped_jid = prep_join_jid ($node, $domain, $resource)
 
 This function joins the parts C<$node>, C<$domain> and C<$resource>
 to a full jid and applies stringprep profiles. If the profiles couldn't
@@ -148,7 +154,7 @@ sub prep_join_jid {
    $jid
 }
 
-=item B<join_jid ($user, $domain, $resource)>
+=item $jid = join_jid ($user, $domain, $resource)
 
 This is a plain concatenation of C<$user>, C<$domain> and C<$resource>
 without stringprep.
@@ -166,7 +172,7 @@ sub join_jid {
    $jid
 }
 
-=item B<split_jid ($jid)>
+=item ($user, $host, $resource) =  split_jid ($jid)
 
 This function splits up the C<$jid> into user/node, domain and resource
 part and will return them as list.
@@ -184,27 +190,27 @@ sub split_jid {
    }
 }
 
-=item B<node_jid ($jid)>
+=item $node = node_jid ($jid)
 
 See C<prep_res_jid> below.
 
-=item B<domain_jid ($jid)>
+=item $domain = domain_jid ($jid)
 
 See C<prep_res_jid> below.
 
-=item B<res_jid ($jid)>
+=item $resource = res_jid ($jid)
 
 See C<prep_res_jid> below.
 
-=item B<prep_node_jid ($jid)>
+=item $prepped_node = prep_node_jid ($jid)
 
 See C<prep_res_jid> below.
 
-=item B<prep_domain_jid ($jid)>
+=item $prepped_domain = prep_domain_jid ($jid)
 
 See C<prep_res_jid> below.
 
-=item B<prep_res_jid ($jid)>
+=item $prepped_resource = prep_res_jid ($jid)
 
 These functions return the corresponding parts of a JID.
 The C<prep_> prefixed JIDs return the stringprep'ed versions.
@@ -223,7 +229,7 @@ sub prep_res_jid    {
    my $res = res_jid ($_[0]); defined $res ? resourceprep ($res) : undef
 }
 
-=item B<stringprep_jid ($jid)>
+=item $prepped_jid = stringprep_jid ($jid)
 
 This applies stringprep to all parts of the jid according to the RFC 3920.
 Use this if you want to compare two jids like this:
@@ -242,7 +248,7 @@ sub stringprep_jid {
    return prep_join_jid ($user, $host, $res);
 }
 
-=item B<cmp_jid ($jid1, $jid2)>
+=item $bool = cmp_jid ($jid1, $jid2)
 
 This function compares two jids C<$jid1> and C<$jid2>
 whether they are equal.
@@ -254,7 +260,7 @@ sub cmp_jid {
    stringprep_jid ($jid1) eq stringprep_jid ($jid2)
 }
 
-=item B<cmp_bare_jid ($jid1, $jid2)>
+=item $bool = cmp_bare_jid ($jid1, $jid2)
 
 This function compares two jids C<$jid1> and C<$jid2> whether their
 bare part is equal.
@@ -266,7 +272,7 @@ sub cmp_bare_jid {
    cmp_jid (bare_jid ($jid1), bare_jid ($jid2))
 }
 
-=item B<prep_bare_jid ($jid)>
+=item $prepped_bare_jid = prep_bare_jid ($jid)
 
 This function makes the jid C<$jid> a bare jid, meaning:
 it will strip off the resource part. With stringprep.
@@ -279,7 +285,7 @@ sub prep_bare_jid {
    prep_join_jid ($user, $host)
 }
 
-=item B<bare_jid ($jid)>
+=item $bare_jid = bare_jid ($jid)
 
 This function makes the jid C<$jid> a bare jid, meaning:
 it will strip off the resource part. But without stringprep.
@@ -292,7 +298,7 @@ sub bare_jid {
    join_jid ($user, $host)
 }
 
-=item B<is_bare_jid ($jid)>
+=item $bool = is_bare_jid ($jid)
 
 This method returns a boolean which indicates whether C<$jid> is a 
 bare JID.
@@ -305,7 +311,7 @@ sub is_bare_jid {
    not defined $res
 }
 
-=item B<filter_xml_chars ($string)>
+=item $filtered_string = filter_xml_chars ($string)
 
 This function removes all characters from C<$string> which
 are not allowed in XML and returns the new string.
@@ -318,7 +324,7 @@ sub filter_xml_chars($) {
    $string
 }
 
-=item B<filter_xml_attr_hash_chars ($hashref)>
+=item filter_xml_attr_hash_chars ($hashref)
 
 This runs all values of the C<$hashref> through C<filter_xml_chars> (see above)
 and changes them in-place!
@@ -330,7 +336,7 @@ sub filter_xml_attr_hash_chars {
    $hash->{$_} = filter_xml_chars $hash->{$_} for keys %$hash
 }
 
-=item B<to_xmpp_time ($sec, $min, $hour, $tz, $secfrac)>
+=item $xmpp_time_str = to_xmpp_time ($sec, $min, $hour, $tz, $secfrac)
 
 This function transforms a time to the XMPP date time format.
 The meanings and value ranges of C<$sec>, ..., C<$hour> are explained
@@ -355,7 +361,7 @@ sub to_xmpp_time {
       (defined $tz ? $tz : "Z")
 }
 
-=item B<to_xmpp_datetime ($sec,$min,$hour,$mday,$mon,$year,$tz,$secfrac)>
+=item $xmpp_date_str = to_xmpp_datetime ($sec,$min,$hour,$mday,$mon,$year,$tz,$secfrac)
 
 This function transforms a time to the XMPP date time format.
 The meanings of C<$sec>, ..., C<$year> are explained in the perldoc
@@ -376,7 +382,7 @@ sub to_xmpp_datetime {
    sprintf "%04d-%02d-%02dT%s", $year + 1900, $mon + 1, $mday, $time;
 }
 
-=item B<from_xmpp_datetime ($string)>
+=item my (@timevalues) = from_xmpp_datetime ($string)
 
 This function transforms the C<$string> which is either a time or datetime in XMPP
 format. If the string was not in the right format an empty list is returned.
@@ -415,7 +421,7 @@ sub from_xmpp_datetime {
       ($7 ne '' ? $7        : undef))
 }
 
-=item B<xmpp_datetime_as_timestamp ($string)>
+=item $unixtimestamp = xmpp_datetime_as_timestamp ($string)
 
 This function takes the same arguments as C<from_xmpp_datetime>, but returns a
 unix timestamp, like C<time ()> would.
@@ -760,15 +766,33 @@ sub new_presence {
    $node
 }
 
-=item $node = new_reply ($request_node, $create, %attrs)
+=item $node = new_reply ($request_node, %args)
 
-# TODO: document this!
+This function will generate a reply stanza to the C<$request_node>,
+which can either be an C<iq>, C<message> or C<presence> stanza.
+
+If you need to reply an error see the C<new_error> function below.
+
+C<%args> can contain further attributes for the presence XML element or one
+of these special keys:
+
+=over 4
+
+=item create => $creation
+
+Used to create the contents of the reply.
+
+=item sent_cb => $coderef
+
+See C<new_iq> documentation about this key.
+
+=back
 
 =cut
 
 sub new_reply {
-   my ($node, $child, %attrs) = @_;
-   my $nnode = AnyEvent::XMPP::Node->new ($node->namespace, $node->name, undef, \%attrs);
+   my ($node, %args) = @_;
+   my $nnode = AnyEvent::XMPP::Node->new ($node->namespace, $node->name);
 
    $nnode->meta->{src}  = $node->meta->{dest} if defined $node->meta->{dest};
    $nnode->meta->{dest} = $node->meta->{src}  if defined $node->meta->{src};
@@ -782,13 +806,44 @@ sub new_reply {
          unless defined $nnode->attr ('type');
    }
 
-   $nnode->add ($child);
+   if (my $int = delete $args{create}) {
+      $nnode->add ($int);
+   }
+
+   my $meta = $nnode->meta;
+   my $sent_cb = delete $args{sent_cb};
+   $meta->add_sent_cb ($sent_cb) if defined $sent_cb;
+
+   $nnode->attr ($_ => $args{$_}) for keys %args;
+
    $nnode
 }
 
 =item $node = new_error ($error_node, $error, $type)
 
-# TODO: document this!
+This function is used to generate a stanza error for C<iq>,
+C<message> or C<presence> stanzas. C<$error_node> is the
+stanza which caused the error.
+
+C<$error> is the error type, for possible contents of this
+parameter see the possible return values of the C<type> method of
+L<AnyEvent::XMPP::Error::Stanza>.
+
+C<$type> is the error condition, possible values are the
+return values of the C<condition> method of L<AnyEvent::XMPP::Error::Stanza>.
+
+Usage example:
+
+   # $node is an IQ, we are generating an error reply here:
+
+   $con->send (
+      new_reply (
+         $node,
+         type => 'error',  # IQ type attribute
+         create => [
+            $node->nodes,  # include a copy of the errornous IQ stanza
+            new_error ($node, 'cancel', 'item-not-found')
+         ]));
 
 =cut
 
@@ -818,6 +873,53 @@ sub new_error {
 
 =item extract_lang_element ($node, $elementname, $struct)
 
+This function extracts the human readable information from
+the XMPP stanza in C<$node>. C<$elementname> is the element name
+that is looked for (i.e.: C<subject> or C<body> in a C<message> stanza).
+C<$struct> must be a hash reference, which is used to store the
+following key/value pairs in:
+
+=over 4
+
+=item all_$elementname => $language_value_map
+
+C<$language_value_map> will be a hash reference which contains
+a map of language names and their corresponding texts.
+
+The empty string denotes the element which has no language attached.
+
+=item $elementname => $default_text
+
+C<$default_text> will contain either the contents of the C<$elementname>
+element with the default language of the XMPP stream, the element without a
+language or the last seen element (with any language attached).
+
+=back
+
+Example:
+
+If you get this stanza (stream default language is C<de>) in C<$node>:
+
+   <message>
+      <body xml:lang="en">Hi there!</body>
+      <body xml:lang="de">Hallo da!</body>
+   </message>
+
+Then after this:
+
+   my $struct = { };
+   extract_lang_element ($node, 'body', $struct);
+
+C<$struct> will contain:
+
+   {
+      all_body => {
+         de => "Hallo da!",
+         en => "Hi there!",
+      },
+      body => "Hallo da!"
+   }
+
 =cut
 
 sub extract_lang_element {
@@ -839,8 +941,11 @@ sub extract_lang_element {
       }
    }
 
-   $def_element = $struct->{'all_' . $elname}->{''} unless defined $def_element;
-   $def_element = $element[-1]->text if ((not defined $def_element) && @element);
+   $def_element = $struct->{'all_' . $elname}->{''}
+      unless defined $def_element;
+
+   $def_element = $element[-1]->text
+      if ((not defined $def_element) && @element);
 
    $struct->{$elname} = $def_element if defined $def_element;
 }

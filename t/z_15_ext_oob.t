@@ -19,7 +19,7 @@ print "1..6\n";
 
 sub p {
    my ($nr, $cond, $desc) = @_;
-   printf "%d %sok - %s\n", $nr, ($cond ? '' : 'not '), $desc;
+   printf "%sok %d - %s\n", ($cond ? '' : 'not '), $nr, $desc;
 }
 
 AnyEvent::XMPP::Test::start (sub {

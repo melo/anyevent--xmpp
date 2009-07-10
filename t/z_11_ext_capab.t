@@ -133,7 +133,7 @@ $ctx = pred_ctx {
          my ($IM, $node) = @_;
 
          if (my ($Q) = $node->find (disco_info => 'query')) {
-            my $rep = new_reply ($node, {
+            my $rep = new_reply ($node, create => {
                node => {
                   name => 'query', dns => 'disco_info',
                   attrs => [ node => $Q->attr ('node') ],

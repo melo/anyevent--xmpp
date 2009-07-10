@@ -1,9 +1,15 @@
 #!perl
+no warnings;
+use strict;
+
 use AnyEvent::XMPP::Util qw/resourceprep nodeprep/;
 use Encode;
 use Net::LibIDN ':all';
 
-
+unless (@ARGV) {
+   print "1..0\n";
+   exit;
+}
 
 for (my $i = 0x0000; $i < 0xE0FFF; $i++) {
    my $c = chr ($i);
@@ -14,7 +20,7 @@ for (my $i = 0x0000; $i < 0xE0FFF; $i++) {
       $res  = idn_prep_node (encode ('utf-8', $c), 'utf-8');
       $res  = decode ('utf-8', $res) if defined $res;
       $res2 = nodeprep ($c);
-   } else {
+   } elsif ($ARGV[0] eq 'resource') {
       $res  = idn_prep_resource (encode ('utf-8', $c), 'utf-8');
       $res  = decode ('utf-8', $res) if defined $res;
       $res2 = resourceprep ($c);

@@ -167,7 +167,7 @@ sub reply_failure {
    my ($self, $node, $type) = @_;
 
    $self->{extendable}->send (
-      new_reply ($node, [
+      new_reply ($node, create => [
          $node->nodes,
          new_error ($node,
             $type eq 'reject'

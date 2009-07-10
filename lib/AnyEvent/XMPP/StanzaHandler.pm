@@ -115,7 +115,7 @@ sub init {
 
          my $errnode = new_reply (
             $node,
-            [ 
+            create => [
                $node->nodes,
                new_error ($node, 'service-unavailable')
             ],

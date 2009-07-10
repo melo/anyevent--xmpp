@@ -123,7 +123,7 @@ sub handle_query {
    my ($q) = $node->find_all ([qw/version query/]);
    my @result = $self->version_result;
 
-   $self->{extendable}->send (new_reply ($node, {
+   $self->{extendable}->send (new_reply ($node, create => {
       node => {
          dns    => 'version',
          name   => 'query',

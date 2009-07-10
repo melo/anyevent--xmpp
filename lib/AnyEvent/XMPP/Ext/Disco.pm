@@ -236,7 +236,7 @@ sub reply_with_disco_info {
          childs => [ @identities, @features ]
       });
 
-      my $reply = new_reply ($node, $r);
+      my $reply = new_reply ($node, create => $r);
       $self->event (generated_info_reply => $reply);
       $self->{extendable}->send ($reply);
       $self->{extendable}->stop_event;
@@ -266,7 +266,7 @@ sub reply_with_disco_items {
          } } @$items ],
       });
 
-      my $reply = new_reply ($node, $r);
+      my $reply = new_reply ($node, create => $r);
       $self->event (generated_items_reply => $reply);
       $self->{extendable}->send ($reply);
       $self->{extendable}->stop_event;
