@@ -49,6 +49,8 @@ sub new {
    $self
 }
 
+sub init { } # just a default implementation...
+
 sub required_extensions { }
 
 sub autoload_extensions { }

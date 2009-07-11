@@ -9,48 +9,35 @@ use Scalar::Util;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
 use AnyEvent::XMPP::Util qw/prep_bare_jid/;
 
-our @ISA = qw/AnyEvent::XMPP::Ext/;
+use base qw/AnyEvent::XMPP::Ext/;
 
 =head1 NAME
 
-AnyEvent::XMPP::Ext::VCard - VCards (XEP-0054 & XEP-0084)
+AnyEvent::XMPP::Ext::VCard - VCards (XEP-0054 & XEP-0153)
 
 =head1 SYNOPSIS
 
-   use AnyEvent::XMPP::Ext::VCard;
+   my $vcard = $con->add_ext ("VCard");
 
-   my $vcard = AnyEvent::XMPP::Ext::VCard->new;
-   $con->reg_cb (
-      stream_ready => sub { $vcard->hook_on ($con) }
-   );
+   $vcard->retrieve ($src, $jid, sub {
+      my ($vcard, $src, $jid, $vcard, $error) = @_;
 
-   $vcard->retrieve ($con, 'elmex@jabber.org', sub {
-      my ($jid, $vcard, $error) = @_;
-
-      if ($error) {
-         warn "couldn't get vcard for elmex@jabber.org: " . $error->string . "\n";
+      if (defined $error) {
+         print "error: " . $error->string . "\n";
       } else {
-         print "vCard nick for elmex@jabber.org: ".$vcard->{NICKNAME}."\n";
-         print "Avatar hash for elmex@jabber.org: ".$vcard->{_avatar_hash}."\n";
+         # do something with $vcard
       }
    });
 
-   $vcard->store ($con, undef, { NICKNAME => 'net-xmpp2' }, sub {
-      my ($error) = @_;
-      if ($error) {
-         warn "upload failed: " . $error->string . "\n";
-      } else {
-         print "upload successful\n";
-      }
+   $vcard->store ($src, $vcard, sub {
+      my ($vcard, $src, $vcard, $error) = @_;
+      # ...
    });
-
-   $disco->enable_feature ($vcard->disco_feature);
-
 
 =head1 DESCRIPTION
 
-This extension handles setting and retrieval of the VCard and the
-VCard based avatars.
+This extension handles setting and retrieval of the VCard (XEP-0054) and the
+VCard based avatars (XEP-0153).
 
 For example see the test suite of L<AnyEvent::XMPP>.
 
@@ -58,69 +45,46 @@ For example see the test suite of L<AnyEvent::XMPP>.
 
 =over 4
 
-=item B<new (%args)>
-
-Creates a new vcard extension.
-It can take a C<cache> argument, which should be a tied hash
-which should be able to save the retrieved vcards.
-If no C<cache> is set a internal hash will be used and the
-vcards will be retrieved everytime the program is restarted.
-The keys will be the stringprepped bare JIDs of the people we
-got a vcard from and the value will be a non-cyclic hash/array datastructure
-representing the vcard.
-
-About this datastructure see below at B<VCARD STRUCTURE>.
-
-If you want to support avatars correctly make sure you hook up the connection
-via the C<hook_on> method.
-
 =cut
 
-sub new {
-   my $this = shift;
-   my $class = ref($this) || $this;
-   my $self = bless { @_ }, $class;
-   $self->init;
-   $self
-}
+sub required_extensions { 'AnyEvent::XMPP::Ext::Presence' }
+
+sub disco_feature { xmpp_ns ('vcard') }
 
 sub init {
    my ($self) = @_;
 
-   $self->{cb_id} =
-      $self->reg_cb (
-         ext_before_vcard => sub {
-            my ($self, $jid, $vcard) = @_;
-            my $vc = $self->{cache}->{prep_bare_jid ($jid)} = $vcard;
+   # TODO: test
+   $self->{pres}->reg_cb (
+      generated_presence => sub {
+         my ($pres, $node) = @_;
+
+         my $photo_hash;
+
+         if ($self->{vcards}->{$node->meta->{src}}) {
+            $photo_hash = '';
+            my $hash    = $self->{vcards}->{$node->meta->{src}}->{_avatar_hash};
+            $photo_hash = $hash if defined $hash;
          }
-      );
-}
 
-sub disco_feature { xmpp_ns ('vcard') }
-
-=item B<hook_on ($con, $dont_retrieve_vcard)>
-
-C<$con> must be an object of the class L<AnyEvent::XMPP::Connection> (or derived).
-Once the vCard extension has been hooked up on a connection it will add
-the avatar information to all outgoing presence stanzas.
-
-IMPORTANT: You need to hook on the connection B<BEFORE> it was connected. The
-initial presence stanza needs to contain the information that we support
-avatars. The vcard will automatically retrieved if the session wasn't already
-started. Otherwise you will have to retrieve the vcard manually if you hook it
-up after the C<session_ready> event was received. You can prevent the automatic
-retrieval by giving a true value in C<$dont_retrieve_vcard>.  However, just
-make sure to hook up on any connection before it is connected if you want to
-offer avatar support on it.
-
-Best is probably to do it like this:
-
-   my $vcard = AnyEvent::XMPP::Ext::VCard->new;
-   $con->reg_cb (
-      stream_ready => sub { $vcard->hook_on ($con) }
+         $node->add ({
+            node => {
+               dns  => 'vcard_upd',
+               name => 'x',
+               childs => [
+                  defined $photo_hash
+                     ? { name => 'photo',
+                         childs => [
+                             $photo_hash eq '' ? () : (\$photo_hash)
+                         ]
+                       }
+                     : ()
+               ]
+            }
+         });
+      },
    );
-
-=cut
+}
 
 sub hook_on {
    my ($self, $con, $dont_retrieve_vcard) = @_;
@@ -348,7 +312,7 @@ sub encode_vcard {
 
    if ($vcardh->{_avatar}) {
       $vcardh->{PHOTO} = [
-         { 
+         {
             BINVAL => encode_base64 ($vcardh->{_avatar}),
             TYPE => $vcardh->{_avatar_type}
          }
