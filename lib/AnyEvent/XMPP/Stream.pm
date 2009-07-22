@@ -473,6 +473,9 @@ sub send_header {
          ]
       }
    );
+   # Note: We don't send a header currently. If we ever do that
+   # try to check whether it works with all servers. And make it
+   # optional (opt-out), Zimbra seems to have problems with this.
    $node->set_only_start;
    $node->add_decl_prefix (xmpp_ns ('stream') => 'stream');
    $node->add_decl_prefix ($self->{default_stream_namespace} => '');
