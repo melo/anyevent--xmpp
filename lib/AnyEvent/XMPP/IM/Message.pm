@@ -119,9 +119,11 @@ sub new {
 
 sub from_node {
    my ($self, $node) = @_;
+   $self->{node} = $node;
 
    $self->fetch_delay_from_node ($node);
 
+   my $id       = $node->attr ('id');
    my $from     = $node->attr ('from');
    my $to       = $node->attr ('to');
    my $type     = $node->attr ('type');
@@ -135,6 +137,7 @@ sub from_node {
    $subjects{$_->attr ('lang') || ''} = $_->text
       for $node->find_all ([qw/client subject/]);
 
+   $self->{id}       = $id;
    $self->{from}     = $from;
    $self->{to}       = $to;
    $self->{type}     = $type;
@@ -146,6 +149,20 @@ sub from_node {
 sub to_string {
    my ($self) = @_;
    $self->any_body
+}
+
+=item B<id ([$msg_id])>
+
+This method returns the ID of this message.
+If C<$msg_id> is not undef it will replace the current
+message id.
+
+=cut
+
+sub id {
+   my ($self, $id) = @_;
+   $self->{id} = $id if defined $id;
+   $self->{id}
 }
 
 =item B<from ([$jid])>
@@ -237,6 +254,9 @@ sub send {
       if $self->thread;
    push @add, (from => $self->from)
       if $self->from;
+
+   push @add, (id => $self->id)
+      if $self->id;
 
    $self->{connection}->send_message (
       $self->to, $self->type, $self->{create_cbs},

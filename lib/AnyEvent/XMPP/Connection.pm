@@ -888,7 +888,7 @@ will return the id that was used (so you can react on possible replies).
 
 sub send_message {
    my ($self, $to, $type, $create_cb, %attrs) = @_;
-   my $id = $self->{iq_id}++;
+   my $id = delete $attrs{id} || $self->{iq_id}++;
    $self->{writer}->send_message ($id, $to, $type, $create_cb, %attrs);
    $id
 }

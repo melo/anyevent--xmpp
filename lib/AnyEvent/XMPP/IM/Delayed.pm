@@ -30,6 +30,17 @@ sub new {
    bless { @_ }, $class
 }
 
+=item B<xml_node ()>
+
+Returns the L<AnyEvent::XMPP::Node> object for this stream error.
+
+=cut
+
+sub xml_node {
+   $_[0]->{node}
+}
+
+
 =item B<fetch_delay_from_node ($node)>
 
 C<$node> must be a L<AnyEvent::XMPP::Node>. This method will try to

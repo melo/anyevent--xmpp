@@ -9,7 +9,10 @@ Revision history for AnyEvent::XMPP:
 
          - small uncleanliness fixed in ::Parser.
          - thanks to mons@cpan.org, who found an incompat.
-           between OE 1.1 and AnyEvent::XMPP.
+           between OE 1.1 and AnyEvent::XMPP (thanks to mons@cpan.org).
+         - added message id and xml_node to IM::Message/Delayed
+           (thanks to mons@cpan.org).
+
 
 0.5 Mon Mar 16 21:13:13 CET 2009
 
