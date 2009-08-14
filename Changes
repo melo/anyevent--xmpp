@@ -1,6 +1,15 @@
 Revision history for AnyEvent::XMPP:
 
+
+0.51     Fri Aug 14 10:53:23 CEST 2009
+
+   !!!!!!!!!!!!!!!
+   !!! NOTE: The next version (0.6) of AnyEvent::XMPP will have an incompatible API!
+   !!!!!!!!!!!!!!!
+
          - small uncleanliness fixed in ::Parser.
+         - thanks to mons@cpan.org, who found an incompat.
+           between OE 1.1 and AnyEvent::XMPP.
 
 0.5 Mon Mar 16 21:13:13 CET 2009
 

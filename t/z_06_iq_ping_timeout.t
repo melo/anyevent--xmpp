@@ -33,15 +33,14 @@ $C->reg_cb (
       $cl->finish;
    },
    before_recv_stanza_xml => sub {
-      my ($C, $acc, $node) = @_;
+      my ($C, $acc, $node, $rstop) = @_;
 
       if ($node->eq (client => 'iq')
           && ($node->attr ('type') eq 'result' || $node->attr ('type') eq 'error')
           && grep { $_ eq $node->attr ('id') } @ignore_ids)
       {
-         return 1;
+         $$rstop = 1;
       }
-      ()
    }
 );
 

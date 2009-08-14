@@ -8,11 +8,11 @@ AnyEvent::XMPP - An implementation of the XMPP Protocol
 
 =head1 VERSION
 
-Version 0.5
+Version 0.51
 
 =cut
 
-our $VERSION = '0.5';
+our $VERSION = '0.51';
 
 =head1 SYNOPSIS
 
@@ -113,6 +113,15 @@ Here are some notes to the last releases (release of this version is at top):
 =head2 Version
 
 =over 4
+
+=item * 0.51
+
+Maintenance release. Added a patch which fixes L<Object::Event> compatibility
+and another fix w.r.t. memory leak in the parser. And added the original node
+to L<AnyEvent::XMPP::IM::Message> (thanks go to mons@cpan.org).
+
+B<NOTE:> Version 0.6 of L<AnyEvent::XMPP> will be API incompatible! If you
+are already eager to try the new version out contact me!
 
 =item * 0.5
 

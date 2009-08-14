@@ -2,7 +2,7 @@ NAME
     AnyEvent::XMPP - An implementation of the XMPP Protocol
 
 VERSION
-    Version 0.5
+    Version 0.51
 
 SYNOPSIS
        use AnyEvent::XMPP::Connection;
@@ -88,6 +88,16 @@ RELEASE NOTES
     top):
 
   Version
+    *   0.51
+
+        Maintenance release. Added a patch which fixes Object::Event
+        compatibility and another fix w.r.t. memory leak in the parser. And
+        added the original node to AnyEvent::XMPP::IM::Message (thanks go to
+        mons@cpan.org).
+
+        NOTE: Version 0.6 of AnyEvent::XMPP will be API incompatible! If you
+        are already eager to try the new version out contact me!
+
     *   0.5
 
         Maintenance release. Added a patch from Marcus Dubois for

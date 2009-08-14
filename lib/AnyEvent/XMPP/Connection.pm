@@ -208,9 +208,9 @@ sub new {
    $self->{parser} = new AnyEvent::XMPP::Parser;
    $self->{writer} = AnyEvent::XMPP::Writer->new (
       write_cb     => sub { $self->write_data ($_[0]) },
-      send_iq_cb   => sub { $self->event (send_iq_hook => @_) },
-      send_msg_cb  => sub { $self->event (send_message_hook => @_) },
-      send_pres_cb => sub { $self->event (send_presence_hook => @_) },
+      send_iq_cb   => sub { $self->event (send_iq_hook => @_); return },
+      send_msg_cb  => sub { $self->event (send_message_hook => @_); return },
+      send_pres_cb => sub { $self->event (send_presence_hook => @_); return },
    );
 
    $self->{parser}->set_stanza_cb (sub {
@@ -403,9 +403,9 @@ sub handle_stanza {
       return;
    }
 
-   my (@res) = $self->event (recv_stanza_xml => $node);
-   @res = grep $_, @res;
-   return if @res;
+   my $stop = 0;
+   $self->event (recv_stanza_xml => $node, \$stop);
+   $stop and return;
 
    my $def_ns = $self->default_namespace;
 
@@ -642,10 +642,9 @@ sub handle_iq {
       }
 
    } else {
-      my (@r) = $self->event ("iq_${type}_request_xml" => $node);
-      unless (grep { $_ } @r) {
-         $self->reply_iq_error ($node, undef, 'service-unavailable');
-      }
+      my $handled = 0;
+      $self->event ("iq_${type}_request_xml" => $node, \$handled);
+      $handled or $self->reply_iq_error ($node, undef, 'service-unavailable');
    }
 }
 
@@ -683,8 +682,7 @@ sub handle_stream_features {
 
    } elsif (not $self->{authenticated}) {
       my $continue = 1;
-      my (@ret) = $self->event (stream_pre_authentication => \$continue);
-      $continue = pop @ret if @ret;
+      $self->event (stream_pre_authentication => \$continue);
       if ($continue) {
          $self->authenticate;
       }
@@ -766,8 +764,7 @@ sub start_old_style_authentication {
         );
 
    my $continue = 1;
-   my (@ret) = $self->event (stream_pre_authentication => \$continue);
-   $continue = pop @ret if @ret;
+   $self->event (stream_pre_authentication => \$continue);
    if ($continue) {
       $self->do_iq_auth;
    }
@@ -1104,7 +1101,7 @@ C<$host> and C<$port> were the host and port we were connected to.
 Note: C<$host> and C<$port> might be different from the domain you passed to
 C<new> if C<connect> performed a SRV RR lookup.
 
-=item recv_stanza_xml => $node
+=item recv_stanza_xml => $node, $rstop
 
 This event is generated before any processing of a "XML" stanza happens.
 C<$node> is the node of the stanza that is being processed, it's of
@@ -1113,9 +1110,7 @@ type L<AnyEvent::XMPP::Node>.
 This method might not be as handy for debugging purposes as C<debug_recv>.
 
 If you want to handle the stanza yourself and don't want this module
-to take care of it return a true value from your registered callback.
-
-If any of the event callbacks return a true value this stanza will be ignored.
+to take care of it set a true value to the scalar referenced by C<$rstop>.
 
 =item send_stanza_data => $data
 
@@ -1197,17 +1192,17 @@ Please note that if you overtake handling of a stanza none of the internal
 handling of that stanza will be done. That means you won't get events
 like C<iq_set_request_xml> anymore.
 
-=item iq_set_request_xml => $node
+=item iq_set_request_xml => $node, $rhandled
 
-=item iq_get_request_xml => $node
+=item iq_get_request_xml => $node, $rhandled
 
 These events are sent when an iq request stanza of type 'get' or 'set' is received.
 C<$type> will either be 'get' or 'set' and C<$node> will be the L<AnyEvent::XMPP::Node>
 object of the iq tag.
 
-If one of the event callbacks returns a true value the IQ request will be
-considered as handled.
-If no callback returned a true value or no value at all an error iq will be generated.
+To signal the stanza was handled set the scalar referenced by C<$rhandled>
+to a true value.
+If the stanza was not handled an error iq will be generated.
 
 =item iq_result_cb_exception => $exception
 
