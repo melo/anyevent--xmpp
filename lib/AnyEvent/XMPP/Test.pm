@@ -221,7 +221,7 @@ sub end {
    AnyEvent->condvar->recv;
 }
 
-sub tp {
+sub tp($$$) {
    my ($nr, $cond, $desc) = @_;
    printf "%sok %d - %s\n", ($cond ? '' : 'not '), $nr, $desc;
 }

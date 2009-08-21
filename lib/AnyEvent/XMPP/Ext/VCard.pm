@@ -7,7 +7,7 @@ use MIME::Base64;
 use Digest::SHA1 qw/sha1_hex/;
 use Scalar::Util;
 use AnyEvent::XMPP::Namespaces qw/xmpp_ns/;
-use AnyEvent::XMPP::Util qw/prep_bare_jid/;
+use AnyEvent::XMPP::Util qw/prep_bare_jid new_iq new_reply/;
 
 use base qw/AnyEvent::XMPP::Ext/;
 
@@ -55,7 +55,10 @@ sub init {
    my ($self) = @_;
 
    # TODO: test
-   $self->{pres}->reg_cb (
+   $self->{extendable}->reg_cb (
+      source_available => sub {
+         my ($ext, $jid) = @_;
+      },
       generated_presence => sub {
          my ($pres, $node) = @_;
 
@@ -180,102 +183,69 @@ sub cache {
    $self->{cache}
 }
 
-sub _store {
-   my ($self, $con, $vcard_cb, $cb) = @_;
-
-   $con->send_iq (
-      set => sub {
-         my ($w) = @_;
-         $w->addPrefix (xmpp_ns ('vcard'), '');
-         $w->startTag ([xmpp_ns ('vcard'), 'vCard']);
-         $vcard_cb->($w);
-         $w->endTag;
-
-      }, sub {
-         my ($xmlnode, $error) = @_;
-
-         if ($error) {
-            $cb->($error);
-         } else {
-            $cb->();
-         }
-      }
-   );
-}
-
-=item B<store ($con, $vcard, $cb)>
+=item B<store ($src, $vcard, $cb)>
 
 This method will store your C<$vcard> on the connected server.
 C<$cb> is called when either an error occured or the storage was successful.
 If an error occured the first argument is not undefined and contains an
 L<AnyEvent::XMPP::Error::IQ> object.
 
-C<$con> should be a L<AnyEvent::XMPP::Connection> or an object from some derived class.
+C<$src> should be the source JID of one of your connected resources.
 
-C<$vcard> has a datastructure as described below in B<VCARD STRUCTURE>.
+C<$vcard> has a data structure as described below in B<VCARD STRUCTURE>.
 
 =cut
 
 sub store {
-   my ($self, $con, $vcard, $cb) = @_;
+   my ($self, $src, $vcard, $cb) = @_;
 
-   $self->_store ($con, sub {
-      my ($w) = @_;
-      $self->encode_vcard ($vcard, $w);
-   }, sub {
-      $cb->(@_);
-   });
+   my $vchld = $self->encode_vcard ($vcard);
+
+   $self->{extendable}->send (new_iq (
+      set =>
+         src => $src,
+      create => {
+         node => { dns => vcard => name => 'vCard', childs => $vchld }
+      }, cb => sub {
+         my ($n, $e) = @_;
+
+         $cb->($e);
+      }
+   ));
 }
 
-sub _retrieve {
-   my ($self, $con, $dest, $cb) = @_;
+=item B<retrieve ($src, $jid, $cb)>
 
-
-   $con->send_iq (
-      get => { defns => 'vcard', node => { ns => 'vcard', name => 'vCard' } },
-      sub {
-         my ($xmlnode, $error) = @_;
-
-         if ($error) {
-            $cb->(undef, undef, $error);
-
-         } else {
-            my ($vcard) = $xmlnode->find_all ([qw/vcard vCard/]);
-            my $jid = $dest || prep_bare_jid ($con->jid);
-            $vcard = $self->decode_vcard ($vcard);
-            if (prep_bare_jid ($jid) eq prep_bare_jid ($con->jid)) {
-               $self->{own_vcards}->{prep_bare_jid $con->jid} = $vcard;
-            }
-            $self->event (vcard => $jid, $vcard);
-            $cb->($jid, $vcard, $error);
-         }
-      },
-      (defined $dest ? (to => $dest) : ())
-   );
-}
-
-=item B<retrieve ($con, $jid, $cb)>
-
-This method will retrieve the vCard for C<$jid> via the connection C<$con>.
+This method will retrieve the vCard for C<$jid> via the source resource C<$src>.
 If C<$jid> is undefined the vCard of yourself is retrieved.
+
 The callback C<$cb> is called when an error occured or the vcard was retrieved.
-The first argument of the callback will be the JID to which the vCard belongs,
-the second argument is the vCard itself (as described in B<VCARD STRUCTURE> below)
-and the thrid argument is the error, if an error occured (undef otherwise).
+The first argument to C<$cb> is the vCard itself (as described in B<VCARD STRUCTURE>
+below) and the second argument is the error, if an error occured
+(undef otherwise).
 
 =cut
 
 sub retrieve {
-   my ($self, $con, $dest, $cb) = @_;
+   my ($self, $src, $jid, $cb) = @_;
 
-   $self->_retrieve ($con, $dest, sub {
-      my ($jid, $vc, $error) = @_;
+   $self->{extendable}->send (new_iq (
+      get =>
+         src => $src,
+         (defined $jid ? (to  => $jid) : ()),
+      create => { node => { dns => vcard => name => 'vCard' } },
+      cb => sub {
+         my ($n, $e) = @_;
 
-      if ($error) { $cb->(undef, $error); return }
-      else {
-         $cb->($jid, $vc);
+         if ($e) {
+            $cb->(undef, $e);
+         } else {
+            my ($vcard) = $n->find_all ([qw/vcard vCard/]);
+            $vcard = $self->decode_vcard ($vcard);
+            $cb->($vcard);
+         }
       }
-   });
+   ));
 }
 
 sub decode_vcard {
@@ -308,7 +278,7 @@ sub decode_vcard {
 }
 
 sub encode_vcard {
-   my ($self, $vcardh, $w) = @_;
+   my ($self, $vcardh) = @_;
 
    if ($vcardh->{_avatar}) {
       $vcardh->{PHOTO} = [
@@ -319,44 +289,43 @@ sub encode_vcard {
       ];
    }
 
+   my @childs;
+
    for my $ve (keys %$vcardh) {
       next if substr ($ve, 0, 1) eq '_';
 
-      for my $el (@{ref ($vcardh->{$ve}) eq 'ARRAY' ? $vcardh->{$ve} : [$vcardh->{$ve}]}) {
-
+      for my $el (
+         @{ref ($vcardh->{$ve}) eq 'ARRAY'
+              ? $vcardh->{$ve} : [$vcardh->{$ve}]}
+      ) {
          if (ref $el) {
-            $w->startTag ([xmpp_ns ('vcard'), $ve]);
-
-            for (keys %$el) {
-               if ((not defined $el->{$_}) || $el->{$_} eq '') {
-                  $w->emptyTag ([xmpp_ns ('vcard'), $_]);
-
-               } else {
-                  $w->startTag ([xmpp_ns ('vcard'), $_]);
-                  $w->characters ($el->{$_});
-                  $w->endTag;
+            push @childs,
+               {
+                  dns => 'vcard', name => $ve, childs => [
+                     map {
+                        (not (defined $el->{$_}) || $el->{$_} eq '')
+                           ? { dns => 'vcard', name => $_ }
+                           : { dns => 'vcard', name => $_,
+                               childs => [ $el->{$_} ] }
+                     } keys %$el
+                  ]
                }
-            }
-            $w->endTag;
 
          } elsif ((not defined $el) || $el eq '') {
-            $w->emptyTag ([xmpp_ns ('vcard'), $ve]);
+            push @childs, { dns => 'vcard', name => $ve }
 
          } else {
-            $w->startTag ([xmpp_ns ('vcard'), $ve]);
-            $w->characters ($el);
-            $w->endTag;
+            push @childs, { dns => 'vcard', name => $ve, childs => [ $el ] }
          }
       }
    }
+
+   \@childs
 }
 
 sub DESTROY {
    my ($self) = @_;
    $self->unreg_cb ($self->{cb_id});
-   for (@{$self->{hooked}}) {
-      $_->[0]->unreg_cb ($_->[1]) if defined $_->[0];
-   }
 }
 
 =back
@@ -420,7 +389,7 @@ The vcard extension will emit these events:
 =head1 TODO
 
 Implement caching, the cache stuff is just a storage hash at the moment.
-Or maybe drop it completly and let the application handle caching.
+Or maybe drop it completely and let the application handle caching.
 
 =over 4
 
