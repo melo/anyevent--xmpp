@@ -438,7 +438,10 @@ sub handle_stanza {
       $self->disconnect ('SASL authentication failure: ' . $error->string);
 
    } elsif ($node->eq ($def_ns => 'iq')) {
-      $self->event (iq_xml => $node);
+      my $iq = ($node->nodes)[0];
+      my $proto = $iq? $iq->namespace : undef;
+      
+      $self->event (iq_xml => $node, $proto);
 
    } elsif ($node->eq ($def_ns => 'message')) {
       $self->event (message_xml => $node);
@@ -615,10 +618,10 @@ sub _reply_iq {
 }
 
 sub handle_iq {
-   my ($self, $node) = @_;
+   my ($self, $node, $proto) = @_;
 
    my $type = $node->attr ('type');
-
+   
    my $id = $node->attr ('id');
    delete $self->{iq_timers}->{$id} if defined $id;
 
@@ -642,7 +645,7 @@ sub handle_iq {
       }
 
    } else {
-      my (@r) = $self->event ("iq_${type}_request_xml" => $node);
+      my (@r) = $self->event ("iq_${type}_request_xml" => $node, $proto);
       unless (grep { $_ } @r) {
          $self->reply_iq_error ($node, undef, 'service-unavailable');
       }

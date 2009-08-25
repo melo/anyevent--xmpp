@@ -35,6 +35,15 @@ sub add_extension {
    });
 }
 
+sub add_extension_cb {
+   my ($self, $ext) = @_;
+   
+   $ext->ext_added($self);
+   
+   return $self->add_extension($ext);
+}
+
+
 =item B<remove_extension ($ext)>
 
 This method removes the extension C<$ext>.
@@ -44,6 +53,14 @@ This method removes the extension C<$ext>.
 sub remove_extension {
    my ($self, $ext) = @_;
    $self->remove_forward ($ext);
+}
+
+sub remove_extension_cb {
+   my ($self, $ext) = @_;
+   
+   $ext->ext_removed($self);
+   
+   $self->remove_extension($ext);
 }
 
 
