@@ -21,6 +21,7 @@ WriteMakefile(
         'Object::Event'      => 0,
         'Time::Local'        => 0,
         'parent'             => 0,
+        'Test::More'         => 0.92,
     },
     dist                => {
        COMPRESS => 'gzip -9f',

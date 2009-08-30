@@ -17,7 +17,7 @@ our @EXPORT_OK = qw/resourceprep nodeprep prep_join_jid join_jid
                     from_xmpp_datetime to_xmpp_datetime to_xmpp_time
                     xmpp_datetime_as_timestamp
                     filter_xml_chars filter_xml_attr_hash_chars xml_escape
-                    new_iq new_reply new_error new_presence new_message
+                    new_iq new_reply new_error new_presence new_message new_iq_error_reply
                     xml_unescape extract_lang_element
                     /;
 our @ISA = qw/Exporter/;
@@ -870,6 +870,27 @@ sub new_error {
       }
    )
 }
+
+
+=item new_iq_error_reply($iq, $error, $type)
+
+Shortcut to create a reply with an error to an IQ stanza.
+
+=cut
+
+sub new_iq_error_reply {
+  my ($iq, $error, $type) = @_;
+  
+  return new_reply(
+    $iq,
+    type => 'error',
+    create => [
+      $iq->nodes,
+      new_error($iq, $error, $type),
+    ],
+  );
+}
+
 
 =item extract_lang_element ($node, $elementname, $struct)
 
