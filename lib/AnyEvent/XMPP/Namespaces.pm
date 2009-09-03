@@ -26,6 +26,8 @@ our %NAMESPACES = (
 
    iq_oob      => 'jabber:iq:oob',
    x_oob       => 'jabber:x:oob',
+   
+   ibb         => 'http://jabber.org/protocol/ibb',
 
    disco_info  => 'http://jabber.org/protocol/disco#info',
    disco_items => 'http://jabber.org/protocol/disco#items',
