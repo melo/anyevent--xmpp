@@ -38,13 +38,114 @@ my @test_cases = (
       ],
     }
   },
+
+  ### XEP-0115 second example (section 5.3)
+  'q07IKJEyjvHSyhy//CH0CxmKi8w=' => {
+    node => {
+      dns    => 'disco_info',
+      name   => 'query',
+      attrs  => [node => 'http://psi-im.org#q07IKJEyjvHSyhy//CH0CxmKi8w='],
+      childs => [
+        { name  => 'identity',
+          attrs => [
+            category => 'client',
+            type     => 'pc',
+            name     => 'Psi 0.11',
+            ['xml', 'lang'] => 'en',
+          ],
+        },
+        { name  => 'identity',
+          attrs => [
+            category => 'client',
+            type     => 'pc',
+            name     => 'Ψ 0.11',
+            ['xml', 'lang'] => 'el',
+          ],
+        },
+
+        { name  => 'feature',
+          attrs => [var => 'http://jabber.org/protocol/caps']
+        },
+        { name  => 'feature',
+          attrs => [var => 'http://jabber.org/protocol/disco#info']
+        },
+        { name  => 'feature',
+          attrs => [var => 'http://jabber.org/protocol/disco#items']
+        },
+        { name  => 'feature',
+          attrs => [var => 'http://jabber.org/protocol/muc']
+        },
+        { name   => 'x',
+          dns    => 'jabber:x:data',
+          attrs  => [type => 'result'],
+          childs => [
+            { name  => 'field',
+              attrs => [
+                var  => 'FORM_TYPE',
+                type => 'hidden',
+              ],
+              childs => [
+                { name   => 'value',
+                  childs => ['urn:xmpp:dataforms:softwareinfo'],
+                },
+              ]
+            },
+            { name   => 'field',
+              attrs  => [var => 'ip_version',],
+              childs => [
+                { name   => 'value',
+                  childs => ['ipv4'],
+                },
+                { name   => 'value',
+                  childs => ['ipv6'],
+                },
+              ]
+            },
+            { name   => 'field',
+              attrs  => [var => 'os',],
+              childs => [
+                { name   => 'value',
+                  childs => ['Mac'],
+                },
+              ]
+            },
+            { name   => 'field',
+              attrs  => [var => 'os_version',],
+              childs => [
+                { name   => 'value',
+                  childs => ['10.5.1'],
+                },
+              ]
+            },
+            { name   => 'field',
+              attrs  => [var => 'software',],
+              childs => [
+                { name   => 'value',
+                  childs => ['Psi'],
+                },
+              ]
+            },
+            { name   => 'field',
+              attrs  => [var => 'software_version',],
+              childs => [
+                { name   => 'value',
+                  childs => ['0.11'],
+                },
+              ]
+            },
+          ]
+        }
+      ],
+    }
+  },
+
 );
 
 ## Run over all tests
 while (@test_cases) {
   my ($wanted_ver, $spec) = splice(@test_cases, 0, 2);
   my $node = simxml(%$spec);
-  diag("Stanza is " . $node->as_string);
+#  diag("Stanza is " . $node->as_string);
   my $calc_ver = AnyEvent::XMPP::Ext::Caps::_ver_gen($node, 'sha-1');
   is($calc_ver, $wanted_ver);
 }
