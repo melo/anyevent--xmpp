@@ -20,6 +20,7 @@ WriteMakefile(
         'Digest::SHA1'       => 0,
         'Object::Event'      => 0,
         'Time::Local'        => 0,
+        'Test::More'         => 0.94, ## Required for done_testing()
     },
     dist                => {
        COMPRESS => 'gzip -9f',
