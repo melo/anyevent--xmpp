@@ -21,6 +21,10 @@ sub _ver_gen {
   my ($disco_info, $hash) = @_;
 
   my ($ids, $features, $forms) = _extract_ids_features_and_forms($disco_info);
+  
+  ### Section 5.4, bullets 3.4, 3.5
+  return if _has_dups($ids);
+  return if _has_dups($features);
 
   my $S = join('', sort @$ids, sort @$features, sort @$forms);
   utf8::encode($S);    ### Turns UTF-8 string into byte sequence
@@ -61,6 +65,14 @@ sub _extract_ids_features_and_forms {
   }
 
   return (\@ids, \@feats, \@forms);
+}
+
+sub _has_dups {
+  my $list = $_[0];
+  
+  my %dc = map { $_ => 1 } @$list;
+  return 0 if @$list == keys(%dc);
+  return 1;
 }
 
 1;

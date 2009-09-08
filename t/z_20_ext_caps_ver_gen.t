@@ -138,7 +138,63 @@ my @test_cases = (
       ],
     }
   },
+  
+  ### Violate section 5.4, bullet 3.3
+  undef, {
+    node => {
+      dns   => 'disco_info',
+      name  => 'query',
+      attrs => [
+        node => 'http://code.google.com/p/exodus#q07IKJEyjvHSyhy//CH0CxmKi8w='
+      ],
+      childs => [
+        { name  => 'identity',
+          attrs => [
+            category => 'client',
+            type     => 'pc',
+            name     => 'Exodus 0.9.1',
+          ],
+        },
+        { name  => 'identity',
+          attrs => [
+            category => 'client',
+            type     => 'pc',
+            name     => 'Exodus 0.9.1',
+          ],
+        },
+      ],
+    }
+  },
 
+  ### Violate section 5.4, bullet 3.3
+  undef, {
+    node => {
+      dns   => 'disco_info',
+      name  => 'query',
+      attrs => [
+        node => 'http://code.google.com/p/exodus#q07IKJEyjvHSyhy//CH0CxmKi8w='
+      ],
+      childs => [
+        { name  => 'identity',
+          attrs => [
+            category => 'client',
+            type     => 'pc',
+            name     => 'Exodus 0.9.1',
+            [xml => 'lang'] => 'en',
+          ],
+        },
+        { name  => 'identity',
+          attrs => [
+            category => 'client',
+            type     => 'pc',
+            name     => 'Exodus 0.9.1',
+            [xml => 'lang'] => 'en',
+          ],
+        },
+      ],
+    }
+  },
+  
 );
 
 ## Run over all tests
@@ -147,7 +203,18 @@ while (@test_cases) {
   my $node = simxml(%$spec);
 #  diag("Stanza is " . $node->as_string);
   my $calc_ver = AnyEvent::XMPP::Ext::Caps::_ver_gen($node, 'sha-1');
-  is($calc_ver, $wanted_ver);
+  if (defined ($wanted_ver)) {
+    ok(defined($calc_ver), "calc for '$wanted_ver' defined");
+    is($calc_ver, $wanted_ver);
+  }
+  else {
+    ok(!defined($calc_ver));
+  }
 }
+
+
+## Just make sure this works
+ok(AnyEvent::XMPP::Ext::Caps::_has_dups([1, 1, 2]));
+ok(!AnyEvent::XMPP::Ext::Caps::_has_dups([1, 2, 3]));
 
 done_testing();
