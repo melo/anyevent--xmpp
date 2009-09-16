@@ -88,6 +88,13 @@ work properly.
 =item $stream = AnyEvent::XMPP::Stream->new (%args)
 
 This is the constructor, you must call it from all subclasses you write.
+
+B<NOTE:> The C<$stream> object, as well, as all subclasses, guarantee you that
+you can use the C<heap> member of these objects, which stores a hash for you to
+store any data you want to associate with the stream. For example timers or
+anything else.  All subclasses should also take care that this member is not
+used for other purposes.
+
 C<%args> hash may contain these options:
 
 =over 4
@@ -123,8 +130,9 @@ sub new {
       default_stream_namespace => 'client',
       default_stream_lang      => 'en',
       stream_end_timeout       => 30,
-      enable_methods           => 1,
+      hash                     => { },
       @_
+      enable_methods           => 1,
    );
 
    $self->{default_stream_namespace} = xmpp_ns_maybe ($self->{default_stream_namespace});

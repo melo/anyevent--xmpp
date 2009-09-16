@@ -31,10 +31,15 @@ connections and managing multiple accounts.
 
 =over 4
 
-=item new (%args)
+=item my $im = AnyEvent::XMPP::IM->new (%args)
 
-This is the constructor for L<AnyEvent::XMPP::IM> and it takes these
-arguments in the argument hash C<%args>:
+This is the constructor for an L<AnyEvent::XMPP::IM> objects.
+
+The objects created by this class also provide you with a C<heap> member that
+stores a hash which lets you store some associated information.
+(See also L<AnyEvent::XMPP::Stream> about this.)
+
+It takes these arguments in the argument hash C<%args>:
 
 =over 4
 
@@ -53,6 +58,7 @@ sub new {
    my $class = ref($this) || $this;
    my $self  = $class->SUPER::new (
       initial_reconnect_interval => 5,
+      heap => { },
       @_,
       enable_methods => 1,
    );

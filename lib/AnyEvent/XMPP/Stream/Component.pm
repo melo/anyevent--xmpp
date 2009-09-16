@@ -77,11 +77,11 @@ for you.
 
 =over 4
 
-=item B<new (%args)>
+=item my $comp = AnyEvent::XMPP::Stream::Component->new (%args)
 
-This is the constructor. It takes the same arguments as
-the constructor of L<AnyEvent::XMPP::Stream> along with a
-few others:
+This is the constructor. It takes the same arguments and provides the same
+guarantees as the constructor of L<AnyEvent::XMPP::Stream> along with a few
+others:
 
 =over 4
 

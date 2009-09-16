@@ -73,7 +73,9 @@ L<AnyEvent::XMPP::IM>, which provides most of the features described in RFC
 
 =over 4
 
-=item $con = AnyEvent::XMPP::Stream->new (%args)
+=item $con = AnyEvent::XMPP::Stream::Client->new (%args)
+
+See also the notes about the constructor of L<AnyEvent::XMPP::Stream>.
 
 Following arguments can be passed in C<%args>:
 
