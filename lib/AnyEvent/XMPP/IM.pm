@@ -21,11 +21,13 @@ AnyEvent::XMPP::IM - An instant messaging connection
 
 =head2 DESCRIPTION
 
-This class implements functionality for RFC 3921 by using
-L<AnyEvent::XMPP::Connection> and adding some components.
+This class acts as highlevel XMPP client. It poses as
+connection manager to multiple XMPP accounts and does things
+such as reconnecting with exponential backoff.
 
-It also poses as connection manager, reconnecting lost
-connections and managing multiple accounts.
+It also will attach these extensions to itself:
+
+TODO
 
 =head2 METHODS
 
@@ -78,6 +80,14 @@ sub new {
    return $self
 }
 
+=item $im->send ($node)
+
+This method will send the XMPP stanza C<$node>. The connection
+that is used to send the message is determined by the meta value
+C<src> (See also L<AnyEvent::XMPP::Meta>).
+
+=cut
+
 sub send {
    my ($self, $node) = @_;
 
@@ -98,9 +108,13 @@ sub send {
    $con->send ($node);
 }
 
-sub recv {
-   my ($self, $node) = @_;
-}
+=item $im->add_account ($jid, $pw, %args)
+
+This method adds an account and will try to initiate a connection immediately.
+C<$jid> is the JID of the account, C<$pw> is the password and C<%args> are
+additional arguments to the L<AnyEvent::XMPP::Stream::Client> constructor.
+
+=cut
 
 sub add_account {
    my ($self, $jid, $password, %args) = @_;
@@ -110,13 +124,38 @@ sub add_account {
       password => $password,
       %args
    };
+
+   $self->update_connections;
 }
+
+=item $im->remove_account ($jid)
+
+This method removes the account C<$jid> and it's connection
+if it exists.
+
+=cut
 
 sub remove_account {
    my ($self, $jid) = @_;
 
    delete $self->{accs}->{prep_bare_jid $jid};
+   $self->remove_connection ($jid);
 }
+
+=item $im->set_accounts (%accs)
+
+This method sets a bunch of accounts that should be connected.
+The keys for the C<%accs> hash are the bare JIDs of the accounts.
+
+The value should be an array reference to an array where the first element is
+the password and the second element are additional arguments to the constructor
+of L<AnyEvent::XMPP::Stream::Client>.
+
+If you pass nothing at all to this function all currently connected accounts
+will be disconnected. Generally connections are not reconnected if their
+configuration changes. You will have to do that yourself.
+
+=cut
 
 sub set_accounts {
    my ($self, %accs) = @_;
@@ -193,6 +232,13 @@ sub spawn_connection {
    $conhdl->{con}->connect;
 }
 
+=item $im->remove_connection ($jid)
+
+This method will forcefully remove the connection for the account C<$jid> and
+reconnect it.
+
+=cut
+
 sub remove_connection {
    my ($self, $jid) = @_;
 
@@ -218,6 +264,15 @@ sub update_connections {
       }
    }
 }
+
+=item my $con = $im->get_connection ($jid)
+
+Returns the L<AnyEvent::XMPP::Stream::Client> object
+for the account C<$jid>.
+
+Returns undef if no such connection exists.
+
+=cut
 
 sub get_connection {
    my ($self, $jid) = @_;
@@ -306,6 +361,7 @@ sub disconnected {
 
 sub source_available   { }
 sub source_unavailable { }
+sub recv { }
 
 =back
 
