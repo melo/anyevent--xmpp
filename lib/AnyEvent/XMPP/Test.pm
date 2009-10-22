@@ -11,7 +11,7 @@ require Exporter;
 our @ISA = qw/Exporter/;
 
 our @EXPORT = qw/$COMP_HOST $COMP_PORT $HOST $PORT $SECRET $SERVICE $JID1
-                 $JID2 $FJID1 $FJID2 $PASS @DEF_HANDLERS &tp/;
+                 $JID2 $FJID1 $FJID2 $PASS @DEF_HANDLERS &tp &cvreg/;
 
 =head1 NAME
 
@@ -224,6 +224,17 @@ sub end {
 sub tp($$$) {
    my ($nr, $cond, $desc) = @_;
    printf "%sok %d - %s\n", ($cond ? '' : 'not '), $nr, $desc;
+}
+
+sub cvreg {
+   my ($obj, $ev) = @_;
+   my $cv = AE::cv;
+   $obj->reg_cb ($ev => sub {
+      my ($obj, @r) = @_;
+      $obj->unreg_me;
+      $cv->(@r);
+   });
+   $cv
 }
 
 =back

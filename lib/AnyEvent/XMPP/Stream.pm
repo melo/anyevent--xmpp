@@ -131,7 +131,7 @@ sub new {
       default_stream_lang      => 'en',
       stream_end_timeout       => 30,
       hash                     => { },
-      @_
+      @_,
       enable_methods           => 1,
    );
 

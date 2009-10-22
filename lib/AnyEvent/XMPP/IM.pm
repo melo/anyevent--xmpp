@@ -95,7 +95,7 @@ sub send {
    $src_jid = $node->attr ('from') unless defined $src_jid;
    unless (defined $src_jid) {
       my ($any) = (values %{$self->{conns}});
-      $src_jid = $any->{con}->jid if $any
+      $src_jid = $any->jid if $any
    }
 
    my $con = $self->get_connection ($src_jid);
@@ -149,7 +149,7 @@ The keys for the C<%accs> hash are the bare JIDs of the accounts.
 
 The value should be an array reference to an array where the first element is
 the password and the second element are additional arguments to the constructor
-of L<AnyEvent::XMPP::Stream::Client>.
+of L<AnyEvent::XMPP::Stream::Client> as hash reference.
 
 If you pass nothing at all to this function all currently connected accounts
 will be disconnected. Generally connections are not reconnected if their
@@ -173,10 +173,10 @@ sub set_accounts {
 sub _install_retry {
    my ($conhdl) = @_;
 
-   $conhdl->{timeout} *= 2;
-   $conhdl->{timer} =
-      AnyEvent->timer (after => $conhdl->{timeout}, cb => sub {
-         $conhdl->{con}->connect;
+   $conhdl->{imhp}->{timeout} *= 2;
+   $conhdl->{imhp}->{timer} =
+      AnyEvent->timer (after => $conhdl->{imhp}->{timeout}, cb => sub {
+         $conhdl->connect;
       });
 }
 
@@ -185,17 +185,16 @@ sub spawn_connection {
 
    $jid = prep_bare_jid $jid;
 
-   my $conhdl = $self->{conns}->{$jid} = {
-      con => AnyEvent::XMPP::Stream::Client->new (%{$self->{accs}->{$jid}}),
-      timeout => $self->{initial_reconnect_interval},
-   };
+   my $conhdl = $self->{conns}->{$jid} =
+      AnyEvent::XMPP::Stream::Client->new (%{$self->{accs}->{$jid}});
+   $conhdl->{imhp}->{timeout} = $self->{initial_reconnect_interval};
 
-   $conhdl->{regid} = $conhdl->{con}->reg_cb (
+   $conhdl->{imhp}->{regid} = $conhdl->reg_cb (
       stream_ready => sub {
          my ($con, $njid) = @_;
 
-         $conhdl->{timeout} = $self->{initial_reconnect_interval};
-         delete $conhdl->{timer};
+         $conhdl->{imhp}->{timeout} = $self->{initial_reconnect_interval};
+         delete $conhdl->{imhp}->{timer};
 
          $self->connected ($con->jid, $con->{peer_host}, $con->{peer_port});
       },
@@ -204,7 +203,7 @@ sub spawn_connection {
 
          _install_retry ($conhdl);
 
-         $self->connect_error ($jid, $msg, $conhdl->{timeout});
+         $self->connect_error ($jid, $msg, $conhdl->{imhp}->{timeout});
       },
       error => sub {
          my ($con, $error) = @_;
@@ -221,7 +220,7 @@ sub spawn_connection {
 
          _install_retry ($conhdl);
 
-         $self->disconnected ($jid, $h, $p, $reason, $conhdl->{timeout});
+         $self->disconnected ($jid, $h, $p, $reason, $conhdl->{imhp}->{timeout});
       },
       source_unavailable => sub {
          my ($con, $jid) = @_;
@@ -229,7 +228,7 @@ sub spawn_connection {
       }
    );
 
-   $conhdl->{con}->connect;
+   $conhdl->connect;
 }
 
 =item $im->remove_connection ($jid)
@@ -244,9 +243,9 @@ sub remove_connection {
 
    $jid = prep_bare_jid $jid;
    my $c = delete $self->{conns}->{$jid};
-   $c->{con}->disconnect ('removed account');
-   $c->{con}->unreg_cb ($c->{regid});
-   delete $c->{con};
+   $c->disconnect ('removed account');
+   $c->unreg_cb ($c->{imhp}->{regid});
+   delete $c->{imhp};
 }
 
 sub update_connections {
@@ -278,8 +277,7 @@ sub get_connection {
    my ($self, $jid) = @_;
    my $c = $self->{conns}->{prep_bare_jid $jid}
       or return;
-   $c = $c->{con};
-   $c->is_ready 
+   $c->is_ready
       or return;
    $c
 }
