@@ -17,6 +17,7 @@ t/tokenizer.t
 t/z_01_stream.t
 t/z_02_component.t
 t/z_03_register.t
+t/z_04_cm.t
 t/z_04_iq.t
 t/z_05_component_ext.t
 t/z_05_ext_ping.t
@@ -40,7 +41,7 @@ lib/AnyEvent/XMPP/Ext/MsgTracker.pm
 lib/AnyEvent/XMPP/Ext/Presence.pm
 lib/AnyEvent/XMPP/Ext/Roster.pm
 lib/AnyEvent/XMPP/Ext/Skel.pm
-lib/AnyEvent/XMPP/IM.pm
+lib/AnyEvent/XMPP/CM.pm
 lib/AnyEvent/XMPP/IQTracker.pm
 lib/AnyEvent/XMPP/Meta.pm
 lib/AnyEvent/XMPP/ResourceManager.pm

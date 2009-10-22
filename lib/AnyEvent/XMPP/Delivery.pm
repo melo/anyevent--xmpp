@@ -68,7 +68,7 @@ register to the C<before_recv> event and NOT stop the stanza.
 
 These two events are a bit special, in that kind of sense that only
 some kinds of Objects (usually L<AnyEvent::XMPP::Stream::Client> and
-L<AnyEvent::XMPP::IM>) emit them, to signal availability of routing
+L<AnyEvent::XMPP::CM>) emit them, to signal availability of routing
 sources. C<$jid> contains the routing source that became available, which
 is usually the JID of some client resource which connected, authenticated
 and successfully bound on a XML Stream.

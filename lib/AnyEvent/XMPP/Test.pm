@@ -3,7 +3,7 @@ use strict;
 no warnings;
 
 use Test::More;
-use AnyEvent::XMPP::IM;
+use AnyEvent::XMPP::CM;
 use AnyEvent::XMPP::Util qw/cmp_jid cmp_bare_jid new_presence stringprep_jid/;
 use Time::HiRes qw/usleep/;
 
@@ -97,7 +97,7 @@ sub start {
       $cnt = 2;
    }
 
-   my $im = AnyEvent::XMPP::IM->new (initial_reconnect_interval => 180);
+   my $im = AnyEvent::XMPP::CM->new (initial_reconnect_interval => 180);
 
    my @aexts;
    my $two_accs = $cnt > 1;

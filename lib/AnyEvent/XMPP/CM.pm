@@ -1,4 +1,4 @@
-package AnyEvent::XMPP::IM;
+package AnyEvent::XMPP::CM;
 use strict;
 no warnings;
 use AnyEvent::XMPP::Util qw/prep_bare_jid new_iq new_presence stringprep_jid/;
@@ -15,7 +15,7 @@ our $DEBUG = 0;
 
 =head1 NAME
 
-AnyEvent::XMPP::IM - An instant messaging connection
+AnyEvent::XMPP::CM - An instant messaging connection manager
 
 =head1 SYNOPSIS
 
@@ -25,17 +25,13 @@ This class acts as highlevel XMPP client. It poses as
 connection manager to multiple XMPP accounts and does things
 such as reconnecting with exponential backoff.
 
-It also will attach these extensions to itself:
-
-TODO
-
 =head2 METHODS
 
 =over 4
 
-=item my $im = AnyEvent::XMPP::IM->new (%args)
+=item my $im = AnyEvent::XMPP::CM->new (%args)
 
-This is the constructor for an L<AnyEvent::XMPP::IM> objects.
+This is the constructor for an L<AnyEvent::XMPP::CM> objects.
 
 The objects created by this class also provide you with a C<heap> member that
 stores a hash which lets you store some associated information.
@@ -71,7 +67,7 @@ sub new {
       ext_after_error => sub {
          my ($self, $jid, $error) = @_;
 
-         warn "unhandled error in AnyEvent::XMPP::IM: " . $error->string . "."
+         warn "unhandled error in AnyEvent::XMPP::CM: " . $error->string . "."
               ." Please read the documentation of the 'error' event, to inhibit this"
               ." warning!\n";
       }
@@ -293,7 +289,7 @@ These events are emitted by this object via the L<Object::Event> API:
 =item connected => $jid, $peer_host, $peer_port
 
 This event is generated when the XMPP session for the account C<$jid>
-was initiated and everything is ready to send IM stanzas (iq, presence, messages).
+was initiated and everything is ready to send CM stanzas (iq, presence, messages).
 
 =cut
 

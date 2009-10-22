@@ -12,7 +12,7 @@ AnyEvent::XMPP::Ext::Ping - Implementation of XMPP Ping XEP-0199
 
 =head1 SYNOPSIS
 
-   my $con = AnyEvent::XMPP::IM->new (...);
+   my $con = AnyEvent::XMPP::CM->new (...);
    my $ext = $con->add_ext ('Ping');
    $ext->auto_timeout (10);
 
@@ -53,7 +53,7 @@ C<enable_timeout> (see below) for every new source that became available
 (see C<source_available> event of the L<AnyEvent::XMPP::Delivery> interface).
 
 This is useful if you want connections that have this extension automatically
-timeouted. In particular this is useful with classes like L<AnyEvent::XMPP::IM>
+timeouted. In particular this is useful with classes like L<AnyEvent::XMPP::CM>
 and L<AnyEvent::XMPP::Stream::Client>.
 
 =cut

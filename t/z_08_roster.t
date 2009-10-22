@@ -5,7 +5,7 @@ no warnings;
 
 use AnyEvent;
 use AnyEvent::XMPP::Test;
-use AnyEvent::XMPP::IM;
+use AnyEvent::XMPP::CM;
 use AnyEvent::XMPP::Util qw/split_jid cmp_bare_jid new_iq new_message
                            new_presence bare_jid cmp_jid/;
 use AnyEvent::XMPP::Node qw/simxml/;
@@ -17,7 +17,7 @@ AnyEvent::XMPP::Test::check ('client');
 print "1..8\n";
 
 my $ROST;
-my $IM;
+my $CM;
 
 sub clean {
    my $cb = shift;
@@ -81,7 +81,7 @@ my $tout =
    });
 
 
-($IM, $ROST) = $connected->recv;
+($CM, $ROST) = $connected->recv;
 
 $_->recv for ($roster_jid1_fetched, $roster_jid2_fetched);
 
@@ -200,7 +200,7 @@ clean ($cleanup_done);
 
 $cleanup_done->send;
 
-$IM->get_connection ($FJID1)->send_end;
+$CM->get_connection ($FJID1)->send_end;
 
 $roster1_empty->recv;
 
@@ -208,4 +208,4 @@ tp (8, $ROST->item_jids ($FJID1) == 0, "first roster empty");
 
 undef $tout;
 
-AnyEvent::XMPP::Test::end ($IM);
+AnyEvent::XMPP::Test::end ($CM);

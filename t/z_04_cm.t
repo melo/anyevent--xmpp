@@ -5,7 +5,7 @@ no warnings;
 
 use AnyEvent;
 use AnyEvent::XMPP::Test;
-use AnyEvent::XMPP::IM;
+use AnyEvent::XMPP::CM;
 use AnyEvent::XMPP::Util qw/cmp_bare_jid/;
 use JSON -convert_blessed_universally;
 
@@ -13,7 +13,7 @@ AnyEvent::XMPP::Test::check ('client');
 
 print "1..2\n";
 
-my $im = AnyEvent::XMPP::IM->new;
+my $im = AnyEvent::XMPP::CM->new;
 
 $im->set_accounts ($JID1 => [$PASS, { host => $HOST, port => $PORT }]);
 

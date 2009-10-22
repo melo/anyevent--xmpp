@@ -14,8 +14,8 @@ AnyEvent::XMPP::Ext - Extension baseclass and documentation
 This module also has documentation about the supported extensions
 and also is a base class for all extensions that can be added
 via the C<add_extension> method of the classes that derive from
-L<AnyEvent::XMPP::Extendable>. (That are: L<AnyEvent::XMPP::Client>,
-L<AnyEvent::XMPP::Connection> and L<AnyEvent::XMPP::IM::Connection>)
+L<AnyEvent::XMPP::Extendable>. (That are for example:
+L<AnyEvent::XMPP::Stream> (and derived classes), L<AnyEvent::XMPP::CM>).
 
 =head1 Methods
 
@@ -164,15 +164,7 @@ extension implements a connection timeout mechanism based on this.
 =item XEP-0203 - Delayed Delivery (Version 1.0)
 
 Both delayed delivery XEPs are supported and are implemented by
-L<AnyEvent::XMPP::IM::Delayed> which is a super class of L<AnyEvent::XMPP::IM::Message>
-and L<AnyEvent::XMPP::IM::Presence>.
-
-If you need to fetch delay from stanzas you caught yourself in an event you
-can use a L<AnyEvent::XMPP::IM::Delayed> object to parse/fetch the delay out of the
-L<AnyEvent::XMPP::Node>.
-
-Use the functions described above in the XEP-0082 item to decode the timestamps
-of delays.
+L<AnyEvent::XMPP::Ext::Delay>.
 
 =back
 

@@ -5,7 +5,7 @@ AnyEvent::XMPP::Parser
 AnyEvent::XMPP::Stream
 AnyEvent::XMPP::Stream::Client
 AnyEvent::XMPP::Stream::Component
-AnyEvent::XMPP::IM
+AnyEvent::XMPP::CM
 AnyEvent::XMPP::Error
 AnyEvent::XMPP::Node
 AnyEvent::XMPP

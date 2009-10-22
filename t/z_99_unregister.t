@@ -4,7 +4,7 @@ no warnings;
 
 use AnyEvent;
 use AnyEvent::XMPP::Test;
-use AnyEvent::XMPP::IM;
+use AnyEvent::XMPP::CM;
 use AnyEvent::XMPP::Ext::Registration;
 use AnyEvent::XMPP::Util qw/split_jid cmp_bare_jid new_iq/;
 use AnyEvent::XMPP::Node qw/simxml/;
@@ -12,7 +12,7 @@ use AnyEvent::XMPP::Node qw/simxml/;
 AnyEvent::XMPP::Test::check ('client');
 
 my $cv = AnyEvent->condvar;
-my $im = AnyEvent::XMPP::IM->new;
+my $im = AnyEvent::XMPP::CM->new;
 
 my $cnt = 2;
 my $n = 0;

@@ -5,7 +5,7 @@ no warnings;
 
 use AnyEvent;
 use AnyEvent::XMPP::Test;
-use AnyEvent::XMPP::IM;
+use AnyEvent::XMPP::CM;
 use AnyEvent::XMPP::Util qw/split_jid cmp_bare_jid new_iq new_message
                            new_presence bare_jid cmp_jid/;
 use AnyEvent::XMPP::Node qw/simxml/;

@@ -52,7 +52,8 @@ AnyEvent::XMPP::Stream - XMPP client stream (RFC 3920).
 
 =head1 DESCRIPTION
 
-This module represents a XMPP stream as described in RFC 3920.
+This module represents a XMPP stream as described in RFC 3920
+with additional support for instant messaging session like described in RFC 3921.
 
 It implements the L<AnyEvent::XMPP::Delivery> interface for stanza delivery.
 It's a subclass of L<AnyEvent::XMPP::Stream> and it inherits the event
@@ -66,8 +67,8 @@ L<AnyEvent::XMPP::Ext> extensions.
 This module only handles basic XMPP stream connecting, authentication and
 resource binding and not advanced stuff like roster management, presence
 handling and account management. For a more advanced class see
-L<AnyEvent::XMPP::IM>, which provides most of the features described in RFC
-3921.
+L<AnyEvent::XMPP::Client> and the extensions for handling roster, presence
+and other stuff.
 
 =head1 METHODS
 
