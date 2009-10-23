@@ -15,7 +15,7 @@ use JSON -convert_blessed_universally;
 
 AnyEvent::XMPP::Test::check ('client');
 
-print "1..6\n";
+print "1..3\n";
 
 my $connected = AnyEvent->condvar;
 

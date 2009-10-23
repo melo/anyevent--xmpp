@@ -14,17 +14,10 @@ AnyEvent::XMPP::StanzaHandler - A stanza handler super class for clients
    package MyCon;
    use base qw/AnyEvent::XMPP::Stream AnyEvent::XMPP::StanzaHandler/;
 
-   __PACKAGE__->inherit_event_methods_from (qw/
-      AnyEvent::XMPP::Stream
-      AnyEvent::XMPP::StanzaHandler
-   /);
-
    sub new {
       my $this  = shift;
       my $class = ref($this) || $this;
       my $self = $class->AnyEvent::XMPP::Stream::new (@_);
-
-      AnyEvent::XMPP::StanzaHandler::init ($self);
 
       $self
    }
@@ -56,87 +49,68 @@ three major stanza types: message, presence and IQ (requests).
 Along with that it will provide some means to say that a stanza was 'handled'
 and in some cases it will provide default behavior if a stanza was not handled.
 
-=head1 METHODS
-
-=over 4
-
-=item B<new (%args)>
-
 =cut
 
-sub init {
-   my ($self) = @_;
+sub send : event_cb(-100) {
+   my ($delivery, $node) = @_;
+   my $t = $node->meta->{type};
 
-   $self->reg_cb (
-      send => -100 => sub {
-         my ($delivery, $node) = @_;
-         my $t = $node->meta->{type};
-         
-         if ($t eq 'presence') {
-            $delivery->event (send_presence => $node);
+   if ($t eq 'presence') {
+      $delivery->event (send_presence => $node);
 
-         } elsif ($t eq 'message') {
-            $delivery->event (send_message => $node);
+   } elsif ($t eq 'message') {
+      $delivery->event (send_message => $node);
 
-         } elsif ($t eq 'iq') {
-            my $iq_t = $node->attr ('type');
-            
-            if ($iq_t eq 'set' || $iq_t eq 'get') {
-               $delivery->event (send_iq => $node);
+   } elsif ($t eq 'iq') {
+      my $iq_t = $node->attr ('type');
 
-            } else {
-               $delivery->event (send_iq_reply => $node);
-            }
-         }
-      },
-      recv => -100 => sub {
-         my ($delivery, $node) = @_;
-         my $t = $node->meta->{type};
+      if ($iq_t eq 'set' || $iq_t eq 'get') {
+         $delivery->event (send_iq => $node);
 
-         if ($t eq 'presence') {
-            $delivery->event (recv_presence => $node);
-
-         } elsif ($t eq 'message') {
-            $delivery->event (recv_message => $node);
-
-         } elsif ($t eq 'iq') {
-            my $iq_t = $node->attr ('type');
-
-            if ($iq_t eq 'set' || $iq_t eq 'get') {
-               $delivery->event (recv_iq => $node);
-
-            } else {
-               $delivery->event (recv_iq_reply => $node);
-            }
-         }
-      },
-      ext_after_recv_iq => sub {
-         my ($delivery, $node) = @_;
-
-         my $errnode = new_reply (
-            $node,
-            create => [
-               $node->nodes,
-               new_error ($node, 'service-unavailable')
-            ],
-            type => 'error'
-         );
-
-         $errnode->refresh_meta;
-
-         $delivery->send ($errnode);
+      } else {
+         $delivery->event (send_iq_reply => $node);
       }
-   );
+   }
 }
 
-=back
+sub recv : event_cb(-100) {
+   my ($delivery, $node) = @_;
+   my $t = $node->meta->{type};
 
-=cut
+   if ($t eq 'presence') {
+      $delivery->event (recv_presence => $node);
 
-__PACKAGE__->hand_event_methods_down (qw/
-   recv_presence recv_message recv_iq recv_iq_reply
-   send_presence send_message send_iq send_iq_reply
-/);
+   } elsif ($t eq 'message') {
+      $delivery->event (recv_message => $node);
+
+   } elsif ($t eq 'iq') {
+      my $iq_t = $node->attr ('type');
+
+      if ($iq_t eq 'set' || $iq_t eq 'get') {
+         $delivery->event (recv_iq => $node);
+
+      } else {
+         $delivery->event (recv_iq_reply => $node);
+      }
+   }
+}
+
+sub recv_iq : event_cb(ext_after) {
+   my ($delivery, $node) = @_;
+
+   my $errnode = new_reply (
+      $node,
+      create => [
+         $node->nodes,
+         new_error ($node, 'service-unavailable')
+      ],
+      type => 'error'
+   );
+
+   $errnode->refresh_meta;
+
+   $delivery->send ($errnode);
+}
 
 =head1 EVENTS
 

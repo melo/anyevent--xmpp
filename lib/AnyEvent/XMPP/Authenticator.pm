@@ -40,7 +40,7 @@ C<$con>.
 sub new {
    my $this  = shift;
    my $class = ref($this) || $this;
-   my $self  = $class->SUPER::new (@_, enable_methods => 1);
+   my $self  = $class->SUPER::new (@_);
 
    $self->{regid} =
       $self->{connection}->reg_cb (
@@ -314,7 +314,7 @@ needs to be reinitiated (because we are finished with SASL authentication).
 
 =cut
 
-sub auth { }
+sub auth : event_cb { }
 
 =item auth_fail => $error
 
@@ -324,7 +324,7 @@ object or an L<AnyEvent::XMPP::Error::SASL> object (see below).
 
 =cut
 
-sub auth_fail { }
+sub auth_fail : event_cb { }
 
 =back
 

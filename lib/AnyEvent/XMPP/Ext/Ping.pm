@@ -245,6 +245,10 @@ These events are emitted by this extension:
 
 Please consult the C<enable_timeout> method for documentation of this event.
 
+=cut
+
+sub ping_timeout : event_cb { }
+
 =back
 
 =head1 AUTHOR

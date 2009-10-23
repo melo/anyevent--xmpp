@@ -4,17 +4,8 @@ no warnings;
 use AnyEvent::XMPP::Util qw/prep_bare_jid new_iq new_presence stringprep_jid dump_twig_xml/;
 use AnyEvent::XMPP::Stream::Client;
 use AnyEvent::XMPP::Node qw/simxml/;
+use Object::Event;
 use base qw/Object::Event AnyEvent::XMPP::StanzaHandler AnyEvent::XMPP::Extendable/;
-
-__PACKAGE__->inherit_event_methods_from (qw/
-   AnyEvent::XMPP::StanzaHandler
-   AnyEvent::XMPP::Extendable
-/);
-
-__PACKAGE__->hand_event_methods_down_from (qw/
-   AnyEvent::XMPP::StanzaHandler
-   AnyEvent::XMPP::Extendable
-/);
 
 our $DEBUG = 0;
 
@@ -52,7 +43,8 @@ It takes these arguments in the argument hash C<%args>:
 
 =item initial_reconnect_interval => $seconds
 
-TODO
+This is the initial reconnect interval time that is used
+as timeout for the first retry.
 
 Default: 5 seconds
 
@@ -67,10 +59,7 @@ sub new {
       initial_reconnect_interval => 5,
       heap => { },
       @_,
-      enable_methods => 1,
    );
-
-   AnyEvent::XMPP::StanzaHandler::init ($self);
 
    $self->reg_cb (
       ext_after_error => sub {
@@ -93,8 +82,7 @@ C<src> (See also L<AnyEvent::XMPP::Meta>).
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/send/);
-sub send {
+sub send : event_cb {
    my ($self, $node) = @_;
 
    my $src_jid = $node->meta->{src};
@@ -370,8 +358,7 @@ was initiated and everything is ready to send CM stanzas (iq, presence, messages
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/connected/);
-sub connected {
+sub connected : event_cb {
    my ($self, $jid, $ph, $pp) = @_;
 
    $self->source_available (stringprep_jid $jid);
@@ -390,8 +377,7 @@ FIXME: Put error event doc from ::Stream here.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/error/);
-sub error {
+sub error : event_cb {
    my ($self, $jid, $error) = @_;
 
    if ($DEBUG) {
@@ -407,8 +393,7 @@ C<$reconnect_timeout> seconds.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/disconnected/);
-sub disconnected {
+sub disconnected : event_cb {
    my ($self, $jid, $ph, $pp, $reason, $recontout) = @_;
 
    if ($DEBUG && $reason !~ /expected stream end/) {
@@ -425,8 +410,7 @@ or some other specialized stuff.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/spawned/);
-sub spawned {
+sub spawned : event_cb {
    my ($self, $jid, $con) = @_;
    $self->install_debug_logs;
 }
@@ -443,16 +427,12 @@ C<$text> is the text of the stanza.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/debug_log/);
-sub debug_log {
+sub debug_log : event_cb {
 }
 
-__PACKAGE__->hand_event_methods_down (qw/
-   source_available source_unavailable recv
-/);
-sub source_available   { }
-sub source_unavailable { }
-sub recv { }
+sub source_available : event_cb   { }
+sub source_unavailable : event_cb { }
+sub recv : event_cb { }
 
 =back
 

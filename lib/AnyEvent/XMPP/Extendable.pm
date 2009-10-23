@@ -17,17 +17,10 @@ AnyEvent::XMPP::Extendable - Superclass for extendable things.
       AnyEvent::XMPP::Extendable
    /;
 
-   __PACKAGE__->inherit_event_methods_from (qw/
-      AnyEvent::XMPP::Stream
-      AnyEvent::XMPP::StanzaHandler
-      AnyEvent::XMPP::Extendable
-   /);
-
    sub new {
       my $this  = shift;
       my $class = ref($this) || $this;
       my $self = $class->AnyEvent::XMPP::Stream::new (@_);
-      AnyEvent::XMPP::StanzaHandler::init ($self);
       $self
    }
 

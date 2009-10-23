@@ -13,18 +13,6 @@ use base qw/
    AnyEvent::XMPP::Extendable
 /;
 
-__PACKAGE__->inherit_event_methods_from (qw/
-   AnyEvent::XMPP::Stream
-   AnyEvent::XMPP::StanzaHandler
-   AnyEvent::XMPP::Extendable
-/);
-
-__PACKAGE__->hand_event_methods_down_from (qw/
-   AnyEvent::XMPP::Stream
-   AnyEvent::XMPP::StanzaHandler
-   AnyEvent::XMPP::Extendable
-/);
-
 =head1 NAME
 
 AnyEvent::XMPP::Stream::Component - "XML" stream that implements the XEP-0114
@@ -140,8 +128,6 @@ sub new {
       );
    }
 
-   AnyEvent::XMPP::StanzaHandler::init ($self);
-
    $self->reg_cb (
       send => -400 => sub {
          my ($self, $node) = @_;
@@ -189,8 +175,7 @@ sub jid {
    $self->{jid}
 }
 
-__PACKAGE__->hand_event_methods_down (qw/recv/);
-sub recv {
+sub recv : event_cb {
    my ($self, $node) = @_;
 
    unless ($self->{authenticated}) {
@@ -225,26 +210,22 @@ and can now be used to transmit stanzas.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/stream_ready/);
-sub stream_ready {
+sub stream_ready : event_cb {
    my ($self) = @_;
 
    $self->source_available (stringprep_jid $self->{jid});
 }
 
-__PACKAGE__->hand_event_methods_down (qw/disconnected/);
-sub disconnected {
+sub disconnected : event_cb {
    my ($self) = @_;
 
    $self->source_unavailable (stringprep_jid $self->{jid});
 }
 
-__PACKAGE__->hand_event_methods_down (qw/source_available/);
-sub source_available {
+sub source_available : event_cb {
 }
 
-__PACKAGE__->hand_event_methods_down (qw/source_unavailable/);
-sub source_unavailable {
+sub source_unavailable : event_cb {
 }
 
 =back

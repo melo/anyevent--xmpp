@@ -132,7 +132,6 @@ sub new {
       stream_end_timeout       => 30,
       hash                     => { },
       @_,
-      enable_methods           => 1,
    );
 
    $self->{default_stream_namespace} = xmpp_ns_maybe ($self->{default_stream_namespace});
@@ -216,41 +215,6 @@ sub new {
       );
    });
 
-   $self->reg_cb (
-      ext_after_send => sub {
-         my ($self, $node) = @_;
-
-         if ($node->meta->sent_cbs) {
-            push @{$self->{write_done_queue}}, $node->meta->sent_cbs
-         }
-
-         if ((defined $node->meta->{lang})
-             && $node->meta->{lang} ne $self->{default_stream_lang}) {
-
-            $node->attr_ns (xml => lang => $node->{meta}->{lang});
-         }
-
-         $node->meta->{lang} = $self->{default_stream_lang}
-            unless defined $node->meta->{lang};
-
-         $self->write_data (
-            my $stanza_data =
-               $node->as_string (0, {
-                  %{$self->{namespace_prefixes}},
-                  STREAM_NS => $self->{default_stream_namespace}
-               })
-         );
-
-         $self->sent_stanza_xml ($stanza_data);
-      },
-      ext_after_error => sub {
-         my ($self, $error) = @_;
-
-         warn "unhandled error in AnyEvent::XMPP::Stream: " . $error->string . "."
-              ." Please read the documentation of the 'error' event, to inhibit this"
-              ." warning!\n";
-      }
-   );
 
    return $self
 }
@@ -616,8 +580,13 @@ Here is an example:
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/error/);
-sub error { }
+sub error : event_cb(ext_after) {
+   my ($self, $error) = @_;
+
+   warn "unhandled error in AnyEvent::XMPP::Stream: " . $error->string . "."
+        ." Please read the documentation of the 'error' event, to inhibit this"
+        ." warning!\n";
+}
 
 =item connected => $peer_host, $peer_port
 
@@ -627,8 +596,7 @@ are the hostname and port number of the other TCP endpoint.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/connected/);
-sub connected { 
+sub connected : event_cb {
    my ($self, $ph, $pp) = @_;
 
    if ($DEBUG) {
@@ -645,8 +613,7 @@ couldn't be made.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/connect_error/);
-sub connect_error {
+sub connect_error : event_cb {
    my ($self, $str) = @_;
 
    if ($DEBUG) {
@@ -660,8 +627,7 @@ This event is emitted when the connection disconnected for some C<$reason>.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/disconnected/);
-sub disconnected {
+sub disconnected : event_cb {
    my ($self, $ph, $pp, $reas) = @_;
 
    if ($DEBUG && $reas !~ /expected stream end/) {
@@ -677,8 +643,7 @@ an L<AnyEvent::XMPP::Node> object.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/stream_start/);
-sub stream_start { }
+sub stream_start : event_cb { }
 
 =item stream_end => $node
 
@@ -688,8 +653,7 @@ element.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/stream_end/);
-sub stream_end {
+sub stream_end : event_cb {
    my ($self) = @_;
 
    if ($self->{disconnect_timer}) {
@@ -711,8 +675,7 @@ C<$node> is an L<AnyEvent::XMPP::Node> object.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/recv_stanza_xml/);
-sub recv_stanza_xml {
+sub recv_stanza_xml : event_cb {
    my ($self, $node) = @_;
 
    if ($DEBUG) {
@@ -730,8 +693,7 @@ For a 100% coverage always use the C<debug_send> event!
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/sent_stanza_xml/);
-sub sent_stanza_xml {
+sub sent_stanza_xml : event_cb {
    my ($self, $data) = @_;
 
    if ($DEBUG) {
@@ -750,8 +712,7 @@ The attached meta information is an object of type L<AnyEvent::XMPP::Meta>.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/recv/);
-sub recv {
+sub recv : event_cb {
    my ($self, $node) = @_;
 }
 
@@ -764,9 +725,31 @@ You may attach a meta information object of L<AnyEvent::XMPP::Meta> to the C<$no
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/send/);
-sub send {
+sub send : event_cb(ext_after) {
    my ($self, $node) = @_;
+
+   if ($node->meta->sent_cbs) {
+      push @{$self->{write_done_queue}}, $node->meta->sent_cbs
+   }
+
+   if ((defined $node->meta->{lang})
+       && $node->meta->{lang} ne $self->{default_stream_lang}) {
+
+      $node->attr_ns (xml => lang => $node->{meta}->{lang});
+   }
+
+   $node->meta->{lang} = $self->{default_stream_lang}
+      unless defined $node->meta->{lang};
+
+   $self->write_data (
+      my $stanza_data =
+         $node->as_string (0, {
+            %{$self->{namespace_prefixes}},
+            STREAM_NS => $self->{default_stream_namespace}
+         })
+   );
+
+   $self->sent_stanza_xml ($stanza_data);
 }
 
 =item send_buffer_empty
@@ -791,8 +774,7 @@ when the data for a stanza has been sent out.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/send_buffer_empty/);
-sub send_buffer_empty { }
+sub send_buffer_empty : event_cb { }
 
 =item debug_recv => $data
 
@@ -801,8 +783,7 @@ has been received. C<$data> is the received unicode character data chunk.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/debug_recv/);
-sub debug_recv {
+sub debug_recv : event_cb {
    my ($self, $data) = @_;
 
    if ($DEBUG > 10) {
@@ -817,8 +798,7 @@ C<$data> is sent outward.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/debug_send/);
-sub debug_send {
+sub debug_send : event_cb {
    my ($self, $data) = @_;
 
    if ($DEBUG > 10) {

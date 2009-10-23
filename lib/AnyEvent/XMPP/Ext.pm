@@ -31,7 +31,7 @@ a list of namespace URIs of the features that the extension enables.
 sub new {
    my $this = shift;
    my $class = ref($this) || $this;
-   my $self = $class->SUPER::new (@_, enable_methods => 1);
+   my $self = $class->SUPER::new (@_);
 
    if ($self->disco_feature) {
       my @own_disco_feat = $self->disco_feature;

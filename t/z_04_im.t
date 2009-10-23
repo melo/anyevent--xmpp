@@ -11,7 +11,7 @@ use JSON -convert_blessed_universally;
 
 AnyEvent::XMPP::Test::check ('client');
 
-print "1..2\n";
+print "1..1\n";
 
 my $im = AnyEvent::XMPP::IM->new;
 

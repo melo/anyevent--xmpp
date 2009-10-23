@@ -269,19 +269,19 @@ sub has_roster_for {
 
 =cut
 
-sub fetched { }
+sub fetched : event_cb { }
 
 =item change => $jid, $item_jid, $old_item, $new_item
 
 =cut
 
-sub change { }
+sub change : event_cb { }
 
 =item gone => $jid
 
 =cut
 
-sub gone { }
+sub gone : event_cb { }
 
 =item fetch_error => $jid, $error
 
@@ -291,7 +291,7 @@ C<$jid> is the resource on which the fetch failed.
 
 =cut
 
-sub fetch_error { }
+sub fetch_error : event_cb { }
 
 =back
 

@@ -183,7 +183,6 @@ sub new {
          'jabber:component:connect' => 1,
       },
       @_,
-      enable_methods => 1,
    );
    bless $self, $class;
 
@@ -501,10 +500,10 @@ are emitted by the parser:
 
 =cut
 
-sub stream_start { }
-sub stream_end { }
-sub recv { }
-sub feed_text { }
+sub stream_start : event_cb { }
+sub stream_end : event_cb { }
+sub recv : event_cb { }
+sub feed_text : event_cb { }
 
 =back
 

@@ -567,17 +567,17 @@ to the presence.
 
 =cut
 
-sub generated_presence { }
+sub generated_presence : event_cb { }
 
-sub self { }
+sub self : event_cb { }
 
-sub change { }
+sub change : event_cb { }
 
-sub subscription_request { }
+sub subscription_request : event_cb { }
 
-sub subscribed { }
+sub subscribed : event_cb { }
 
-sub unsubscribed { }
+sub unsubscribed : event_cb { }
 
 =back
 

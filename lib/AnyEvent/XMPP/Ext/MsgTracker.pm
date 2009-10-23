@@ -124,7 +124,7 @@ the resource went offline.
 
 =cut
 
-sub destination_change {
+sub destination_change : event_cb {
    my ($self, $resjid, $bare_jid, $full_jid) = @_;
 
    if (defined $full_jid) {

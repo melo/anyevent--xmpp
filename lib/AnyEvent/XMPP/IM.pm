@@ -6,10 +6,6 @@ use AnyEvent::XMPP::Node qw/simxml/;
 use AnyEvent::XMPP::Util qw/node_jid stringprep_jid is_bare_jid new_message/;
 use base qw/AnyEvent::XMPP::CM/;
 
-__PACKAGE__->inherit_event_methods_from (qw/
-   AnyEvent::XMPP::CM
-/);
-
 our $VERSION = '0.1';
 
 =head1 NAME

@@ -12,23 +12,13 @@ use AnyEvent::XMPP::Error;
 use AnyEvent::XMPP::ResourceManager;
 use Carp qw/croak/;
 
+use Object::Event;
+
 use base qw/
    AnyEvent::XMPP::Stream
    AnyEvent::XMPP::StanzaHandler
    AnyEvent::XMPP::Extendable
 /;
-
-__PACKAGE__->inherit_event_methods_from (qw/
-   AnyEvent::XMPP::Stream
-   AnyEvent::XMPP::StanzaHandler
-   AnyEvent::XMPP::Extendable
-/);
-
-__PACKAGE__->hand_event_methods_down_from (qw/
-   AnyEvent::XMPP::Stream
-   AnyEvent::XMPP::StanzaHandler
-   AnyEvent::XMPP::Extendable
-/);
 
 our $DEBUG = 0;
 
@@ -383,8 +373,6 @@ sub new {
       }
    );
 
-   AnyEvent::XMPP::StanzaHandler::init ($self);
-
    return $self;
 }
 
@@ -578,8 +566,7 @@ L<AnyEvent::XMPP::Ext::Registration>.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/pre_authentication/);
-sub pre_authentication { }
+sub pre_authentication : event_cb { }
 
 =item stream_ready
 
@@ -588,8 +575,7 @@ was bound.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/stream_ready/);
-sub stream_ready { 
+sub stream_ready : event_cb { 
    my ($self) = @_;
 
    $self->source_available (stringprep_jid $self->{jid});
@@ -619,8 +605,7 @@ it are defaulted to the server JID (C<src>) and your full JID (C<dest>).
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/recv/);
-sub recv {
+sub recv : event_cb {
    my ($self, $node) = @_;
 
    unless ($self->is_ready) {
@@ -680,7 +665,7 @@ sub recv {
    }
 }
 
-sub send {
+sub send : event_cb {
    my ($self, $node) = @_;
 
    $self->{tracker}->register ($node);
@@ -693,8 +678,7 @@ This event is used to drive the handshake process.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/recv_features/);
-sub recv_features { }
+sub recv_features : event_cb { }
 
 =item source_available => $jid
 
@@ -705,8 +689,7 @@ of the L<AnyEvent::XMPP::Delivery> interface.
 
 =cut
 
-__PACKAGE__->hand_event_methods_down (qw/source_available/);
-sub source_available { }
+sub source_available : event_cb { }
 
 =item source_unavailable => $jid
 
@@ -718,13 +701,12 @@ interface.
 
 =cut
 
-sub disconnected {
+sub disconnected : event_cb {
    my ($self) = @_;
    $self->source_unavailable (stringprep_jid $self->{jid});
 }
 
-__PACKAGE__->hand_event_methods_down (qw/source_unavailable/);
-sub source_unavailable { }
+sub source_unavailable : event_cb { }
 
 =back
 
