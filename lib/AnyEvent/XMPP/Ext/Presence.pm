@@ -327,7 +327,7 @@ sub set_default {
 
 sub set_presence {
    my ($self, $jid, @args) = @_;
-   
+
    if (@args) {
       $self->{set}->{stringprep_jid $jid} = [@args];
    } else {

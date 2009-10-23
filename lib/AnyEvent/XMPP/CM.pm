@@ -1,12 +1,17 @@
 package AnyEvent::XMPP::CM;
 use strict;
 no warnings;
-use AnyEvent::XMPP::Util qw/prep_bare_jid new_iq new_presence stringprep_jid/;
+use AnyEvent::XMPP::Util qw/prep_bare_jid new_iq new_presence stringprep_jid dump_twig_xml/;
 use AnyEvent::XMPP::Stream::Client;
 use AnyEvent::XMPP::Node qw/simxml/;
 use base qw/Object::Event AnyEvent::XMPP::StanzaHandler AnyEvent::XMPP::Extendable/;
 
 __PACKAGE__->inherit_event_methods_from (qw/
+   AnyEvent::XMPP::StanzaHandler
+   AnyEvent::XMPP::Extendable
+/);
+
+__PACKAGE__->hand_event_methods_down_from (qw/
    AnyEvent::XMPP::StanzaHandler
    AnyEvent::XMPP::Extendable
 /);
@@ -25,8 +30,9 @@ This class acts as highlevel XMPP client connection manager.
 It poses as connection manager to multiple XMPP accounts and does things
 such as reconnecting with exponential backoff.
 
-It inherits the L<AnyEvent::XMPP::StanzaHandler> interface and interface, and
-can be extended using the L<AnyEvent::XMPP::Extendable> interface.
+This class implements the delivery interface C<AnyEvent::XMPP::Delivery>, it
+inherits the L<AnyEvent::XMPP::StanzaHandler> interface, and can be extended
+using the L<AnyEvent::XMPP::Extendable> interface.
 
 =head2 METHODS
 
@@ -87,6 +93,7 @@ C<src> (See also L<AnyEvent::XMPP::Meta>).
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/send/);
 sub send {
    my ($self, $node) = @_;
 
@@ -96,6 +103,7 @@ sub send {
       my ($any) = (values %{$self->{conns}});
       $src_jid = $any->jid if $any
    }
+
 
    my $con = $self->get_connection ($src_jid);
    unless ($con) {
@@ -124,7 +132,7 @@ sub add_account {
       %args
    };
 
-   $self->update_connections;
+   $self->update_connections unless $self->{upd_inhib};
 }
 
 =item $cm->remove_account ($jid)
@@ -161,6 +169,8 @@ sub set_accounts {
 
    $self->{accs} = {};
 
+   local $self->{upd_inhib} = 1; # to prevent add_account from updating
+
    for my $jid (keys %accs) {
       my ($pw, $args) = ref $accs{$jid} ? @{$accs{$jid}} : ($accs{$jid}, {});
       $self->add_account ($jid, $pw, %$args);
@@ -188,6 +198,8 @@ sub spawn_connection {
       AnyEvent::XMPP::Stream::Client->new (%{$self->{accs}->{$jid}});
    $conhdl->{imhp}->{timeout} = $self->{initial_reconnect_interval};
 
+   $self->spawned ($jid, $conhdl);
+
    $conhdl->{imhp}->{regid} = $conhdl->reg_cb (
       stream_ready => sub {
          my ($con, $njid) = @_;
@@ -202,11 +214,16 @@ sub spawn_connection {
 
          _install_retry ($conhdl);
 
-         $self->connect_error ($jid, $msg, $conhdl->{imhp}->{timeout});
+         $self->error ($jid,
+            AnyEvent::XMPP::Error::CM::Connect->new (text =>
+               $msg
+               . ", reconnect in "
+               . $conhdl->{imhp}->{timeout}
+               . " seconds"));
       },
       error => sub {
          my ($con, $error) = @_;
-         $self->error ($con->jid, $error);
+         $self->error ($jid, $error);
          $con->stop_event;
       },
       recv => -1 => sub {
@@ -219,6 +236,7 @@ sub spawn_connection {
 
          _install_retry ($conhdl);
 
+         # FIXME: the remove account triggers a reconnect here!
          $self->disconnected ($jid, $h, $p, $reason, $conhdl->{imhp}->{timeout});
       },
       source_unavailable => sub {
@@ -241,7 +259,8 @@ sub remove_connection {
    my ($self, $jid) = @_;
 
    $jid = prep_bare_jid $jid;
-   my $c = delete $self->{conns}->{$jid};
+   my $c = delete $self->{conns}->{$jid}
+      or return;
    $c->disconnect ('removed account');
    $c->unreg_cb ($c->{imhp}->{regid});
    delete $c->{imhp};
@@ -257,7 +276,7 @@ sub update_connections {
    }
 
    for (keys %{$self->{accs}}) {
-      unless ($self->{conns}->{$_}) {
+      unless (exists $self->{conns}->{$_}) {
          $self->spawn_connection ($_);
       }
    }
@@ -281,6 +300,61 @@ sub get_connection {
    $c
 }
 
+=item $im->enable_debug_logging ($enabled, [$format])
+
+This method will enable the debugging event C<debug_log>,
+which will log all sent and received XML stanzas in text form.
+
+If C<$enabled> is true the logging will be enabled, and if it
+is false it will be disabled.
+
+If C<$format> is true the debugging output you receive will
+be pretty-printed. You will need L<XML::Twig> for this to work.
+
+=cut
+
+sub install_debug_logs {
+   my ($self) = @_;
+
+   unless ($self->{debug_log}) {
+      delete $self->{debug_log_cbs};
+      return;
+   }
+
+   for my $j (keys %{$self->{conns}}) {
+      unless ($self->{debug_log_cbs}->{$j}) {
+         $self->{debug_log_cbs}->{$j} =
+            $self->{conns}->{$j}->reg_cb (
+               recv_stanza_xml => sub {
+                  my ($con, $node) = @_;
+
+                  $self->debug_log ($j, 'recv',
+                     $self->{debug_format}
+                        ? dump_twig_xml ($node->raw_string)
+                        : $node->raw_string);
+               },
+               sent_stanza_xml => sub {
+                  my ($con, $data) = @_;
+
+                  $self->debug_log ($j, 'sent',
+                     $self->{debug_format}
+                        ? dump_twig_xml ($data)
+                        : $data);
+               },
+            );
+      }
+   }
+}
+
+sub enable_debug_logging {
+   my ($self, $enable, $format) = @_;
+
+   $self->{debug_log} = $enable;
+   $self->{debug_format} = $format;
+
+   $self->install_debug_logs;
+}
+
 =back
 
 =head1 EVENTS
@@ -296,6 +370,7 @@ was initiated and everything is ready to send CM stanzas (iq, presence, messages
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/connected/);
 sub connected {
    my ($self, $jid, $ph, $pp) = @_;
 
@@ -309,33 +384,18 @@ sub connected {
 =item error => $jid, $error
 
 This event is emitted when an error occurred on the connection to the account C<$jid>.
+Please note that also connect errors are reported here!
 
 FIXME: Put error event doc from ::Stream here.
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/error/);
 sub error {
    my ($self, $jid, $error) = @_;
 
    if ($DEBUG) {
       print "$jid: ERROR: " . $error->string . "\n";
-   }
-}
-
-=item connect_error => $jid, $reason, $reconnect_timeout
-
-This error is emitted when a problem occurred while the TCP connection
-was being made. C<$jid> is the account, C<$reason> is the human readable error
-message and C<$reconnect_timeout> contains the seconds to the next
-retry.
-
-=cut
-
-sub connect_error {
-   my ($self, $jid, $reason, $recon_tout) = @_;
-
-   if ($DEBUG) {
-      print "$jid: CONNECT ERROR: $reason, reconnect in $recon_tout seconds.\n";
    }
 }
 
@@ -347,6 +407,7 @@ C<$reconnect_timeout> seconds.
 
 =cut
 
+__PACKAGE__->hand_event_methods_down (qw/disconnected/);
 sub disconnected {
    my ($self, $jid, $ph, $pp, $reason, $recontout) = @_;
 
@@ -356,6 +417,39 @@ sub disconnected {
    }
 }
 
+=item spawned => $jid, $con
+
+This event is emitted whenever a connection object (C<$con>) was created
+for the account C<$jid>. You may use this to install debug logging
+or some other specialized stuff.
+
+=cut
+
+__PACKAGE__->hand_event_methods_down (qw/spawned/);
+sub spawned {
+   my ($self, $jid, $con) = @_;
+   $self->install_debug_logs;
+}
+
+=item debug_log => $jid, $direction, $text
+
+This event is emitted when debug logging has been enabled via
+C<enable_debug_logging>. C<$jid> is the account JID where the
+stanza was received or sent.
+
+C<$direction> is either C<sent> or C<recv>.
+
+C<$text> is the text of the stanza.
+
+=cut
+
+__PACKAGE__->hand_event_methods_down (qw/debug_log/);
+sub debug_log {
+}
+
+__PACKAGE__->hand_event_methods_down (qw/
+   source_available source_unavailable recv
+/);
 sub source_available   { }
 sub source_unavailable { }
 sub recv { }
@@ -376,5 +470,9 @@ This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
 
 =cut
+
+package AnyEvent::XMPP::Error::CM::Connect;
+use strict;
+use base qw/AnyEvent::XMPP::Error/;
 
 1;

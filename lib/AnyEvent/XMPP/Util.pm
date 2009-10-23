@@ -448,9 +448,16 @@ sub dump_twig_xml {
    my $t = XML::Twig->new;
    if ($t->safe_parse ("<deb>$data</deb>")) {
       $t->set_pretty_print ('indented');
-      return ($t->sprint . "\n");
+      my $tx = $t->sprint;
+      $tx =~ s/^\s*<deb>\n?//;
+      $tx =~ s/<\/deb>\s*$//;
+      if ($tx =~ /^(\s+)\S/) {
+         my $indent = $1;
+         $tx =~ s/^\Q$indent\E//mg;
+      }
+      return "$tx\n"
    } else {
-      return "$data\n";
+      return "$data\n"
    }
 }
 

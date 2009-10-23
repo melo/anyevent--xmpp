@@ -96,14 +96,14 @@ sub new {
       @_
    );
 
-   $self->{disco}   = $self->{im}->add_ext ('Disco');
-   $self->{version} = $self->{im}->add_ext ('Version');
-   $self->{pres}    = $self->{im}->add_ext ('Presence');
-   $self->{rost}    = $self->{im}->add_ext ('Roster');
-   $self->{delay}   = $self->{im}->add_ext ('Delay');
-   $self->{lang}    = $self->{im}->add_ext ('LangExtract');
-   $self->{track}   = $self->{im}->add_ext ('MsgTracker');
-   $self->{muc}     = $self->{im}->add_ext ('MUC');
+   $self->{disco}   = $self->add_ext ('Disco');
+   $self->{version} = $self->add_ext ('Version');
+   $self->{pres}    = $self->add_ext ('Presence');
+   $self->{rost}    = $self->add_ext ('Roster');
+   $self->{delay}   = $self->add_ext ('Delay');
+   $self->{lang}    = $self->add_ext ('LangExtract');
+   $self->{track}   = $self->add_ext ('MsgTracker');
+   $self->{muc}     = $self->add_ext ('MUC');
 
    $self->init_exts;
 
@@ -164,17 +164,17 @@ sub send_message {
       new_message (chat => $msg, src => $resjid, to => $tojid));
 }
 
-=item my $nick = $im->nickname_for_jid ($jid)
+=item my $nick = $im->nickname_for_jid ($accountjid, $jid)
 
-This method will give you a nickname for the C<$jid>.
-The nickname you set in the roster will be checked, and if
-none is set some other default will be used (for instance the node
-part of the JID).
+This method will give you a nickname for the C<$jid> for the account
+C<$accountjid>.  The nickname you set in the roster will be checked, and if
+none is set some other default will be used (for instance the node part of the
+JID).
 
 =cut
 
 sub nickname_for_jid {
-   my ($self, $nick) = @_;
+   my ($self, $resjid, $jid) = @_;
 
    my $item = $self->{rost}->get ($resjid, $jid)
       or return node_jid ($jid);
