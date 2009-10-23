@@ -21,15 +21,18 @@ AnyEvent::XMPP::CM - An instant messaging connection manager
 
 =head2 DESCRIPTION
 
-This class acts as highlevel XMPP client. It poses as
-connection manager to multiple XMPP accounts and does things
+This class acts as highlevel XMPP client connection manager.
+It poses as connection manager to multiple XMPP accounts and does things
 such as reconnecting with exponential backoff.
+
+It inherits the L<AnyEvent::XMPP::StanzaHandler> interface and interface, and
+can be extended using the L<AnyEvent::XMPP::Extendable> interface.
 
 =head2 METHODS
 
 =over 4
 
-=item my $im = AnyEvent::XMPP::CM->new (%args)
+=item my $cm = AnyEvent::XMPP::CM->new (%args)
 
 This is the constructor for an L<AnyEvent::XMPP::CM> objects.
 
@@ -76,7 +79,7 @@ sub new {
    return $self
 }
 
-=item $im->send ($node)
+=item $cm->send ($node)
 
 This method will send the XMPP stanza C<$node>. The connection
 that is used to send the message is determined by the meta value
@@ -104,7 +107,7 @@ sub send {
    $con->send ($node);
 }
 
-=item $im->add_account ($jid, $pw, %args)
+=item $cm->add_account ($jid, $pw, %args)
 
 This method adds an account and will try to initiate a connection immediately.
 C<$jid> is the JID of the account, C<$pw> is the password and C<%args> are
@@ -124,7 +127,7 @@ sub add_account {
    $self->update_connections;
 }
 
-=item $im->remove_account ($jid)
+=item $cm->remove_account ($jid)
 
 This method removes the account C<$jid> and it's connection
 if it exists.
@@ -138,7 +141,7 @@ sub remove_account {
    $self->remove_connection ($jid);
 }
 
-=item $im->set_accounts (%accs)
+=item $cm->set_accounts (%accs)
 
 This method sets a bunch of accounts that should be connected.
 The keys for the C<%accs> hash are the bare JIDs of the accounts.
@@ -227,7 +230,7 @@ sub spawn_connection {
    $conhdl->connect;
 }
 
-=item $im->remove_connection ($jid)
+=item $cm->remove_connection ($jid)
 
 This method will forcefully remove the connection for the account C<$jid> and
 reconnect it.
@@ -260,7 +263,7 @@ sub update_connections {
    }
 }
 
-=item my $con = $im->get_connection ($jid)
+=item my $con = $cm->get_connection ($jid)
 
 Returns the L<AnyEvent::XMPP::Stream::Client> object
 for the account C<$jid>.

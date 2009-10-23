@@ -97,10 +97,12 @@ sub send {
    my ($self, $node) = @_;
 
    my $src = $node->meta->{src};
-   my $to  = $node->attr ('to');
+   my $to  = stringprep_jid $node->attr ('to');
 
    if (exists $self->{t}->{$src}
        && exists $self->{t}->{$src}->{$to}) {
+
+      # only adjust to for bare JIDs in $to!
 
       $node->attr ('to', $self->{t}->{$src}->{$to});
    }

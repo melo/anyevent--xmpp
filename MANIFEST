@@ -42,6 +42,7 @@ lib/AnyEvent/XMPP/Ext/Presence.pm
 lib/AnyEvent/XMPP/Ext/Roster.pm
 lib/AnyEvent/XMPP/Ext/Skel.pm
 lib/AnyEvent/XMPP/CM.pm
+lib/AnyEvent/XMPP/IM.pm
 lib/AnyEvent/XMPP/IQTracker.pm
 lib/AnyEvent/XMPP/Meta.pm
 lib/AnyEvent/XMPP/ResourceManager.pm

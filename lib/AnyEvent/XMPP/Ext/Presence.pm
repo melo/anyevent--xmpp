@@ -199,15 +199,15 @@ sub _to_pres_struct {
 
    my $struct = { };
 
-   my (@show)   = $node->find_all ([qw/stanza show/]);
-   my (@prio)   = $node->find_all ([qw/stanza priority/]);
+   my (@show) = $node->find_all ([qw/stanza show/]);
+   my (@prio) = $node->find_all ([qw/stanza priority/]);
 
-   $struct->{jid}      = defined $jid ? $jid : $node->attr ('from');
-   $struct->{show}     =
+   $struct->{jid}  = defined $jid ? $jid : $node->attr ('from');
+   $struct->{show} =
       @show
          ? $show[0]->text
          : ($node->attr ('type') eq 'unavailable' ? 'unavailable' : 'available');
-   $struct->{priority}   = @prio ? $prio[0]->text : 0;
+   $struct->{priority} = @prio ? $prio[0]->text : 0;
 
    # in case we sent this stanza:
    if (not (defined ($node->meta->{status})) && $node->find (stanza => 'status')) {
