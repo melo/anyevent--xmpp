@@ -18,7 +18,7 @@ WriteMakefile(
         'Unicode::Stringprep'=> 0,
         'Authen::SASL'       => 0,
         'Digest::SHA1'       => 0,
-        'Object::Event'      => 0,
+        'Object::Event'      => 1.2,
         'Time::Local'        => 0,
     },
     dist                => {
