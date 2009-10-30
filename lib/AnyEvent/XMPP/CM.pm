@@ -167,6 +167,14 @@ sub set_accounts {
    $self->update_connections;
 }
 
+=item my (@jids) = $cm->get_accounts ()
+
+This method returns the stringprep'ed bare JIDs of all configured accounts.
+
+=cut
+
+sub get_accounts { keys %{$_[0]->{accs} || {}} }
+
 sub _install_retry {
    my ($conhdl) = @_;
 
