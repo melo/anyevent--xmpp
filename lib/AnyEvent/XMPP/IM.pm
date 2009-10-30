@@ -56,6 +56,8 @@ to a server.
 
 =back
 
+For further details please consult the documentation of the extensions.
+
 =head2 METHODS
 
 =over 4
@@ -122,7 +124,7 @@ sub init_exts {
    $self->{delay}->enable_unix_timestamp;
 }
 
-=item $im->send_message ($from_jid, $to_jid, $msg)
+=item my ($private, $src_jid) = $im->send_message ($from_jid, $to_jid, $msg)
 
 This method will send a text message C<$msg> from your account C<$from_jid> to
 the JID C<$to_jid>.
@@ -136,6 +138,14 @@ the JID of a MUC room you are joined.
 In case C<$to_jid> is a bare JID it will also do the 'right thing' in case you
 have a conversation with it. (The messages will be sent using the
 L<AnyEvent::XMPP::Ext::MsgTracker> extension).
+
+The method returns a true value in C<$private> if the message that was sent
+privately to someone (in which case you will not get an echo back from
+somewhere). C<$private> is false if it was delivered to a groupchat, where you
+will get an echo from the MUC Room.
+
+In C<$src_jid> the actual source resource JID of your XMPP account will be
+returned, where the message was actually sent from.
 
 =cut
 
@@ -153,11 +163,12 @@ sub send_message {
 
       $self->{im}->send (
          new_message (groupchat => $msg, src => $resjid, to => $tojid));
-      return;
+      return (0, $resjid);
    }
 
    $self->{track}->send (
       new_message (chat => $msg, src => $resjid, to => $tojid));
+   (1, $resjid)
 }
 
 =item my $nick = $im->nickname_for_jid ($accountjid, $jid)
