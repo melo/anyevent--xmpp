@@ -1,4 +1,4 @@
-#!perl -T
+#!perl
 
 my @MODULES = qw/
 AnyEvent::XMPP::Parser
