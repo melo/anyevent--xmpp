@@ -155,6 +155,7 @@ sub _analyze_stanza {
    return if $meta->{error};
 
    my $from   = stringprep_jid $node->attr ('from');
+print STDERR "!!! PRESENCE UPDATE !!! '$from' - '".$node->attr('from')."'\n\n";
    my $to     = stringprep_jid $node->attr ('to');
 
    $to = $resjid unless defined $to;
@@ -166,6 +167,7 @@ sub _analyze_stanza {
    }
 
    if ($meta->{presence}) {
+     print STDERR "!!! change event prep '$from'\n\n";
       $self->_int_upd_presence (
          $resjid, $from, $meta->{is_resource_presence}, _to_pres_struct ($node));
 

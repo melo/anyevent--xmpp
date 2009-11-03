@@ -604,7 +604,7 @@ sub as_string {
       # mostly a hack around XMPP's crazy default namespacing:
       # replace 'ae:xmpp:stream:default_ns':
       $ns = $stream_ns if defined $stream_ns && ($ns eq xmpp_ns ('stanza'));
-
+      
       unless (exists $subdecls->{$ns}) {
          my $pref = $subdecls->{$ns} = 'ns' . ++$idcnt;
          unshift @attrs, [$pref, $ns, 'xmlns']
@@ -623,9 +623,12 @@ sub as_string {
 
       if ($ans ne $ns) { # optimisation: attributes without prefix have
                          # the namespace of the element they are in
-         if (exists $subdecls->{$ans}) {
-            $pref = $subdecls->{$ans};
 
+         if ($ans eq 'http://www.w3.org/XML/1998/namespace') {
+            $pref = 'xml';
+         }
+         elsif (exists $subdecls->{$ans}) {
+            $pref = $subdecls->{$ans};
          } else { 
             $pref = $subdecls->{$ans} = 'ns' . ++$idcnt;
             unshift @attrs, [$pref, $ans, 'xmlns']
